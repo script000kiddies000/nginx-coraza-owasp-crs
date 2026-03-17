@@ -1,0 +1,10 @@
+# Cursor / IDE
+.cursor/
+
+# Local logs / runtime
+logs/*
+
+# Blueprints / research notes
+blueprint*
+
+

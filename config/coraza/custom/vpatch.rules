@@ -1,0 +1,93 @@
+# Coraza Virtual Patching rules
+#
+# Tempat untuk menaruh patch spesifik CVE / aplikasi tanpa harus mengubah kode
+# aplikasi di belakang reverse proxy. Contoh-contoh di bawah bersifat ilustratif,
+# silakan sesuaikan dengan kebutuhan target sebenarnya.
+
+# vPatch example: block legacy admin endpoint completely
+
+
+# WafX Virtual Patching Rules — auto-generated, do not edit manually
+# Generated: 2026-03-09 04:30:33
+
+# CVE-2024-3400 — Palo Alto PAN-OS Command Injection [critical]
+# CVE-2024-3400 — PAN-OS GlobalProtect command injection
+SecRule REQUEST_URI "@rx (?i)/global-protect/login\.esp|/ssl-vpn/hipreport\.esp" \
+    "id:9900015,phase:1,pass,log,msg:'CVE-2024-3400 PAN-OS GlobalProtect endpoint',tag:'CVE-2024-3400',chain"
+SecRule REQUEST_COOKIES|ARGS "@rx (?i)[;\|&$\(\)]\s*\w+\s*=" \
+    "deny,status:403,msg:'CVE-2024-3400 OS command injection in session parameter'"
+
+# CVE-2024-21762 — Fortinet SSL-VPN Out-of-Bounds Write RCE [critical]
+# CVE-2024-21762 — Fortinet SSL VPN RCE
+SecRule REQUEST_URI "@rx (?i)/remote/hostcheck_validate|/remote/login\?lang=" \
+    "id:9900014,phase:1,deny,status:403,log,msg:'CVE-2024-21762 Fortinet SSL-VPN probe blocked',tag:'CVE-2024-21762',severity:'CRITICAL'"
+
+# CVE-2023-44487 — HTTP/2 Rapid Reset (DoS) [high]
+# CVE-2023-44487 — HTTP/2 Rapid Reset monitoring
+# Primary mitigation: nginx http2_max_concurrent_streams + limit_conn
+# This rule logs excessive reset patterns for alerting
+SecRule REQUEST_METHOD "@rx ^(GET|HEAD|POST|PUT|DELETE|PATCH|OPTIONS)$" \
+    "id:9900013,phase:1,pass,log,msg:'CVE-2023-44487 HTTP/2 Rapid Reset monitoring active',tag:'CVE-2023-44487'"
+
+# CVE-2022-40684 — Fortinet Auth Bypass [critical]
+# CVE-2022-40684 — Fortinet FortiOS auth bypass
+SecRule REQUEST_HEADERS:Forwarded "@rx (?i)for=\[" \
+    "id:9900012,phase:1,deny,status:403,log,msg:'CVE-2022-40684 Fortinet auth bypass header pattern',tag:'CVE-2022-40684',severity:'CRITICAL'"
+
+# CVE-2022-1388 — F5 BIG-IP iControl Auth Bypass [critical]
+# CVE-2022-1388 — F5 BIG-IP auth bypass
+SecRule REQUEST_URI "@rx (?i)/mgmt/tm/util/bash|/mgmt/shared/authn/login" \
+    "id:9900011,phase:1,pass,log,msg:'CVE-2022-1388 F5 BIG-IP mgmt endpoint',tag:'CVE-2022-1388',chain"
+SecRule REQUEST_HEADERS:X-F5-Auth-Token "@rx .+" \
+    "deny,status:403,msg:'CVE-2022-1388 suspicious F5 auth token header'"
+
+# CVE-2021-3129 — Laravel Ignition RCE [critical]
+# CVE-2021-3129 — Laravel Ignition RCE
+SecRule REQUEST_URI "@rx (?i)/_ignition/execute-solution" \
+    "id:9900010,phase:1,deny,status:403,log,msg:'CVE-2021-3129 Laravel Ignition endpoint blocked',tag:'CVE-2021-3129',severity:'CRITICAL'"
+
+# CVE-2023-34362 — MOVEit SQL Injection [critical]
+# CVE-2023-34362 — MOVEit Transfer SQLi
+SecRule REQUEST_URI "@rx (?i)/moveit/|/api/v1/token\b" \
+    "id:9900009,phase:1,pass,log,msg:'CVE-2023-34362 MOVEit endpoint access',tag:'CVE-2023-34362',chain"
+SecRule ARGS|REQUEST_BODY "@rx (?i)(?:union\s+(?:all\s+)?select|drop\s+table|insert\s+into|exec\s*\(|xp_cmdshell)" \
+    "deny,status:403,msg:'CVE-2023-34362 MOVEit SQLi payload'"
+
+# CVE-2022-26134 — Confluence OGNL Pre-Auth RCE [critical]
+# CVE-2022-26134 — Confluence pre-auth OGNL RCE
+SecRule REQUEST_URI "@rx (?i)\$\{[^}]*\}|\%24\{[^%]*\%7[dD]" \
+    "id:9900008,phase:1,deny,status:403,log,msg:'CVE-2022-26134 Confluence pre-auth OGNL RCE',tag:'CVE-2022-26134',severity:'CRITICAL'"
+
+# CVE-2021-41773 — Apache HTTP Server Path Traversal [high]
+# CVE-2021-41773 — Apache 2.4.49 path traversal
+SecRule REQUEST_URI "@rx (?i)\.\.%2[fF]|\.\.%5[cC]|%2[eE]%2[eE]%2[fF]|%2[eE]%2[eE]/" \
+    "id:9900007,phase:1,deny,status:403,log,msg:'[HIGH] CVE-2021-41773 Apache path traversal attempt',tag:'CVE-2021-41773,SEVERITY_HIGH',severity:'CRITICAL'"
+
+# CVE-2021-26084 — Confluence OGNL Injection [critical]
+# CVE-2021-26084 — Confluence OGNL injection
+SecRule REQUEST_URI "@rx (?i)/pages/doenterpagevariables\.action|/pages/createpage-entervariables\.action" \
+    "id:9900005,phase:1,deny,status:403,log,msg:'CVE-2021-26084 Confluence OGNL injection path',tag:'CVE-2021-26084',severity:'CRITICAL'"
+SecRule ARGS "@rx (?i)\%\{|#\{|\$\{|@[a-zA-Z]" \
+    "id:9900006,phase:2,deny,status:403,log,msg:'CVE-2021-26084 OGNL expression in parameter',tag:'CVE-2021-26084',severity:'CRITICAL',chain"
+SecRule REQUEST_URI "@rx (?i)confluence" ""
+
+# CVE-2022-22963 — Spring Cloud Function SPEL RCE [critical]
+# CVE-2022-22963 — Spring Cloud Function SpEL injection
+SecRule REQUEST_HEADERS:spring\.cloud\.function\.routing-expression "@rx .+" \
+    "id:9900004,phase:1,deny,status:403,log,msg:'CVE-2022-22963 Spring Cloud SpEL header injection',tag:'CVE-2022-22963',severity:'CRITICAL'"
+
+# CVE-2022-22965 — Spring4Shell (Spring MVC RCE) [critical]
+# CVE-2022-22965 — Spring4Shell
+SecRule ARGS_NAMES "@rx (?i)class\.module\.classLoader|class\.classLoader|Class\.forName" \
+    "id:9900003,phase:2,deny,status:403,log,msg:'CVE-2022-22965 Spring4Shell classLoader injection',tag:'CVE-2022-22965',severity:'CRITICAL'"
+
+# CVE-2021-45046 — Log4j JNDI Context Lookup (Bypass) [critical]
+# CVE-2021-45046 — Log4j obfuscated JNDI bypass
+SecRule REQUEST_URI|ARGS|ARGS_NAMES|REQUEST_HEADERS "@rx (?i)\$\{[^\}]*\$\{[^\}]*\}" \
+    "id:9900002,phase:2,deny,status:403,log,msg:'CVE-2021-45046 Log4j nested expression bypass',tag:'CVE-2021-45046',severity:'CRITICAL'"
+
+# CVE-2021-44228 — Log4Shell (Log4j RCE) [critical]
+# CVE-2021-44228 — Log4Shell
+SecRule REQUEST_URI|ARGS|ARGS_NAMES|REQUEST_HEADERS|XML:/* "@rx (?i)\$\{[^\}]*(?:jndi|ldap|rmi|dns|iiop|corba|nds|http)[^\}]*\}" \
+    "id:9900001,phase:2,deny,status:403,log,msg:'CVE-2021-44228 Log4Shell JNDI injection attempt',tag:'CVE-2021-44228',severity:'CRITICAL'"
+
