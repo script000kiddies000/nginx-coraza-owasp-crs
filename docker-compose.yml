@@ -15,7 +15,8 @@ services:
       - ./config/snippets:/etc/nginx/snippets:ro
       - ./config/coraza/coraza.conf:/etc/nginx/coraza/coraza.conf:ro
       - ./config/coraza/custom:/etc/nginx/coraza/custom:ro
-      - ./config/coraza/crs:/etc/nginx/coraza/crs:ro
+      # CRS mounted as rw so entrypoint can copy crs-setup.conf from example
+      - ./config/coraza/crs:/etc/nginx/coraza/crs:rw
 
       # Logs — persistent di host
       # - access.log  → symlink ke stdout  (lihat via: docker logs nginx-coraza-crs)

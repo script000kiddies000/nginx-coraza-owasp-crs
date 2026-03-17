@@ -33,6 +33,13 @@ fi
 touch /var/log/nginx/coraza_audit.log
 chown www-data:www-data /var/log/nginx/coraza_audit.log
 
+# Pastikan CRS setup config tersedia (sering hilang saat CRS folder di-mount dari host)
+CRS_SETUP="/etc/nginx/coraza/crs/crs-setup.conf"
+CRS_SETUP_EXAMPLE="/etc/nginx/coraza/crs/crs-setup.conf.example"
+if [ ! -s "$CRS_SETUP" ] && [ -s "$CRS_SETUP_EXAMPLE" ]; then
+  cp "$CRS_SETUP_EXAMPLE" "$CRS_SETUP"
+fi
+
 # Test konfigurasi nginx sebelum start
 nginx -t
 

@@ -7,4 +7,6 @@ logs/*
 # Blueprints / research notes
 blueprint*
 
+config/coraza/crs/.git/
+
 
