@@ -65,6 +65,16 @@ Versi/komponen utama (lihat `Dockerfile`):
 - **HTTPS reverse proxy**: `https://localhost:8443/` → container `:443` (self-signed)
 - **Benchmark murni Nginx**: `http://localhost:8081/bench` → container `:81` (tanpa WAF/backend)
 
+## Static assets (bypass WAF)
+
+Untuk menghindari overhead WAF pada file statik (CSS/JS/icon/font) dan mencegah timeout saat browser
+melakukan banyak request paralel, `default.conf` menambahkan `location` yang mematikan Coraza untuk:
+
+- Path khusus: `/flasgger_static/`
+- Ekstensi umum: `css, js, map, png, jpg, gif, svg, ico, woff/woff2, ttf, eot`
+
+Jika kamu punya banyak vhost, sebaiknya jadikan ini template dan sesuaikan path static per-aplikasi.
+
 ## Cara Build & Jalankan
 
 ```powershell
