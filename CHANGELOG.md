@@ -16,12 +16,14 @@ This project does not currently enforce Semantic Versioning.
 - Virtual patching support via `config/coraza/custom/vpatch.rules` included from `config/coraza/coraza.conf`.
 - Security headers on TLS vhost (HSTS and common browser hardening headers).
 - Static assets bypass (disable Coraza) for common asset paths/extensions to reduce overhead and prevent upstream timeouts on multi-asset pages.
+- Custom Coraza rule to skip response body inspection for all `application/json` responses (keeps request-side WAF, reduces latency for large JSON APIs).
 
 ### Changed
 - Upstream proxy configured with keepalive + `proxy_http_version 1.1` + `Connection ""`.
 - Increased `worker_connections` for higher concurrency.
 - README updated with ports/endpoints, build specifications, benchmark notes, deploy section, and troubleshooting for `unknown severity: HIGH`.
 - Added root `.gitignore` to ignore `.cursor/`, `blueprint*`, `logs/`, and `extract_wafx_nginx/`.
+- entrypoint no longer rewires `access.log` / `error.log` to stdout/stderr so that Nginx logs are written as regular files under `logs/`.
 
 ### Fixed
 - Avoided Coraza parse failures by using supported severities (e.g. mapping `HIGH` labeling into `msg`/`tag` while using `severity:'CRITICAL'`).

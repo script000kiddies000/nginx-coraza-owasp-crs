@@ -1,17 +1,7 @@
 #!/bin/sh
 # entrypoint.sh — dijalankan saat container start
 #
-# MENGAPA FILE INI PERLU:
-# docker-compose volume mount menggantikan seluruh direktori /var/log/nginx
-# dengan folder host ./logs/. Symlink yang dibuat di Dockerfile layer
-# (ln -sf /dev/stdout access.log) HILANG setelah volume di-mount.
-# Entrypoint ini membuat ulang symlink SETELAH volume di-mount,
-# sehingga "docker logs" tetap menampilkan access + error log nginx.
 set -e
-
-# Recreate symlinks ke Docker log collector setelah volume mount
-ln -sf /dev/stdout /var/log/nginx/access.log
-ln -sf /dev/stderr /var/log/nginx/error.log
 
 # Generate self-signed cert untuk test HTTPS/JA3 (jika belum ada)
 CERT_DIR="/etc/nginx/certs"

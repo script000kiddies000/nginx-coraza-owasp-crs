@@ -75,6 +75,17 @@ melakukan banyak request paralel, `default.conf` menambahkan `location` yang mem
 
 Jika kamu punya banyak vhost, sebaiknya jadikan ini template dan sesuaikan path static per-aplikasi.
 
+## Response inspection (JSON vs non-JSON)
+
+Coraza diset dengan `SecResponseBodyAccess On` dan limit global 512 KB, tetapi ada rule
+custom yang **mematikan inspeksi response body untuk semua respons dengan
+`Content-Type: application/json`**. Tujuannya:
+
+- Mengurangi overhead WAF untuk API JSON besar
+- Tetap mempertahankan inspeksi response untuk konten lain (HTML, dll)
+
+Request-side WAF (phase 1/2) tetap aktif untuk semua request.
+
 ## Cara Build & Jalankan
 
 ```powershell
