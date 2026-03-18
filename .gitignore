@@ -9,4 +9,7 @@ blueprint*
 
 config/coraza/crs/.git/
 
+# Local feature notes (not for public repo)
+todo_fitur.md
+
 
