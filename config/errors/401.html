@@ -4,7 +4,34 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>401 — Unauthorized | Flux WAF</title>
-  <link rel="stylesheet" href="/errors/error.css">
+  <style>/* Flux WAF — Error Pages */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0b0e14;--surface:#141820;--border:#1f2633;--accent:#00d4aa;--accent2:#0ea5e9;--danger:#ef4444;--warn:#f59e0b;--text:#e2e8f0;--muted:#64748b;--code-bg:#0f1623}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:3rem 2.5rem;max-width:520px;width:100%;text-align:center;box-shadow:0 0 0 1px rgba(0,212,170,.06),0 24px 64px rgba(0,0,0,.5);animation:fadeUp .4s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+.icon-wrap{display:inline-flex;align-items:center;justify-content:center;width:80px;height:80px;border-radius:50%;margin-bottom:1.5rem;background:var(--code-bg);border:1.5px solid var(--border)}
+.icon-wrap svg{display:block}
+.icon-wrap.red{border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.08)}
+.icon-wrap.amber{border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.08)}
+.icon-wrap.blue{border-color:rgba(14,165,233,.35);background:rgba(14,165,233,.08)}
+.code{font-size:4rem;font-weight:800;letter-spacing:-2px;line-height:1;background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:.25rem}
+.code.red{background:linear-gradient(135deg,#ef4444,#f97316);-webkit-background-clip:text;background-clip:text}
+.code.amber{background:linear-gradient(135deg,#f59e0b,#eab308);-webkit-background-clip:text;background-clip:text}
+h1{font-size:1.35rem;font-weight:700;color:var(--text);margin-bottom:.6rem}
+p{color:var(--muted);font-size:.95rem;margin-bottom:1.5rem}
+.ref{display:flex;align-items:center;justify-content:space-between;gap:.75rem;background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:.65rem 1rem;font-size:.8rem;color:var(--muted);margin-bottom:1.75rem}
+.ref-id{font-family:"SF Mono","Fira Code","Consolas",monospace;font-size:.78rem;color:var(--accent);letter-spacing:.04em;user-select:all}
+.copy-btn{background:none;border:1px solid var(--border);color:var(--muted);border-radius:5px;padding:.2rem .55rem;font-size:.72rem;cursor:pointer;transition:border-color .2s,color .2s;white-space:nowrap}
+.copy-btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn{display:inline-flex;align-items:center;gap:.45rem;padding:.7rem 1.6rem;border-radius:8px;font-size:.9rem;font-weight:600;text-decoration:none;transition:opacity .2s,transform .15s;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0b0e14;border:none;cursor:pointer}
+.btn:hover{opacity:.88;transform:translateY(-1px)}.btn:active{transform:translateY(0)}
+.brand{margin-top:2.5rem;display:flex;align-items:center;justify-content:center;gap:.45rem;color:var(--muted);font-size:.78rem}
+.brand-name{font-weight:700;letter-spacing:.08em;color:var(--accent);font-size:.8rem}
+.dot{color:var(--border)}
+@media(max-width:480px){.card{padding:2rem 1.5rem}.code{font-size:3rem}}
+  </style>
 </head>
 <body>
   <div class="card">

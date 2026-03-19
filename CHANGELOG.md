@@ -8,6 +8,8 @@ This project does not currently enforce Semantic Versioning.
 ## Unreleased
 
 ### Added
+- **Backend Header Stripping** — snippet `config/snippets/hide-backend-headers.conf` di-include di semua server block. Strip: `X-Powered-By` (PHP/Express), `X-AspNet-Version`, `X-AspNetMvc-Version`, `X-Generator`, `X-Drupal-Cache`, `X-Drupal-Dynamic-Cache`, `X-Runtime` (Rails), `X-Varnish`, `Via`. Override `Server` header menjadi `Flux WAF`.
+- **Error pages CSS inline** — fix CSS tidak ter-load karena `location ^~ /errors/` bersifat `internal`. CSS dari `error.css` di-inline langsung ke tiap HTML file.
 - **GeoIP2 Country Blocking** — `ngx_http_geoip2_module` (MaxMind GeoLite2) dikompilasi sebagai dynamic module. Block terjadi sebelum WAF via `if ($geoip2_blocked_country)`. Country list di `config/geoip/geoip-blocked-countries.conf`. Database `.mmdb` didownload dengan `config/geoip/download-geolite2.sh <LICENSE_KEY>` (butuh akun MaxMind gratis). Butuh rebuild image Docker.
 - **Request ID / Correlation ID** — `$request_id` (built-in Nginx) di-inject ke: `access.log` via `log_format main`, response header `X-Request-ID`, `proxy_set_header X-Request-ID` ke backend, dan semua error page via `sub_filter '__REQUEST_ID__'`. ID yang tampil di halaman error sekarang identik dengan ID di log Nginx.
 - **Custom Error Pages** — `config/errors/403.html`, `429.html`, `502.html` dengan Flux WAF branding (dark theme, SVG icon, shared `error.css`). Halaman 429 memiliki countdown 30s + auto-reload. Semua halaman generate Reference ID (hex) untuk tracing. Nginx menyertakan `X-Request-ID` header di response error.
