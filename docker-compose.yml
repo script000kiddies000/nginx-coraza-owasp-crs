@@ -29,6 +29,16 @@ services:
       # - coraza_audit.log → file JSON real  (lihat via: docker exec ... tail -f)
       - ./logs:/var/log/nginx
 
+    # Perf tuning — Go runtime environment untuk Coraza WAF
+    # Revert: hapus blok environment ini jika RAM membengkak atau tidak ada perbedaan latency
+    environment:
+      # GOGC=200 → GC Coraza 2x lebih jarang, kurangi stop-the-world pause
+      # Default: 100. Trade-off: heap Go bisa naik ~20-40MB sebelum GC.
+      - GOGC=400
+      # GOMAXPROCS → paksa Go runtime pakai jumlah core yang benar di dalam container
+      # Ganti angka sesuai vCPU yang dialokasikan ke container (cek: nproc)
+      - GOMAXPROCS=4
+
     restart: unless-stopped
 
     logging:

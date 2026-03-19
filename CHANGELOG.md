@@ -8,6 +8,7 @@ This project does not currently enforce Semantic Versioning.
 ## Unreleased
 
 ### Added
+- **Performance tuning** — `multi_accept on`, `accept_mutex off`, `client_body_buffer_size 256k`, `keepalive_timeout 30`, `GOGC=400`, `GOMAXPROCS=4`. Hasil: RPS naik dari ~1100 ke ~1946 (+54% vs WAFx). Trade-off: tail latency (>90th pct) masih lebih tinggi dari WAFx (73ms vs 28ms).
 - **Backend Header Stripping** — snippet `config/snippets/hide-backend-headers.conf` di-include di semua server block. Strip: `X-Powered-By` (PHP/Express), `X-AspNet-Version`, `X-AspNetMvc-Version`, `X-Generator`, `X-Drupal-Cache`, `X-Drupal-Dynamic-Cache`, `X-Runtime` (Rails), `X-Varnish`, `Via`. Override `Server` header menjadi `Flux WAF`.
 - **Error pages CSS inline** — fix CSS tidak ter-load karena `location ^~ /errors/` bersifat `internal`. CSS dari `error.css` di-inline langsung ke tiap HTML file.
 - **GeoIP2 Country Blocking** — `ngx_http_geoip2_module` (MaxMind GeoLite2) dikompilasi sebagai dynamic module. Block terjadi sebelum WAF via `if ($geoip2_blocked_country)`. Country list di `config/geoip/geoip-blocked-countries.conf`. Database `.mmdb` didownload dengan `config/geoip/download-geolite2.sh <LICENSE_KEY>` (butuh akun MaxMind gratis). Butuh rebuild image Docker.

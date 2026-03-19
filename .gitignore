@@ -9,8 +9,9 @@ blueprint*
 
 config/coraza/crs/.git/
 
-# Local feature notes (not for public repo)
+# Local feature notes / benchmark results (not for public repo)
 todo_fitur.md
+benchmark-results.md
 
 # MaxMind GeoLite2 database (binary, tidak perlu di-commit)
 config/geoip/*.mmdb
