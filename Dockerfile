@@ -47,12 +47,12 @@ RUN git clone --depth 1 https://github.com/corazawaf/libcoraza.git && \
 FROM golang:1.25-bookworm AS builder-nginx
 
 # TODO (aktifkan saat test masing-masing modul):
-#   libgeoip-dev  → GeoIP module
 #   libgd-dev     → Image filter module
 #   libxslt-dev   → XSLT filter module
 #   libxml2-dev   → dependency xslt
 RUN apt-get update && apt-get install -y \
     build-essential libpcre3-dev zlib1g-dev libssl-dev git wget patch \
+    libmaxminddb-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Ambil libcoraza.so + header dari stage 1
@@ -82,6 +82,9 @@ RUN patch -p1 -d openssl-3.4 < nginx-ssl-fingerprint/patches/openssl.openssl-3.4
 
 # Patch 2: tambahkan fp_ja3_* fields ke ngx_ssl_connection_t di nginx 1.27
 RUN patch -p1 -d nginx-1.27.4 < nginx-ssl-fingerprint/patches/nginx-1.27.patch
+
+# ngx_http_geoip2_module: GeoIP2 MaxMind dynamic module
+RUN git clone --depth 1 https://github.com/leev/ngx_http_geoip2_module.git
 
 # coraza-nginx: nginx dynamic module yang menghubungkan nginx → libcoraza
 RUN git clone --depth 1 https://github.com/corazawaf/coraza-nginx.git
@@ -124,6 +127,7 @@ RUN ./configure \
       --with-http_realip_module \
       --with-http_sub_module \
       --add-module=../nginx-ssl-fingerprint \
+      --add-dynamic-module=../ngx_http_geoip2_module \
       --add-dynamic-module=../coraza-nginx && \
     make -j$(nproc) && \
     make install
@@ -135,6 +139,7 @@ RUN ./configure \
 #   /usr/share/nginx/modules/ngx_http_xslt_filter_module.so
 #   /usr/share/nginx/modules/ngx_stream_geoip_module.so
 RUN strip /usr/sbin/nginx \
+          /usr/share/nginx/modules/ngx_http_geoip2_module.so \
           /usr/share/nginx/modules/ngx_http_coraza_module.so
 
 # ==============================================================================
@@ -143,15 +148,15 @@ RUN strip /usr/sbin/nginx \
 FROM debian:bookworm-slim
 
 # Runtime dependencies saja (tidak ada -dev packages)
-# libssl3    → tidak wajib untuk nginx (OpenSSL di-static-link), tapi dibutuhkan tools lain
-# openssl    → untuk generate self-signed cert saat test HTTPS/JA3
+# libssl3         → tidak wajib untuk nginx (OpenSSL di-static-link), tapi dibutuhkan tools lain
+# openssl         → untuk generate self-signed cert saat test HTTPS/JA3
+# libmaxminddb0   → runtime lib untuk ngx_http_geoip2_module.so
 # TODO: aktifkan runtime libs saat modulnya aktif:
-#   libgeoip1  → ngx_http_geoip_module.so + ngx_stream_geoip_module.so
 #   libgd3     → ngx_http_image_filter_module.so
 #   libxslt1.1 → ngx_http_xslt_filter_module.so
 #   libxml2    → dependency libxslt1.1
 RUN apt-get update && apt-get install -y \
-    libpcre3 zlib1g libssl3 ca-certificates openssl \
+    libpcre3 zlib1g libssl3 ca-certificates openssl libmaxminddb0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Pastikan www-data user ada

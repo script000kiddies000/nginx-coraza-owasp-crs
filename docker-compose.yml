@@ -13,8 +13,11 @@ services:
       - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./config/conf.d:/etc/nginx/conf.d:ro
       - ./config/snippets:/etc/nginx/snippets:ro
+      - ./config/errors:/etc/nginx/errors:ro
       # Threat intel — rw karena sync_threat_intel.py nulis ip_rules.conf dari host
       - ./config/threat-intel:/etc/nginx/threat-intel:rw
+      # GeoIP2 — ro, mmdb diupdate dari host dengan download-geolite2.sh
+      - ./config/geoip:/etc/nginx/geoip:ro
       - ./config/coraza/coraza.conf:/etc/nginx/coraza/coraza.conf:ro
       - ./config/coraza/custom:/etc/nginx/coraza/custom:ro
       # CRS mounted as rw so entrypoint can copy crs-setup.conf from example

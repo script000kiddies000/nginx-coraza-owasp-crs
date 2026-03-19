@@ -3,8 +3,14 @@
 Web Application Firewall (WAF) berbasis **Nginx (custom build)** + **Coraza WAF** + **OWASP CRS v4**, dikemas dalam Docker.
 
 Fitur tambahan di repo ini:
-- **JA3 TLS fingerprint allow/deny** (via `nginx-ssl-fingerprint`)
-- **vPatch rules** (virtual patching) via Coraza `Include`
+- **JA3/JA4 TLS fingerprint allow/deny** (via `nginx-ssl-fingerprint`)
+- **GeoIP2 country blocking** (MaxMind GeoLite2, `ngx_http_geoip2_module`)
+- **Threat Intel IP blocking** (Spamhaus DROP/EDROP, Emerging Threats, AbuseIPDB)
+- **DLP rules** — block credit card, AWS key, PEM private key, SSN, API token
+- **Basic WAF rules** — SQLi, XSS, Path Traversal, RCE (direct-block sebelum CRS)
+- **vPatch rules** (virtual patching CVE) via Coraza `Include`
+- **Custom error pages** (400/401/403/404/429/500/502) dengan branding + Request ID
+- **Request ID** di log, header `X-Request-ID`, dan error page (traceable)
 - **WordPress reverse-proxy hardening snippet**
 - **HTTPS test mode** (self-signed cert auto-generated saat container start)
 - **Benchmark endpoint** tanpa WAF/backend (`/bench`)
@@ -12,38 +18,53 @@ Fitur tambahan di repo ini:
 ## Arsitektur
 
 ```
-CLIENT HTTP Request
+CLIENT REQUEST (HTTP / HTTPS)
        │
        ▼
-┌──────────────────────────────────────┐
-│        NGINX 1.27.4 (custom)         │
-│                                      │
-│  [Pre-WAF] TLS Fingerprint (HTTPS)   │
-│  └── JA3/JA4 (nginx-ssl-fingerprint) │
-│       map $http_ssl_ja3_hash → 403   │
-│                                      │
-│  [Phase 1] Request Headers / Routing │
-│  ├── WordPress hardening (snippet)   │
-│  └── Coraza (Phase 1 rules)          │
-│                                      │
-│  [Phase 2] Request Body              │
-│  ├── vPatch (custom rules)           │
-│  ├── OWASP CRS (SQLi/XSS/RCE/...)    │
-│  └── Anomaly Score ≥ 5 → 403 BLOCK  │
-│                                      │
-│  [Phase 3] Proxy / Response          │
-│  └── Reverse proxy → upstream backend│
-│      (keepalive upstream enabled)    │
-│                                      │
-│  [Phase 5] Audit Log (JSON)          │
-│  └── /var/log/nginx/coraza_audit.log │
-└──────────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│           NGINX 1.27.4 (custom build)        │
+│                                              │
+│  [Layer 1] Network — Threat Intel IP Block   │
+│  └── ip_rules.conf (Spamhaus DROP/EDROP,     │
+│      Emerging Threats, AbuseIPDB)            │
+│      → deny (TCP close, no response)         │
+│                                              │
+│  [Layer 2] GeoIP2 Country Block              │
+│  └── ngx_http_geoip2_module + GeoLite2       │
+│      $geoip2_blocked_country → 403           │
+│                                              │
+│  [Layer 3] TLS Fingerprint (HTTPS only)      │
+│  └── JA3/JA4 via nginx-ssl-fingerprint       │
+│      map $http_ssl_ja3_hash → 403            │
+│                                              │
+│  [Layer 4] Coraza WAF                        │
+│  ├── Phase 1: Headers                        │
+│  │   ├── WordPress hardening snippet         │
+│  │   ├── vPatch rules (CVE custom)           │
+│  │   └── DLP: AWS Key, PEM Private Key       │
+│  ├── Phase 2: Request Body                   │
+│  │   ├── Basic rules (SQLi/XSS/LFI/RCE)     │
+│  │   ├── DLP (Credit Card, SSN, API token)   │
+│  │   └── OWASP CRS v4 (Anomaly Score ≥5→403)│
+│  └── Phase 3: Proxy to upstream              │
+│      proxy_set_header X-Request-ID           │
+│      (keepalive upstream enabled)            │
+│                                              │
+│  [Layer 5] Custom Error Pages                │
+│  └── 400/401/403/404/429/500/502             │
+│      sub_filter → inject $request_id        │
+│                                              │
+│  [Audit] Coraza Audit Log (JSON)             │
+│  └── /var/log/nginx/coraza_audit.log         │
+│      access.log → includes $request_id      │
+└──────────────────────────────────────────────┘
        │
        ▼
  UPSTREAM / BACKEND (app/server lain)
+ Header: X-Request-ID diteruskan ke backend
 
- BENCHMARK (tanpa WAF/backend):
-   http://localhost:8081/bench → return 200 "OK\n"
+ BENCHMARK (no WAF, no backend):
+   http://localhost:8081/bench → 200 "OK\n"
 ```
 
 ## Build Specifications
@@ -181,25 +202,40 @@ docker exec nginx-coraza-crs tail -f /var/log/nginx/coraza_audit.log
 
 ```
 nginx-coroza-crs-docker/
-├── Dockerfile              # 3-stage build: libcoraza → nginx → production
-├── docker-compose.yml      # Port 8080:80, 8443:443, 8081:81 + volume mounts
-├── entrypoint.sh           # Fix log symlinks setelah volume mount
-├── logs/                   # Audit log tersimpan di sini (host)
+├── Dockerfile                    # 3-stage build: libcoraza → nginx (+ geoip2) → production
+├── docker-compose.yml            # Port 8080:80, 8443:443, 8081:81 + volume mounts
+├── entrypoint.sh                 # Self-signed cert, crs-setup.conf, ip_rules fallback
+├── logs/                         # Nginx access/error + Coraza audit log (host mount)
 ├── scripts/
-│   └── test_ja3.py          # Helper untuk uji JA3 via HTTPS
+│   ├── test_ja3.py               # Uji JA3 fingerprint via HTTPS
+│   └── sync_threat_intel.py      # Sync IP blocklist dari Spamhaus/ET/AbuseIPDB
 └── config/
-    ├── nginx.conf          # Nginx main config (load coraza module)
+    ├── nginx.conf                # load_module geoip2 + coraza, log_format (request_id)
     ├── conf.d/
-    │   └── default.conf    # Virtual host: coraza on + coraza_rules_file
+    │   └── default.conf          # Virtual host: GeoIP → JA3 → WAF → proxy
     ├── snippets/
-    │   ├── wafx-ja3-map.conf
-    │   ├── wafx-ja3-enforce.conf
-    │   └── wafx-wordpress-security.conf
+    │   ├── wafx-ja3-map.conf     # JA3 hash blocklist (map)
+    │   ├── wafx-ja3-enforce.conf # JA3 enforcement (if → 403)
+    │   ├── wafx-wordpress-security.conf
+    │   └── static-assets-bypass.conf
+    ├── errors/                   # Custom error pages (400/401/403/404/429/500/502)
+    │   ├── error.css
+    │   ├── 403.html  429.html  502.html  ...
+    ├── geoip/
+    │   ├── download-geolite2.sh          # Download GeoLite2-Country.mmdb (butuh lisensi)
+    │   ├── geoip-blocked-countries.conf  # Map ISO code → $geoip2_blocked_country
+    │   └── GeoLite2-Country.mmdb         # ← tidak di-commit, download manual
+    ├── threat-intel/
+    │   ├── threat_intel.json     # Konfigurasi feed (Spamhaus, ET, AbuseIPDB)
+    │   └── ip_rules.conf         # Output deny rules (di-generate oleh sync script)
     └── coraza/
-        ├── coraza.conf     # Coraza engine settings + OWASP CRS loader
-        ├── crs/            # OWASP CRS (mounted)
+        ├── coraza.conf           # Coraza engine settings + OWASP CRS loader
+        ├── crs/                  # OWASP CRS v4 (mounted)
         └── custom/
-            └── vpatch.rules # Virtual patch rules (custom)
+            ├── vpatch.rules      # Virtual patch rules (CVE)
+            ├── basic-rules.conf  # SQLi, XSS, Path Traversal, RCE direct-block
+            ├── dlp-rules.conf    # DLP: Credit Card, SSN, AWS Key, PEM, API token
+            └── response-json-skip.conf
 ```
 
 > **CRS Rules** (`/etc/nginx/coraza/crs/`) di-clone langsung ke dalam Docker image

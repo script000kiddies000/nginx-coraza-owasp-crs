@@ -12,4 +12,7 @@ config/coraza/crs/.git/
 # Local feature notes (not for public repo)
 todo_fitur.md
 
+# MaxMind GeoLite2 database (binary, tidak perlu di-commit)
+config/geoip/*.mmdb
+
 

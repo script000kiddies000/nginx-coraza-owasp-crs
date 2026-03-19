@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>403 — Access Denied | Flux WAF</title>
+  <link rel="stylesheet" href="/errors/error.css">
+</head>
+<body>
+  <div class="card">
+
+    <div class="icon-wrap red">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+    </div>
+
+    <div class="code red">403</div>
+    <h1>Access Denied</h1>
+    <p>Your request was blocked by Flux WAF. This may be due to a security policy violation, a blocked IP address, or a suspicious request pattern.</p>
+
+    <div class="ref">
+      <span>Reference ID</span>
+      <span class="ref-id" id="rid">__REQUEST_ID__</span>
+      <button class="copy-btn" onclick="copyRef()">Copy</button>
+    </div>
+
+    <a class="btn" href="javascript:history.back()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+      Go Back
+    </a>
+
+  </div>
+
+  <div class="brand">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    </svg>
+    <span class="brand-name">FLUX WAF</span>
+    <span class="dot">·</span>
+    <span>Protected by Coraza + OWASP CRS</span>
+  </div>
+
+  <script>
+    function copyRef(){var t=document.getElementById('rid').textContent;navigator.clipboard&&navigator.clipboard.writeText(t);var b=document.querySelector('.copy-btn');b.textContent='Copied!';setTimeout(function(){b.textContent='Copy';},1500);}
+  </script>
+</body>
+</html>
