@@ -8,6 +8,11 @@ This project does not currently enforce Semantic Versioning.
 ## Unreleased
 
 ### Added
+- **s6-overlay v3 process manager** — `entrypoint.sh` dihapus, digantikan oleh s6-overlay (`ENTRYPOINT ["/init"]`). Nginx berjalan sebagai supervised longrun service (`/etc/services.d/nginx/run`). Init logic (cert gen, CRS setup, ip_rules placeholder, flux-data dir) dipindahkan ke `/etc/cont-init.d/01-setup.sh` dan `02-nginx-test.sh`. s6 otomatis restart nginx jika exit tidak terduga.
+- **`--with-http_stub_status_module`** — dikompilasi ke nginx. Endpoint `GET /nginx_status` tersedia di `127.0.0.1:8888` (internal container saja, via `config/conf.d/flux-internal.conf`). Akan dibaca Go dashboard untuk metrics aktif connections/requests.
+- **`flux_json` log format** — log paralel JSON di `access_json.log`. Field: `time`, `request_id`, `remote_addr`, `method`, `uri`, `status`, `bytes_sent`, `request_time`, `upstream_time`, `host`, `user_agent`, `country` (GeoIP2), `ssl_protocol`, `ssl_ja3`. Akan di-parse oleh Go dashboard.
+- **`flux-data/` volume** — mount point `/var/lib/flux-waf` untuk BoltDB Go dashboard. Directory dibuat saat build dan dipersist via Docker volume.
+- **`ssl_certs/` volume** — mount point `/etc/nginx/ssl_certs` untuk custom SSL certificate yang diupload user. Directory dipersist di host.
 - **Performance tuning** — `multi_accept on`, `accept_mutex off`, `client_body_buffer_size 256k`, `keepalive_timeout 30`, `GOGC=400`, `GOMAXPROCS=4`. Hasil: RPS naik dari ~1100 ke ~1946 (+54% vs WAFx). Trade-off: tail latency (>90th pct) masih lebih tinggi dari WAFx (73ms vs 28ms).
 - **Backend Header Stripping** — snippet `config/snippets/hide-backend-headers.conf` di-include di semua server block. Strip: `X-Powered-By` (PHP/Express), `X-AspNet-Version`, `X-AspNetMvc-Version`, `X-Generator`, `X-Drupal-Cache`, `X-Drupal-Dynamic-Cache`, `X-Runtime` (Rails), `X-Varnish`, `Via`. Override `Server` header menjadi `Flux WAF`.
 - **Error pages CSS inline** — fix CSS tidak ter-load karena `location ^~ /errors/` bersifat `internal`. CSS dari `error.css` di-inline langsung ke tiap HTML file.

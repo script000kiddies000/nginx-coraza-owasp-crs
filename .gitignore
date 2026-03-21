@@ -16,4 +16,10 @@ benchmark-results.md
 # MaxMind GeoLite2 database (binary, tidak perlu di-commit)
 config/geoip/*.mmdb
 
+# Runtime data directories (keep dirs via .gitkeep, ignore contents)
+flux-data/*
+!flux-data/.gitkeep
+ssl_certs/*
+!ssl_certs/.gitkeep
+
 

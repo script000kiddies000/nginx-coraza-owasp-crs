@@ -1,0 +1,4 @@
+#!/bin/sh
+# Nginx longrun service — diawasi s6-overlay
+# s6 akan restart otomatis jika nginx exit tidak terduga
+exec nginx -g "daemon off;"

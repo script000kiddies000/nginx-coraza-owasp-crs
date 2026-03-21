@@ -1,0 +1,5 @@
+#!/bin/sh
+# finish — dipanggil s6 saat nginx service exit
+# $1 = exit code dari run script
+# $2 = exit code dari signal (jika dikill)
+echo "[s6-nginx] Service exited. Exit code: $1, signal: $2"

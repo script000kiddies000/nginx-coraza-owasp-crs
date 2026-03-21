@@ -3,7 +3,7 @@ version: '3.8'
 services:
   waf:
     build: .
-    container_name: nginx-coraza-crs
+    container_name: nginx-coroza-crs
     ports:
       - "8080:80"
       - "8443:443"
@@ -20,22 +20,29 @@ services:
       - ./config/geoip:/etc/nginx/geoip:ro
       - ./config/coraza/coraza.conf:/etc/nginx/coraza/coraza.conf:ro
       - ./config/coraza/custom:/etc/nginx/coraza/custom:ro
-      # CRS mounted as rw so entrypoint can copy crs-setup.conf from example
+      # CRS mounted as rw so s6 init can copy crs-setup.conf from example
       - ./config/coraza/crs:/etc/nginx/coraza/crs:rw
 
       # Logs — persistent di host
-      # - access.log  → symlink ke stdout  (lihat via: docker logs nginx-coraza-crs)
-      # - error.log   → symlink ke stderr  (lihat via: docker logs nginx-coraza-crs)
-      # - coraza_audit.log → file JSON real  (lihat via: docker exec ... tail -f)
+      # - access.log      : plain text (format main)
+      # - access_json.log : JSON per-request (dibaca Go dashboard)
+      # - error.log       : nginx error log
+      # - coraza_audit.log: Coraza audit JSON
       - ./logs:/var/log/nginx
+
+      # Flux WAF data — BoltDB untuk Go dashboard (diisi saat dashboard dibangun)
+      - ./flux-data:/var/lib/flux-waf
+
+      # SSL certs upload oleh user — dipersist di host, dibaca nginx di default.conf
+      - ./ssl_certs:/etc/nginx/ssl_certs:ro
 
     # Perf tuning — Go runtime environment untuk Coraza WAF
     # Revert: hapus blok environment ini jika RAM membengkak atau tidak ada perbedaan latency
     environment:
-      # GOGC=200 → GC Coraza 2x lebih jarang, kurangi stop-the-world pause
+      # GOGC=400 -> GC Coraza lebih jarang, kurangi stop-the-world pause
       # Default: 100. Trade-off: heap Go bisa naik ~20-40MB sebelum GC.
       - GOGC=400
-      # GOMAXPROCS → paksa Go runtime pakai jumlah core yang benar di dalam container
+      # GOMAXPROCS -> paksa Go runtime pakai jumlah core yang benar di dalam container
       # Ganti angka sesuai vCPU yang dialokasikan ke container (cek: nproc)
       - GOMAXPROCS=4
 

@@ -101,6 +101,7 @@ WORKDIR /build/nginx-1.27.4
 #   --with-http_v2_module             → HTTP/2
 #   --with-http_realip_module         → real IP dari proxy/CDN
 #   --with-http_sub_module            → response body substitution
+#   --with-http_stub_status_module    → /nginx_status endpoint (dibaca Go dashboard)
 #   --add-module=../nginx-ssl-fingerprint   → JA3/JA4 STATIC (nginx sudah di-patch)
 #   --add-dynamic-module=../coraza-nginx    → Coraza WAF DYNAMIC module
 #
@@ -126,6 +127,7 @@ RUN ./configure \
       --with-http_v2_module \
       --with-http_realip_module \
       --with-http_sub_module \
+      --with-http_stub_status_module \
       --add-module=../nginx-ssl-fingerprint \
       --add-dynamic-module=../ngx_http_geoip2_module \
       --add-dynamic-module=../coraza-nginx && \
@@ -144,19 +146,32 @@ RUN strip /usr/sbin/nginx \
 
 # ==============================================================================
 # STAGE 3: Production image — hanya runtime, TIDAK ada compiler / Go / git
+#
+# Process manager: s6-overlay v3 (https://github.com/just-containers/s6-overlay)
+# s6 mengawasi nginx sebagai supervised longrun service.
+# Init scripts di /etc/cont-init.d/ dijalankan satu kali sebelum service start.
 # ==============================================================================
 FROM debian:bookworm-slim
+
+ARG S6_OVERLAY_VERSION=3.2.0.0
 
 # Runtime dependencies saja (tidak ada -dev packages)
 # libssl3         → tidak wajib untuk nginx (OpenSSL di-static-link), tapi dibutuhkan tools lain
 # openssl         → untuk generate self-signed cert saat test HTTPS/JA3
 # libmaxminddb0   → runtime lib untuk ngx_http_geoip2_module.so
+# curl + xz-utils → dipakai saat install s6-overlay tarball
 # TODO: aktifkan runtime libs saat modulnya aktif:
 #   libgd3     → ngx_http_image_filter_module.so
 #   libxslt1.1 → ngx_http_xslt_filter_module.so
 #   libxml2    → dependency libxslt1.1
 RUN apt-get update && apt-get install -y \
     libpcre3 zlib1g libssl3 ca-certificates openssl libmaxminddb0 \
+    curl xz-utils \
+    && ARCH=$(uname -m) \
+    && curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" \
+       | tar xJf - -C / \
+    && curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${ARCH}.tar.xz" \
+       | tar xJf - -C / \
     && rm -rf /var/lib/apt/lists/*
 
 # Pastikan www-data user ada
@@ -186,27 +201,30 @@ RUN echo "/usr/local/lib"           > /etc/ld.so.conf.d/coraza.conf && \
 # di nginx.conf bekerja (relatif terhadap /etc/nginx/)
 RUN ln -sf /usr/share/nginx/modules /etc/nginx/modules
 
-# Setup CRS default config dari example
-RUN cp /etc/nginx/coraza/crs/crs-setup.conf.example \
-       /etc/nginx/coraza/crs/crs-setup.conf
-
-# Direktori yang dibutuhkan nginx
+# Direktori yang dibutuhkan nginx + flux-waf
 RUN mkdir -p \
     /var/log/nginx \
     /etc/nginx/conf.d \
     /etc/nginx/certs \
+    /etc/nginx/ssl_certs \
     /var/cache/nginx \
+    /var/lib/flux-waf \
     /run
 
 # Permissions
-RUN chown -R www-data:www-data /var/log/nginx /var/cache/nginx /run /etc/nginx/certs
+RUN chown -R www-data:www-data /var/log/nginx /var/cache/nginx /run /etc/nginx/certs /etc/nginx/ssl_certs
 
-# Copy entrypoint script
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# ── s6-overlay: cont-init.d (dijalankan sekali saat startup, berurutan) ──────
+COPY s6/cont-init.d/01-setup.sh     /etc/cont-init.d/01-setup.sh
+COPY s6/cont-init.d/02-nginx-test.sh /etc/cont-init.d/02-nginx-test.sh
+RUN chmod +x /etc/cont-init.d/01-setup.sh /etc/cont-init.d/02-nginx-test.sh
+
+# ── s6-overlay: services.d/nginx (nginx diawasi oleh s6 sebagai longrun) ─────
+COPY s6/services.d/nginx/run    /etc/services.d/nginx/run
+COPY s6/services.d/nginx/finish /etc/services.d/nginx/finish
+RUN chmod +x /etc/services.d/nginx/run /etc/services.d/nginx/finish
 
 EXPOSE 80 443
 
-# Gunakan entrypoint (bukan CMD langsung) agar log symlink
-# dibuat SETELAH volume mount, bukan di layer image
-ENTRYPOINT ["/entrypoint.sh"]
+# s6-overlay PID 1 init — menggantikan entrypoint.sh
+ENTRYPOINT ["/init"]
