@@ -1,0 +1,92 @@
+{{define "content"}}
+<div class="max-w-3xl space-y-6" x-data="vpatchApp()" x-init="load()">
+  <p class="text-gray-400 text-sm">
+    Aturan virtual patch di-load dari <span class="font-mono text-gray-500">/etc/nginx/coraza/custom/vpatch.rules</span> (lihat <span class="font-mono">coraza.conf</span>).
+    Panel ini menyimpan preferensi di database dan memicu <strong>nginx reload</strong> — isi file CVE tetap Anda kelola di volume config.
+  </p>
+
+  <div x-show="msgOk" x-cloak class="text-sm text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-lg px-4 py-2" x-text="msgOk"></div>
+  <div x-show="msgErr" x-cloak class="text-sm text-rose-400 border border-rose-500/30 bg-rose-500/10 rounded-lg px-4 py-2" x-text="msgErr"></div>
+
+  <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-4" x-show="loaded">
+    <label class="flex items-center gap-3 cursor-pointer">
+      <input type="checkbox" x-model="form.enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+      <span class="text-sm text-gray-300">Virtual patching dianggap aktif (operasional / monitoring)</span>
+    </label>
+    <label class="flex items-center gap-3 cursor-pointer">
+      <input type="checkbox" x-model="form.aggressive" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+      <span class="text-sm text-gray-300">Mode agresif (catatan kebijakan — untuk ekspansi rule otomatis nanti)</span>
+    </label>
+    <div>
+      <label class="block text-xs text-gray-500 uppercase mb-1">Catatan internal</label>
+      <textarea x-model="form.notes" rows="3" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200"></textarea>
+    </div>
+    <div class="text-xs text-gray-600 font-mono space-y-1" x-show="meta.path">
+      <p>File: <span x-text="meta.path"></span></p>
+      <p x-show="meta.mod_time">Diubah: <span x-text="meta.mod_time"></span> · <span x-text="meta.size_bytes"></span> bytes</p>
+      <p x-show="form.last_reload">Reload terakhir (DB): <span x-text="form.last_reload"></span></p>
+    </div>
+    <div class="flex flex-wrap gap-3">
+      <button type="button" @click="apply()" :disabled="saving"
+              class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold px-5 py-2 rounded-lg">Simpan &amp; reload nginx</button>
+      <button type="button" @click="reloadOnly()" :disabled="saving"
+              class="text-sm text-gray-400 border border-gray-700 hover:bg-gray-800 px-4 py-2 rounded-lg">Reload nginx saja</button>
+      <button type="button" @click="load()" class="text-sm text-gray-500 hover:text-gray-300">Refresh status</button>
+    </div>
+  </div>
+</div>
+<script>
+function vpatchApp() {
+  return {
+    loaded: false,
+    saving: false,
+    msgOk: '',
+    msgErr: '',
+    form: { enabled: false, aggressive: false, notes: '', last_reload: '' },
+    meta: {},
+    async load() {
+      this.msgErr = '';
+      try {
+        const [cfg, st] = await Promise.all([
+          fetch('/api/vpatch/config').then(r => r.json()),
+          fetch('/api/vpatch/status').then(r => r.json())
+        ]);
+        this.form = { ...this.form, ...cfg };
+        this.meta = st.rules_file || {};
+        this.loaded = true;
+      } catch (e) {
+        this.msgErr = e.message || String(e);
+      }
+    },
+    async apply() {
+      this.saving = true; this.msgOk = ''; this.msgErr = '';
+      try {
+        const r = await fetch('/api/vpatch/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.form)
+        });
+        const t = await r.text();
+        let j = {}; try { j = JSON.parse(t); } catch (_) {}
+        if (!r.ok) throw new Error(j.error || t);
+        this.msgOk = 'Disimpan dan nginx reload.';
+        await this.load();
+      } catch (e) { this.msgErr = e.message || String(e); }
+      finally { this.saving = false; }
+    },
+    async reloadOnly() {
+      this.saving = true; this.msgOk = ''; this.msgErr = '';
+      try {
+        const r = await fetch('/api/vpatch/reload', { method: 'POST' });
+        const t = await r.text();
+        let j = {}; try { j = JSON.parse(t); } catch (_) {}
+        if (!r.ok) throw new Error(j.error || t);
+        this.msgOk = 'Nginx reload.';
+        await this.load();
+      } catch (e) { this.msgErr = e.message || String(e); }
+      finally { this.saving = false; }
+    }
+  };
+}
+</script>
+{{end}}

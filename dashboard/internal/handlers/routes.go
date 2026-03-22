@@ -94,6 +94,7 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	mux.HandleFunc("GET /api/vpatch/status", app.RequireAuth(app.APIVPatchStatus))
 
 	mux.HandleFunc("GET /api/dlp/config", app.RequireAuth(app.APIGetDLPConfig))
+	mux.HandleFunc("GET /api/dlp/status", app.RequireAuth(app.APIGetDLPStatus))
 	mux.HandleFunc("POST /api/dlp/apply", app.RequireAuth(app.APIApplyDLPConfig))
 	mux.HandleFunc("GET /api/dlp/events", app.RequireAuth(app.APIDLPEvents))
 	mux.HandleFunc("POST /api/dlp/clear-events", app.RequireAuth(app.APIDLPClearEvents))

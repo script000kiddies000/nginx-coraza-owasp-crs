@@ -20,8 +20,10 @@ const (
 	BucketSettings   = "settings"
 	BucketStatsHourly = "stats_hourly"
 	BucketAttackMap     = "attack_map"
-	BucketThreatIntel   = "threat_intel"
+	BucketThreatIntel    = "threat_intel"
 	BucketSecurityEvents = "security_events"
+	BucketBotBlocked     = "bot_blocked"
+	BucketDLPEvents      = "dlp_events"
 )
 
 // Open opens the BoltDB file. Creates the file if it does not exist.
@@ -38,7 +40,7 @@ func InitBuckets(db *bolt.DB) error {
 	buckets := []string{
 		BucketUsers, BucketSessions, BucketHosts,
 		BucketSettings, BucketStatsHourly, BucketAttackMap, BucketThreatIntel,
-		BucketSecurityEvents,
+		BucketSecurityEvents, BucketBotBlocked, BucketDLPEvents,
 	}
 	return db.Update(func(tx *bolt.Tx) error {
 		for _, name := range buckets {

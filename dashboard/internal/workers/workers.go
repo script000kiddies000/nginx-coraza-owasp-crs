@@ -136,6 +136,19 @@ func auditTailer(db *bolt.DB) {
 				if err := store.AppendSecurityEvent(db, ev); err != nil {
 					log.Printf("[workers] append security event: %v", err)
 				}
+				if strings.Contains(strings.ToLower(ev.Message), "dlp") {
+					dlpEv := models.DLPEvent{
+						Time:     ev.Time,
+						Type:     "dlp",
+						ClientIP: ev.ClientIP,
+						URI:      ev.URI,
+						Action:   ev.Action,
+						Message:  ev.Message,
+					}
+					if err := store.AppendDLPEvent(db, dlpEv); err != nil {
+						log.Printf("[workers] append dlp event: %v", err)
+					}
+				}
 			}
 		}
 		offset, _ = f.Seek(0, 1)

@@ -223,10 +223,7 @@ func (app *App) APIGetBotConfig(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(cfg)
 }
 
-func (app *App) APIApplyBotConfig(w http.ResponseWriter, r *http.Request) { stubJSON(w) }
-func (app *App) APIBotStatus(w http.ResponseWriter, r *http.Request)      { stubJSON(w) }
-func (app *App) APIBotBlockedIPs(w http.ResponseWriter, r *http.Request)  { stubJSON(w) }
-func (app *App) APIBotUnblock(w http.ResponseWriter, r *http.Request)     { stubJSON(w) }
+// Bot apply/status/blocked/unblock: engines_api.go
 
 // ── Access logs (nginx flux_json) ─────────────────────────────────────────────
 
@@ -376,14 +373,7 @@ func (app *App) APIGetThreatIntelBlocked(w http.ResponseWriter, r *http.Request)
 	})
 }
 
-func (app *App) APIIPReputations(w http.ResponseWriter, r *http.Request) { stubJSON(w) }
-
-// ── Virtual Patching ──────────────────────────────────────────────────────────
-
-func (app *App) APIGetVPatchConfig(w http.ResponseWriter, r *http.Request) { stubJSON(w) }
-func (app *App) APIApplyVPatchConfig(w http.ResponseWriter, r *http.Request) { stubJSON(w) }
-func (app *App) APIReloadVPatch(w http.ResponseWriter, r *http.Request)     { stubJSON(w) }
-func (app *App) APIVPatchStatus(w http.ResponseWriter, r *http.Request)     { stubJSON(w) }
+// IP reputations, vpatch, dlp apply/events, wpsec: engines_api.go
 
 // ── DLP ───────────────────────────────────────────────────────────────────────
 
@@ -392,15 +382,6 @@ func (app *App) APIGetDLPConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(cfg)
 }
-
-func (app *App) APIApplyDLPConfig(w http.ResponseWriter, r *http.Request) { stubJSON(w) }
-func (app *App) APIDLPEvents(w http.ResponseWriter, r *http.Request)      { stubJSON(w) }
-func (app *App) APIDLPClearEvents(w http.ResponseWriter, r *http.Request) { stubJSON(w) }
-
-// ── WordPress ─────────────────────────────────────────────────────────────────
-
-func (app *App) APIGetWPSecConfig(w http.ResponseWriter, r *http.Request)   { stubJSON(w) }
-func (app *App) APIApplyWPSecConfig(w http.ResponseWriter, r *http.Request) { stubJSON(w) }
 
 // ── Malware ───────────────────────────────────────────────────────────────────
 

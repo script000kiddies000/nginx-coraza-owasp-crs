@@ -1,0 +1,101 @@
+{{define "content"}}
+<div class="space-y-6" x-data="iprepApp()" x-init="load()">
+  <p class="text-gray-400 text-sm max-w-3xl">
+    Ringkasan dari <strong>security events</strong> (audit) + metadata <strong>threat intel</strong> / <span class="font-mono">ip_rules.conf</span>.
+  </p>
+  <button type="button" @click="load()" class="text-sm text-gray-500 hover:text-gray-300">Refresh</button>
+
+  <template x-if="loading">
+    <p class="text-gray-600 text-sm">Memuat…</p>
+  </template>
+  <div x-show="error" x-cloak class="text-rose-400 text-sm border border-rose-500/30 rounded-lg px-4 py-2" x-text="error"></div>
+
+  <div class="grid lg:grid-cols-2 gap-6" x-show="!loading && !error">
+    <div class="rounded-xl border border-gray-800 bg-gray-900/40 overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-800 text-sm font-semibold text-white">Top IP (audit)</div>
+      <div class="overflow-x-auto max-h-80 overflow-y-auto">
+        <table class="w-full text-sm">
+          <thead class="text-xs text-gray-500 uppercase border-b border-gray-800">
+            <tr><th class="text-left px-4 py-2">IP</th><th class="text-right px-4 py-2">Hits</th></tr>
+          </thead>
+          <tbody class="divide-y divide-gray-800/80 font-mono text-xs">
+            <template x-for="row in top" :key="row.ip">
+              <tr><td class="px-4 py-2 text-cyan-500/90" x-text="row.ip"></td><td class="px-4 py-2 text-right text-amber-400" x-text="row.hits"></td></tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="rounded-xl border border-gray-800 bg-gray-900/40 overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-800 text-sm font-semibold text-white">Threat intel rules (preview)</div>
+      <div class="p-3 text-xs text-gray-500 font-mono max-h-40 overflow-y-auto" x-show="ti.deny_count != null">
+        <span x-text="'Deny count: ' + ti.deny_count"></span>
+        <template x-for="(line, i) in (ti.preview || [])" :key="i">
+          <p class="text-gray-400 mt-1" x-text="line"></p>
+        </template>
+      </div>
+      <div class="px-4 py-3 border-t border-gray-800 text-xs text-gray-600">
+        Threat intel enabled: <span x-text="String(cfg.enabled)"></span> · block score <span x-text="cfg.block_score"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="rounded-xl border border-gray-800 bg-gray-900/40 overflow-hidden" x-show="!loading && !error">
+    <div class="px-4 py-3 border-b border-gray-800 text-sm font-semibold text-white">Sampel event audit</div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs min-w-[640px]">
+        <thead class="text-gray-500 uppercase border-b border-gray-800">
+          <tr>
+            <th class="text-left px-3 py-2">Time</th>
+            <th class="text-left px-3 py-2">Client</th>
+            <th class="text-left px-3 py-2">Rule</th>
+            <th class="text-left px-3 py-2">Action</th>
+            <th class="text-left px-3 py-2">URI</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-800/80">
+          <template x-for="(ev, i) in sample" :key="i">
+            <tr class="hover:bg-gray-800/30">
+              <td class="px-3 py-2 text-gray-500 font-mono whitespace-nowrap" x-text="ev.time"></td>
+              <td class="px-3 py-2 font-mono text-cyan-500/80" x-text="ev.client_ip"></td>
+              <td class="px-3 py-2 font-mono text-amber-400/90" x-text="ev.rule_id"></td>
+              <td class="px-3 py-2" x-text="ev.action"></td>
+              <td class="px-3 py-2 text-gray-500 truncate max-w-xs" x-text="ev.uri"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script>
+function iprepApp() {
+  return {
+    loading: true,
+    error: '',
+    top: [],
+    ti: {},
+    cfg: {},
+    sample: [],
+    async load() {
+      this.loading = true; this.error = '';
+      try {
+        const d = await fetch('/api/ip-reputations').then(r => {
+          if (!r.ok) throw new Error(r.statusText);
+          return r.json();
+        });
+        this.top = d.top_offenders || [];
+        this.ti = d.threat_intel_rules || {};
+        this.cfg = d.threat_intel_config || {};
+        this.sample = d.audit_events_sample || [];
+      } catch (e) {
+        this.error = e.message || String(e);
+      } finally {
+        this.loading = false;
+      }
+    }
+  };
+}
+</script>
+{{end}}

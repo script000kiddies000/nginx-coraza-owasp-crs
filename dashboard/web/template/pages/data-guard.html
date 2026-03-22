@@ -1,0 +1,125 @@
+{{define "content"}}
+<div class="max-w-4xl space-y-6" x-data="dlpApp()" x-init="init()">
+  <p class="text-gray-400 text-sm">
+    Konfigurasi disimpan di database. Aturan nyata ada di <span class="font-mono text-gray-500">/etc/nginx/coraza/custom/dlp-rules.conf</span> (edit di volume).
+    Event DLP diisi otomatis jika pesan audit mengandung <span class="font-mono">DLP</span>.
+  </p>
+
+  <div x-show="msgOk" x-cloak class="text-sm text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-lg px-4 py-2" x-text="msgOk"></div>
+  <div x-show="msgErr" x-cloak class="text-sm text-rose-400 border border-rose-500/30 bg-rose-500/10 rounded-lg px-4 py-2" x-text="msgErr"></div>
+
+  <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-4">
+    <h2 class="text-sm font-semibold text-white">Kebijakan</h2>
+    <label class="flex items-center gap-3 cursor-pointer">
+      <input type="checkbox" x-model="form.dlp_enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+      <span class="text-sm text-gray-300">DLP enabled (flag operasional)</span>
+    </label>
+    <label class="flex items-center gap-3 cursor-pointer">
+      <input type="checkbox" x-model="form.dlp_active" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+      <span class="text-sm text-gray-300">DLP active</span>
+    </label>
+    <label class="flex items-center gap-3 cursor-pointer">
+      <input type="checkbox" x-model="form.auto_quarantine" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+      <span class="text-sm text-gray-300">Auto quarantine (ekspansi nanti)</span>
+    </label>
+    <div>
+      <label class="text-xs text-gray-500 uppercase">Pola / label (satu per baris, untuk dokumentasi)</label>
+      <textarea x-model="patternsText" rows="4" class="w-full mt-1 font-mono text-sm bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-gray-200"></textarea>
+    </div>
+    <div class="text-xs text-gray-600 font-mono" x-show="meta.path">
+      <span x-text="meta.path"></span> · <span x-text="meta.mod_time || '—'"></span>
+    </div>
+    <button type="button" @click="apply()" :disabled="saving"
+            class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold px-5 py-2 rounded-lg">Simpan &amp; reload nginx</button>
+  </div>
+
+  <div class="flex justify-between items-center">
+    <h2 class="text-sm font-semibold text-white">Event DLP</h2>
+    <button type="button" @click="clearEvents()" class="text-xs text-rose-400 hover:underline">Hapus log event</button>
+  </div>
+  <div class="rounded-xl border border-gray-800 bg-gray-900/40 overflow-x-auto">
+    <table class="w-full text-xs min-w-[640px]">
+      <thead class="text-gray-500 uppercase border-b border-gray-800">
+        <tr>
+          <th class="text-left px-3 py-2">Time</th>
+          <th class="text-left px-3 py-2">Type</th>
+          <th class="text-left px-3 py-2">Client</th>
+          <th class="text-left px-3 py-2">URI</th>
+          <th class="text-left px-3 py-2">Action</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-800/80">
+        <template x-for="(ev, i) in events" :key="i">
+          <tr>
+            <td class="px-3 py-2 text-gray-500 font-mono whitespace-nowrap" x-text="ev.time"></td>
+            <td class="px-3 py-2 text-amber-400/90" x-text="ev.type"></td>
+            <td class="px-3 py-2 font-mono text-cyan-500/80" x-text="ev.client_ip"></td>
+            <td class="px-3 py-2 text-gray-500 truncate max-w-xs" x-text="ev.uri"></td>
+            <td class="px-3 py-2" x-text="ev.action"></td>
+          </tr>
+        </template>
+        <tr x-show="!events.length"><td colspan="5" class="px-3 py-8 text-center text-gray-600">Belum ada event</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+function dlpApp() {
+  return {
+    saving: false,
+    msgOk: '',
+    msgErr: '',
+    form: {},
+    patternsText: '',
+    meta: {},
+    events: [],
+    parsePat(s) {
+      return String(s || '').split(/[\n]+/).map(x => x.trim()).filter(Boolean);
+    },
+    async init() {
+      await Promise.all([this.loadCfg(), this.loadEvents(), this.loadStatus()]);
+    },
+    async loadCfg() {
+      const c = await fetch('/api/dlp/config').then(r => r.json());
+      this.form = c;
+      this.patternsText = (c.dlp_patterns || []).join('\n');
+    },
+    async loadStatus() {
+      const s = await fetch('/api/dlp/status').then(r => r.json());
+      this.meta = s.rules_file || {};
+    },
+    async loadEvents() {
+      this.events = await fetch('/api/dlp/events?limit=100').then(r => r.json());
+    },
+    async apply() {
+      this.saving = true; this.msgOk = ''; this.msgErr = '';
+      const body = {
+        ...this.form,
+        dlp_patterns: this.parsePat(this.patternsText)
+      };
+      try {
+        const r = await fetch('/api/dlp/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const t = await r.text();
+        let j = {}; try { j = JSON.parse(t); } catch (_) {}
+        if (!r.ok) throw new Error(j.error || t);
+        this.msgOk = 'Disimpan.';
+        await this.init();
+      } catch (e) { this.msgErr = e.message || String(e); }
+      finally { this.saving = false; }
+    },
+    async clearEvents() {
+      if (!confirm('Hapus semua event DLP di dashboard?')) return;
+      try {
+        await fetch('/api/dlp/clear-events', { method: 'POST' });
+        this.msgOk = 'Event dikosongkan.';
+        await this.loadEvents();
+      } catch (e) { this.msgErr = e.message || String(e); }
+    }
+  };
+}
+</script>
+{{end}}

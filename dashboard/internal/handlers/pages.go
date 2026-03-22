@@ -49,7 +49,7 @@ func (app *App) PageRules(w http.ResponseWriter, r *http.Request) {
 // ── Security Engines ──────────────────────────────────────────────────────────
 
 func (app *App) PageVirtualPatching(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "_stub", models.PageData{Title: "Virtual Patching", ActiveMenu: "vpatch"})
+	app.render(w, r, "virtual-patching", models.PageData{Title: "Virtual Patching", ActiveMenu: "vpatch"})
 }
 
 func (app *App) PageGeoBlocking(w http.ResponseWriter, r *http.Request) {
@@ -57,19 +57,19 @@ func (app *App) PageGeoBlocking(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) PageBotManagement(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "_stub", models.PageData{Title: "Bot Management", ActiveMenu: "botmgmt"})
+	app.render(w, r, "bot-management", models.PageData{Title: "Bot Management", ActiveMenu: "botmgmt"})
 }
 
 func (app *App) PageIPReputations(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "_stub", models.PageData{Title: "IP Reputations", ActiveMenu: "iprep"})
+	app.render(w, r, "ip-reputations", models.PageData{Title: "IP Reputations", ActiveMenu: "iprep"})
 }
 
 func (app *App) PageWPSecurity(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "_stub", models.PageData{Title: "WordPress Security", ActiveMenu: "wpsec"})
+	app.render(w, r, "wordpress-security", models.PageData{Title: "WordPress Security", ActiveMenu: "wpsec"})
 }
 
 func (app *App) PageDataGuard(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "_stub", models.PageData{Title: "Data Guard (DLP)", ActiveMenu: "dlp"})
+	app.render(w, r, "data-guard", models.PageData{Title: "Data Guard (DLP)", ActiveMenu: "dlp"})
 }
 
 // ── Logs ──────────────────────────────────────────────────────────────────────

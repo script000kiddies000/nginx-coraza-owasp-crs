@@ -82,6 +82,48 @@ type DLPConfig struct {
 	DLPPatterns    []string `json:"dlp_patterns"`
 }
 
+// ── Virtual Patching (CRS companion / CVE-style rules file) ───────────────────
+
+type VirtualPatchConfig struct {
+	Enabled    bool   `json:"enabled"`
+	Aggressive bool   `json:"aggressive"` // future: tighter SecAction presets
+	LastReload string `json:"last_reload"`
+	Notes      string `json:"notes"`
+}
+
+// ── WordPress Security (nginx snippet generation) ───────────────────────────
+
+type WPSecurityConfig struct {
+	Enabled             bool   `json:"enabled"`
+	BlockXMLRPC         bool   `json:"block_xmlrpc"`
+	BlockSensitiveFiles bool   `json:"block_sensitive_files"`
+	BlockUploadsPHP     bool   `json:"block_uploads_php"`
+	BlockAuthorEnum     bool   `json:"block_author_enum"`
+	BlockScannerUA      bool   `json:"block_scanner_ua"`
+	StripAssetVersion   bool   `json:"strip_asset_version"`
+	Notes               string `json:"notes"`
+	LastWritten         string `json:"last_written"`
+}
+
+// ── DLP events (dashboard log) ───────────────────────────────────────────────
+
+type DLPEvent struct {
+	Time     string `json:"time"`
+	Type     string `json:"type"`
+	ClientIP string `json:"client_ip"`
+	URI      string `json:"uri"`
+	Action   string `json:"action"`
+	Message  string `json:"message"`
+}
+
+// ── Bot blocklist (manual / future worker) ───────────────────────────────────
+
+type BotBlockedEntry struct {
+	IP        string `json:"ip"`
+	BlockedAt string `json:"blocked_at"`
+	Reason    string `json:"reason"`
+}
+
 // ── System Monitoring (on-the-fly, not stored in DB) ─────────────────────────
 
 type NginxStatus struct {

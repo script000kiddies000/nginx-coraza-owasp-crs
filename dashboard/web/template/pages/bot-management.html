@@ -1,0 +1,142 @@
+{{define "content"}}
+<div class="max-w-4xl space-y-6" x-data="botApp()" x-init="init()">
+  <p class="text-gray-400 text-sm">
+    Konfigurasi disimpan di BoltDB. Daftar IP terblokir untuk modul bot (manual / integrasi worker mendatang).
+    Setelah simpan, nginx di-<strong>reload</strong>.
+  </p>
+
+  <div x-show="msgOk" x-cloak class="text-sm text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-lg px-4 py-2" x-text="msgOk"></div>
+  <div x-show="msgErr" x-cloak class="text-sm text-rose-400 border border-rose-500/30 bg-rose-500/10 rounded-lg px-4 py-2" x-text="msgErr"></div>
+
+  <div class="grid md:grid-cols-2 gap-6">
+    <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-4">
+      <h2 class="text-sm font-semibold text-white">Pengaturan</h2>
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" x-model="form.antibot_enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+        <span class="text-sm text-gray-300">Antibot enabled</span>
+      </label>
+      <div>
+        <label class="text-xs text-gray-500 uppercase">Bot threshold</label>
+        <input type="number" x-model.number="form.bot_threshold" min="1" max="100000"
+               class="w-full mt-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-200">
+      </div>
+      <div>
+        <label class="text-xs text-gray-500 uppercase">Challenge type</label>
+        <select x-model="form.challenge_type" class="w-full mt-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200">
+          <option value="js">js</option>
+          <option value="captcha">captcha</option>
+          <option value="none">none</option>
+          <option value="off">off</option>
+        </select>
+      </div>
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" x-model="form.limit_login_enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+        <span class="text-sm text-gray-300">Limit login (RPM)</span>
+      </label>
+      <input type="number" x-model.number="form.limit_login_rpm" min="1" max="10000"
+             class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-200">
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" x-model="form.cred_stuff_enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+        <span class="text-sm text-gray-300">Credential stuffing window</span>
+      </label>
+      <input type="number" x-model.number="form.cred_stuff_window_min" min="1" max="1440"
+             class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-200">
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" x-model="form.ja3_enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+        <span class="text-sm text-gray-300">JA3 fingerprint (perlu map/snippet nginx)</span>
+      </label>
+      <div>
+        <label class="text-xs text-gray-500 uppercase">Whitelist IP (satu per baris)</label>
+        <textarea x-model="whitelistText" rows="3" class="w-full mt-1 font-mono text-sm bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-gray-200"></textarea>
+      </div>
+      <button type="button" @click="save()" :disabled="saving"
+              class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg">Simpan</button>
+    </div>
+
+    <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 flex flex-col min-h-[320px]">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="text-sm font-semibold text-white">IP terblokir</h2>
+        <span class="text-xs text-gray-500" x-text="status.blocked_count + ' entri'"></span>
+      </div>
+      <ul class="flex-1 overflow-y-auto text-sm font-mono divide-y divide-gray-800/80 max-h-64">
+        <template x-for="e in blocked" :key="e.ip">
+          <li class="py-2 flex justify-between gap-2 items-center">
+            <div>
+              <span class="text-cyan-400" x-text="e.ip"></span>
+              <p class="text-[10px] text-gray-600" x-text="e.reason || ''"></p>
+            </div>
+            <button type="button" @click="unblock(e.ip)" class="text-xs text-rose-400 hover:underline">Unblock</button>
+          </li>
+        </template>
+        <li x-show="!blocked.length" class="py-8 text-center text-gray-600 text-sm">Kosong</li>
+      </ul>
+    </div>
+  </div>
+</div>
+<script>
+function botApp() {
+  return {
+    saving: false,
+    msgOk: '',
+    msgErr: '',
+    form: {},
+    whitelistText: '',
+    blocked: [],
+    status: { blocked_count: 0 },
+    parseWL(s) {
+      return String(s || '').split(/[\n,]+/).map(x => x.trim()).filter(Boolean);
+    },
+    wlToText(a) { return Array.isArray(a) ? a.join('\n') : ''; },
+    async init() {
+      await this.refreshBlocked();
+      await this.loadConfig();
+      const st = await fetch('/api/advbot/status').then(r => r.json());
+      this.status = st;
+      this.form = st.config || {};
+      this.whitelistText = this.wlToText(this.form.whitelist_ips);
+    },
+    async loadConfig() {
+      const c = await fetch('/api/advbot/config').then(r => r.json());
+      this.form = c;
+      this.whitelistText = this.wlToText(c.whitelist_ips);
+    },
+    async refreshBlocked() {
+      const d = await fetch('/api/advbot/blocked').then(r => r.json());
+      this.blocked = d.entries || [];
+    },
+    async save() {
+      this.saving = true; this.msgOk = ''; this.msgErr = '';
+      const body = { ...this.form, whitelist_ips: this.parseWL(this.whitelistText) };
+      try {
+        const r = await fetch('/api/advbot/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const t = await r.text();
+        let j = {}; try { j = JSON.parse(t); } catch (_) {}
+        if (!r.ok) throw new Error(j.error || t);
+        this.msgOk = 'Tersimpan.';
+        await this.init();
+      } catch (e) { this.msgErr = e.message || String(e); }
+      finally { this.saving = false; }
+    },
+    async unblock(ip) {
+      this.msgErr = '';
+      try {
+        const r = await fetch('/api/advbot/unblock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip })
+        });
+        const t = await r.text();
+        let j = {}; try { j = JSON.parse(t); } catch (_) {}
+        if (!r.ok) throw new Error(j.error || t);
+        this.msgOk = 'Unblock: ' + ip;
+        await this.refreshBlocked();
+      } catch (e) { this.msgErr = e.message || String(e); }
+    }
+  };
+}
+</script>
+{{end}}
