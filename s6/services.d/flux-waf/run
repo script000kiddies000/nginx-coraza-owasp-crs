@@ -1,0 +1,4 @@
+#!/bin/sh
+# flux-waf dashboard longrun service
+# s6 akan restart otomatis jika binary exit tidak terduga
+exec /usr/local/bin/flux-waf

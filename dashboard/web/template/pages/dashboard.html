@@ -1,0 +1,215 @@
+{{define "content"}}
+<div class="space-y-6" x-data="dashboardApp()" x-init="init()">
+
+  <!-- Stat Cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Active Hosts</p>
+      <p class="text-3xl font-bold text-white mt-1">{{if .Data}}{{index .Data "HostCount"}}{{else}}0{{end}}</p>
+      <p class="text-xs text-emerald-400 mt-1">Reverse proxy targets</p>
+    </div>
+
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">WAF Mode</p>
+      <p class="text-xl font-bold mt-1
+        {{if eq (index .Data "WAFMode") "On"}}text-emerald-400
+        {{else if eq (index .Data "WAFMode") "Off"}}text-rose-400
+        {{else}}text-yellow-400{{end}}">
+        {{if .Data}}{{index .Data "WAFMode"}}{{else}}Unknown{{end}}
+      </p>
+      <p class="text-xs text-gray-500 mt-1">OWASP CRS v4 active</p>
+    </div>
+
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Requests Today</p>
+      <p class="text-3xl font-bold text-white mt-1" x-text="stats.total_requests ?? '—'">—</p>
+      <p class="text-xs text-gray-500 mt-1">From access log</p>
+    </div>
+
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Blocked Today</p>
+      <p class="text-3xl font-bold text-rose-400 mt-1" x-text="stats.blocked_count ?? '—'">—</p>
+      <p class="text-xs text-gray-500 mt-1">WAF + Threat Intel</p>
+    </div>
+  </div>
+
+  <!-- Traffic Chart + WAF Status -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+    <!-- Traffic Chart -->
+    <div class="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-xl p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold text-white">Traffic (last 24h)</h2>
+        <span class="text-xs text-gray-500">Auto-refresh 30s</span>
+      </div>
+      <div class="h-48 flex items-center justify-center">
+        <canvas id="trafficChart" class="w-full h-full"></canvas>
+      </div>
+    </div>
+
+    <!-- Protection Layers Status -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+      <h2 class="text-sm font-semibold text-white mb-4">Protection Layers</h2>
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-gray-400">Coraza WAF</span>
+          <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+            <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Active
+          </span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-gray-400">OWASP CRS v4</span>
+          <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+            <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Loaded
+          </span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-gray-400">GeoIP Block</span>
+          <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+            <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Active
+          </span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-gray-400">Threat Intel</span>
+          <span class="inline-flex items-center gap-1 text-xs font-medium text-yellow-400 bg-yellow-500/10 px-2 py-0.5 rounded-full">
+            <span class="w-1.5 h-1.5 bg-yellow-400 rounded-full"></span> Pending
+          </span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-gray-400">TLS Fingerprint</span>
+          <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+            <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> JA3/JA4
+          </span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-gray-400">DLP Rules</span>
+          <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+            <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Active
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Security Events -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-sm font-semibold text-white">Recent Security Events</h2>
+      <a href="/security-logs" class="text-xs text-emerald-400 hover:text-emerald-300 transition-colors">View all →</a>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs font-mono">
+        <thead>
+          <tr class="text-gray-600 border-b border-gray-800">
+            <th class="text-left pb-2 pr-4">Time</th>
+            <th class="text-left pb-2 pr-4">Source IP</th>
+            <th class="text-left pb-2 pr-4">Rule</th>
+            <th class="text-left pb-2 pr-4">Country</th>
+            <th class="text-left pb-2">Action</th>
+          </tr>
+        </thead>
+        <tbody class="text-gray-400">
+          <template x-if="events.length === 0">
+            <tr>
+              <td colspan="5" class="py-8 text-center text-gray-600">
+                No security events yet — log tailing starts automatically
+              </td>
+            </tr>
+          </template>
+          <template x-for="e in events" :key="e.time">
+            <tr class="border-b border-gray-800/50">
+              <td class="py-2 pr-4 text-gray-500" x-text="e.time"></td>
+              <td class="py-2 pr-4 text-white" x-text="e.ip"></td>
+              <td class="py-2 pr-4 text-yellow-400" x-text="e.rule"></td>
+              <td class="py-2 pr-4" x-text="e.country"></td>
+              <td class="py-2">
+                <span class="text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded text-xs" x-text="e.action"></span>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+function dashboardApp() {
+  return {
+    stats: {},
+    events: [],
+    chart: null,
+
+    async init() {
+      await this.fetchStats();
+      await this.fetchEvents();
+      this.initChart();
+      setInterval(() => this.fetchStats(), 30000);
+    },
+
+    async fetchStats() {
+      try {
+        const r = await fetch('/api/stats');
+        this.stats = await r.json();
+      } catch(e) {}
+    },
+
+    async fetchEvents() {
+      try {
+        const r = await fetch('/api/security-events');
+        this.events = await r.json();
+      } catch(e) {}
+    },
+
+    initChart() {
+      const ctx = document.getElementById('trafficChart');
+      if (!ctx) return;
+      const labels = Array.from({length: 24}, (_, i) => {
+        const h = (new Date().getHours() - 23 + i + 24) % 24;
+        return h + ':00';
+      });
+      this.chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Requests',
+              data: Array(24).fill(0),
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16,185,129,0.08)',
+              borderWidth: 1.5,
+              pointRadius: 0,
+              fill: true,
+              tension: 0.4,
+            },
+            {
+              label: 'Blocked',
+              data: Array(24).fill(0),
+              borderColor: '#f43f5e',
+              backgroundColor: 'rgba(244,63,94,0.06)',
+              borderWidth: 1.5,
+              pointRadius: 0,
+              fill: true,
+              tension: 0.4,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#6b7280', font: { size: 11 } } } },
+          scales: {
+            x: { grid: { color: '#1f2937' }, ticks: { color: '#4b5563', font: { size: 10 } } },
+            y: { grid: { color: '#1f2937' }, ticks: { color: '#4b5563', font: { size: 10 } }, beginAtZero: true }
+          }
+        }
+      });
+    }
+  }
+}
+</script>
+{{end}}

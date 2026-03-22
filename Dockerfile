@@ -145,7 +145,23 @@ RUN strip /usr/sbin/nginx \
           /usr/share/nginx/modules/ngx_http_coraza_module.so
 
 # ==============================================================================
-# STAGE 3: Production image — hanya runtime, TIDAK ada compiler / Go / git
+# STAGE 3: Build Flux WAF Dashboard (Go binary)
+#
+# Menggunakan golang:1.25-bookworm yang sama dengan stage builder-coraza dan
+# builder-nginx agar Go module version tidak konflik antar stage.
+# Binary di-compile sebagai static binary (CGO_ENABLED=0) agar berjalan di
+# debian:bookworm-slim tanpa C runtime dependency.
+# ==============================================================================
+FROM golang:1.25-bookworm AS builder-dashboard
+
+WORKDIR /build
+COPY dashboard/ .
+# go mod tidy: download deps + buat go.sum jika belum ada
+RUN go mod tidy
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /flux-waf ./cmd/flux-waf/
+
+# ==============================================================================
+# STAGE 4: Production image — hanya runtime, TIDAK ada compiler / Go / git
 #
 # Process manager: s6-overlay v3 (https://github.com/just-containers/s6-overlay)
 # s6 mengawasi nginx sebagai supervised longrun service.
@@ -214,17 +230,25 @@ RUN mkdir -p \
 # Permissions
 RUN chown -R www-data:www-data /var/log/nginx /var/cache/nginx /run /etc/nginx/certs /etc/nginx/ssl_certs
 
+# ── Flux WAF Dashboard binary ─────────────────────────────────────────────────
+COPY --from=builder-dashboard /flux-waf /usr/local/bin/flux-waf
+
 # ── s6-overlay: cont-init.d (dijalankan sekali saat startup, berurutan) ──────
-COPY s6/cont-init.d/01-setup.sh     /etc/cont-init.d/01-setup.sh
+COPY s6/cont-init.d/01-setup.sh      /etc/cont-init.d/01-setup.sh
 COPY s6/cont-init.d/02-nginx-test.sh /etc/cont-init.d/02-nginx-test.sh
 RUN chmod +x /etc/cont-init.d/01-setup.sh /etc/cont-init.d/02-nginx-test.sh
 
-# ── s6-overlay: services.d/nginx (nginx diawasi oleh s6 sebagai longrun) ─────
+# ── s6-overlay: services.d/nginx ─────────────────────────────────────────────
 COPY s6/services.d/nginx/run    /etc/services.d/nginx/run
 COPY s6/services.d/nginx/finish /etc/services.d/nginx/finish
 RUN chmod +x /etc/services.d/nginx/run /etc/services.d/nginx/finish
 
-EXPOSE 80 443
+# ── s6-overlay: services.d/flux-waf (dashboard, depends on nginx) ────────────
+COPY s6/services.d/flux-waf/run    /etc/services.d/flux-waf/run
+COPY s6/services.d/flux-waf/finish /etc/services.d/flux-waf/finish
+RUN chmod +x /etc/services.d/flux-waf/run /etc/services.d/flux-waf/finish
+
+EXPOSE 80 443 8080
 
 # s6-overlay PID 1 init — menggantikan entrypoint.sh
 ENTRYPOINT ["/init"]

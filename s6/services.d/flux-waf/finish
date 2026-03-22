@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "[s6-flux-waf] Service exited. Exit code: $1, signal: $2"

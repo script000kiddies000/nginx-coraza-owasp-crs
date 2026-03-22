@@ -44,7 +44,7 @@ fi
 mkdir -p /var/lib/flux-waf
 
 # ── Flux WAF SSL certs directory ─────────────────────────────────────────────
-mkdir -p /etc/nginx/ssl_certs
-chown www-data:www-data /etc/nginx/ssl_certs || true
+# Directory dibuat di Dockerfile, di sini hanya pastikan ada (ro mount dari host)
+mkdir -p /etc/nginx/ssl_certs 2>/dev/null || true
 
 echo "[s6-init] Setup complete."
