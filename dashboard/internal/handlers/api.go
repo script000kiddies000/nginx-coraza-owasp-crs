@@ -5,11 +5,17 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"time"
 
+	"flux-waf/internal/logs"
 	"flux-waf/internal/models"
 	"flux-waf/internal/monitor"
 	"flux-waf/internal/nginx"
 	"flux-waf/internal/store"
+	"flux-waf/internal/threatintel"
 )
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -222,7 +228,47 @@ func (app *App) APIBotStatus(w http.ResponseWriter, r *http.Request)      { stub
 func (app *App) APIBotBlockedIPs(w http.ResponseWriter, r *http.Request)  { stubJSON(w) }
 func (app *App) APIBotUnblock(w http.ResponseWriter, r *http.Request)     { stubJSON(w) }
 
+// ── Access logs (nginx flux_json) ─────────────────────────────────────────────
+
+func (app *App) APIGetAccessLogs(w http.ResponseWriter, r *http.Request) {
+	limit := 200
+	if q := r.URL.Query().Get("limit"); q != "" {
+		if n, err := strconv.Atoi(q); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	path := os.Getenv("FLUX_ACCESS_JSON_LOG")
+	if path == "" {
+		path = logs.DefaultAccessJSONLog
+	}
+	entries, err := logs.ReadAccessJSONTail(path, limit)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"path":    path,
+		"count":   len(entries),
+		"entries": entries,
+	})
+}
+
 // ── Threat Intel ──────────────────────────────────────────────────────────────
+
+func threatIntelIPRulesPath() string {
+	if p := os.Getenv("FLUX_THREAT_INTEL_IP_RULES"); p != "" {
+		return p
+	}
+	return threatintel.DefaultIPRulesPath
+}
+
+func threatIntelJSONPath() string {
+	if p := os.Getenv("FLUX_THREAT_INTEL_JSON"); p != "" {
+		return p
+	}
+	return threatintel.DefaultJSONPath
+}
 
 func (app *App) APIGetThreatIntelConfig(w http.ResponseWriter, r *http.Request) {
 	cfg := store.GetThreatIntelConfig(app.DB)
@@ -230,9 +276,107 @@ func (app *App) APIGetThreatIntelConfig(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(cfg)
 }
 
-func (app *App) APIForceSyncIntel(w http.ResponseWriter, r *http.Request)    { stubJSON(w) }
-func (app *App) APIGetThreatIntelBlocked(w http.ResponseWriter, r *http.Request) { stubJSON(w) }
-func (app *App) APIIPReputations(w http.ResponseWriter, r *http.Request)     { stubJSON(w) }
+func (app *App) APIPostThreatIntelConfig(w http.ResponseWriter, r *http.Request) {
+	var body models.ThreatIntelConfig
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if body.UpdateInterval < 1 || body.UpdateInterval > 8760 {
+		jsonError(w, "update_interval must be 1–8760 (hours)", http.StatusBadRequest)
+		return
+	}
+	if body.BlockScore < 0 || body.BlockScore > 100 {
+		jsonError(w, "block_score must be 0–100", http.StatusBadRequest)
+		return
+	}
+	cur := store.GetThreatIntelConfig(app.DB)
+	if body.LastSync == "" {
+		body.LastSync = cur.LastSync
+	}
+	info := threatintel.ReadIPRulesInfo(threatIntelIPRulesPath(), 1)
+	body.IPCount = info.DenyCount
+	if err := store.SaveThreatIntelConfig(app.DB, body); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, body)
+}
+
+func (app *App) APIGetThreatIntelStatus(w http.ResponseWriter, r *http.Request) {
+	cfg := store.GetThreatIntelConfig(app.DB)
+	ipPath := threatIntelIPRulesPath()
+	jsonPath := threatIntelJSONPath()
+	info := threatintel.ReadIPRulesInfo(ipPath, 80)
+	var feedsObj any
+	var feedsErr string
+	raw, err := threatintel.ReadFeedsJSON(jsonPath)
+	if err != nil {
+		feedsErr = err.Error()
+	} else if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &feedsObj); err != nil {
+			feedsErr = "invalid feeds JSON: " + err.Error()
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"config":      cfg,
+		"ip_rules":    info,
+		"feeds_file":  feedsObj,
+		"feeds_error": feedsErr,
+		"paths": map[string]string{
+			"ip_rules": ipPath,
+			"feeds":    jsonPath,
+		},
+	})
+}
+
+func (app *App) APIForceSyncIntel(w http.ResponseWriter, r *http.Request) {
+	ipPath := threatIntelIPRulesPath()
+	info := threatintel.ReadIPRulesInfo(ipPath, 1)
+	cfg := store.GetThreatIntelConfig(app.DB)
+	if info.LastSyncLine != "" && info.LastSyncLine != "Never" {
+		cfg.LastSync = info.LastSyncLine
+	} else {
+		cfg.LastSync = time.Now().Format(time.RFC3339) + " (refresh — feed sync belum dijalankan)"
+	}
+	cfg.IPCount = info.DenyCount
+	if err := store.SaveThreatIntelConfig(app.DB, cfg); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]any{
+		"ok":         true,
+		"message":    "Status dimuat ulang dari ip_rules.conf. Untuk sync penuh jalankan: python3 scripts/sync_threat_intel.py (di host).",
+		"last_sync":  cfg.LastSync,
+		"deny_count": info.DenyCount,
+	})
+}
+
+func (app *App) APIGetThreatIntelBlocked(w http.ResponseWriter, r *http.Request) {
+	path := threatIntelIPRulesPath()
+	info := threatintel.ReadIPRulesInfo(path, 500)
+	type row struct {
+		Target string `json:"target"`
+		Line   string `json:"line"`
+	}
+	rows := make([]row, 0, len(info.Preview))
+	for _, line := range info.Preview {
+		target := strings.TrimPrefix(line, "deny ")
+		target = strings.TrimSuffix(strings.TrimSpace(target), ";")
+		rows = append(rows, row{Target: target, Line: line})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"deny_count": info.DenyCount,
+		"path":       info.Path,
+		"entries":    rows,
+		"truncated":  info.DenyCount > len(rows),
+		"read_error": info.ReadError,
+	})
+}
+
+func (app *App) APIIPReputations(w http.ResponseWriter, r *http.Request) { stubJSON(w) }
 
 // ── Virtual Patching ──────────────────────────────────────────────────────────
 

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
@@ -72,9 +73,35 @@ func (app *App) renderLogin(w http.ResponseWriter, errMsg string) {
 }
 
 // jsonOK writes a JSON 200 response with the given payload.
+// payload nil → {"ok":true}; map → keys merged with "ok":true; other values → marshalled and merged with "ok":true.
 func jsonOK(w http.ResponseWriter, payload any) {
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"ok":true}`)
+	if payload == nil {
+		_, _ = w.Write([]byte(`{"ok":true}`))
+		return
+	}
+	switch p := payload.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(p)+1)
+		out["ok"] = true
+		for k, v := range p {
+			out[k] = v
+		}
+		_ = json.NewEncoder(w).Encode(out)
+	default:
+		b, err := json.Marshal(payload)
+		if err != nil {
+			_, _ = w.Write([]byte(`{"ok":true}`))
+			return
+		}
+		var obj map[string]any
+		if err := json.Unmarshal(b, &obj); err != nil {
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
+			return
+		}
+		obj["ok"] = true
+		_ = json.NewEncoder(w).Encode(obj)
+	}
 }
 
 // jsonError writes a JSON error response.

@@ -57,6 +57,7 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	mux.HandleFunc("GET /api/stats", app.RequireAuth(app.APIStats))
 	mux.HandleFunc("GET /api/traffic", app.RequireAuth(app.APITraffic))
 	mux.HandleFunc("GET /api/security-events", app.RequireAuth(app.APISecurityEvents))
+	mux.HandleFunc("GET /api/logs/access", app.RequireAuth(app.APIGetAccessLogs))
 	mux.HandleFunc("GET /api/attack-map", app.RequireAuth(app.APIAttackMapData))
 
 	mux.HandleFunc("GET /api/hosts", app.RequireAuth(app.APIGetHosts))
@@ -81,6 +82,8 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	mux.HandleFunc("POST /api/advbot/unblock", app.RequireAuth(app.APIBotUnblock))
 
 	mux.HandleFunc("GET /api/threat-intel/config", app.RequireAuth(app.APIGetThreatIntelConfig))
+	mux.HandleFunc("POST /api/threat-intel/config", app.RequireAuth(app.APIPostThreatIntelConfig))
+	mux.HandleFunc("GET /api/threat-intel/status", app.RequireAuth(app.APIGetThreatIntelStatus))
 	mux.HandleFunc("POST /api/threat-intel/sync", app.RequireAuth(app.APIForceSyncIntel))
 	mux.HandleFunc("GET /api/threat-intel/blocked", app.RequireAuth(app.APIGetThreatIntelBlocked))
 	mux.HandleFunc("GET /api/ip-reputations", app.RequireAuth(app.APIIPReputations))

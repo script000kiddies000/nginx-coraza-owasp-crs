@@ -79,7 +79,7 @@ func (app *App) PageSecurityLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) PageLogs(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "_stub", models.PageData{Title: "Access Logs", ActiveMenu: "logs"})
+	app.render(w, r, "access-logs", models.PageData{Title: "Access Logs", ActiveMenu: "logs"})
 }
 
 func (app *App) PageAttackMap(w http.ResponseWriter, r *http.Request) {
@@ -127,10 +127,8 @@ func (app *App) PageSettingsUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) PageThreatIntel(w http.ResponseWriter, r *http.Request) {
-	cfg := store.GetThreatIntelConfig(app.DB)
-	app.render(w, r, "_stub", models.PageData{
+	app.render(w, r, "threat-intel", models.PageData{
 		Title:      "Threat Intelligence",
 		ActiveMenu: "threatintel",
-		Data:       cfg,
 	})
 }

@@ -1,0 +1,262 @@
+{{define "content"}}
+<div x-data="threatIntelApp()" x-init="load()">
+
+  <div class="flex items-center justify-between mb-6 gap-4 flex-wrap">
+    <p class="text-gray-400 text-sm max-w-2xl">
+      Konfigurasi disimpan di database dashboard. Feed &amp; aturan nginx dibaca dari
+      <span class="font-mono text-gray-500">/etc/nginx/threat-intel/</span>
+      (<span class="font-mono text-gray-500">threat_intel.json</span>, <span class="font-mono text-gray-500">ip_rules.conf</span>).
+    </p>
+    <div class="flex gap-2 flex-wrap">
+      <button type="button" @click="load()"
+              class="text-sm font-medium text-gray-300 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg transition-colors">
+        Refresh
+      </button>
+      <button type="button" @click="refreshFromDisk()" :disabled="syncing"
+              class="text-sm font-medium text-sky-400 border border-sky-500/30 hover:bg-sky-500/10 px-3 py-2 rounded-lg transition-colors disabled:opacity-50">
+        <span x-show="!syncing">Muat ulang dari ip_rules</span>
+        <span x-show="syncing">…</span>
+      </button>
+    </div>
+  </div>
+
+  <template x-if="loading && !formReady">
+    <div class="flex items-center justify-center py-16 text-gray-600 text-sm">
+      <svg class="animate-spin w-6 h-6 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      Memuat…
+    </div>
+  </template>
+
+  <template x-if="errorBanner">
+    <div class="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-200 text-sm px-4 py-3 mb-4" x-text="errorBanner"></div>
+  </template>
+
+  <template x-if="okBanner">
+    <div class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-200 text-sm px-4 py-3 mb-4" x-text="okBanner"></div>
+  </template>
+
+  <div class="grid gap-6 lg:grid-cols-2" x-show="formReady">
+    <!-- Form -->
+    <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-4">
+      <h2 class="text-sm font-semibold text-gray-200 uppercase tracking-wider">Pengaturan (database)</h2>
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" x-model="form.enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500 focus:ring-emerald-500/40">
+        <span class="text-sm text-gray-300">Threat intelligence aktif</span>
+      </label>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Interval update (jam)</label>
+        <input type="number" min="1" max="8760" x-model.number="form.update_interval"
+               class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 font-mono">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Ambang blok AbuseIPDB (0–100)</label>
+        <input type="number" min="0" max="100" x-model.number="form.block_score"
+               class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 font-mono">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Whitelist IP (satu per baris atau koma)</label>
+        <textarea rows="4" x-model="whitelistText"
+                  class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 font-mono placeholder-gray-600"
+                  placeholder="203.0.113.10&#10;198.51.100.0/24"></textarea>
+      </div>
+      <button type="button" @click="saveConfig()" :disabled="saving"
+              class="w-full sm:w-auto text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg transition-colors disabled:opacity-50">
+        <span x-show="!saving">Simpan</span>
+        <span x-show="saving">Menyimpan…</span>
+      </button>
+      <p class="text-xs text-gray-600 font-mono" x-show="paths.ip_rules">
+        <span x-text="'ip_rules: ' + paths.ip_rules"></span><br>
+        <span x-text="'feeds JSON: ' + paths.feeds"></span>
+      </p>
+    </div>
+
+    <!-- Status from files -->
+    <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-3">
+      <h2 class="text-sm font-semibold text-gray-200 uppercase tracking-wider">Status file</h2>
+      <dl class="text-sm space-y-2">
+        <div class="flex justify-between gap-4">
+          <dt class="text-gray-500">Last sync (header)</dt>
+          <dd class="text-gray-200 font-mono text-right" x-text="ipRules.last_sync_comment || '—'"></dd>
+        </div>
+        <div class="flex justify-between gap-4">
+          <dt class="text-gray-500">Total deny (parsed)</dt>
+          <dd class="text-emerald-400 font-mono" x-text="ipRules.deny_count ?? 0"></dd>
+        </div>
+        <div class="flex justify-between gap-4">
+          <dt class="text-gray-500">DB last_sync</dt>
+          <dd class="text-gray-300 font-mono text-right text-xs break-all" x-text="form.last_sync || '—'"></dd>
+        </div>
+      </dl>
+      <template x-if="ipRules.read_error">
+        <p class="text-xs text-amber-400" x-text="'Baca ip_rules: ' + ipRules.read_error"></p>
+      </template>
+      <template x-if="feedsError">
+        <p class="text-xs text-amber-400" x-text="'Feed JSON: ' + feedsError"></p>
+      </template>
+      <div>
+        <h3 class="text-xs font-semibold text-gray-500 uppercase mb-2">Preview aturan deny</h3>
+        <div class="max-h-48 overflow-y-auto rounded-lg border border-gray-800 bg-black/30 p-3 font-mono text-xs text-gray-400 space-y-1">
+          <template x-if="!ipRules.preview || ipRules.preview.length === 0">
+            <p class="text-gray-600">Tidak ada baris deny atau file kosong.</p>
+          </template>
+          <template x-for="(line, i) in (ipRules.preview || [])" :key="i">
+            <p x-text="line"></p>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feeds table -->
+  <div class="mt-8 rounded-xl border border-gray-800 bg-gray-900/40 overflow-hidden" x-show="formReady">
+    <div class="px-5 py-3 border-b border-gray-800 flex justify-between items-center flex-wrap gap-2">
+      <h2 class="text-sm font-semibold text-gray-200 uppercase tracking-wider">Feed (threat_intel.json)</h2>
+      <span class="text-xs text-gray-600 font-mono" x-show="feedsFile.enabled !== undefined" x-text="'enabled (file): ' + feedsFile.enabled"></span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm min-w-[640px]">
+        <thead class="border-b border-gray-800 text-xs text-gray-500 uppercase">
+          <tr>
+            <th class="text-left px-4 py-3">Nama</th>
+            <th class="text-left px-4 py-3">Tipe</th>
+            <th class="text-left px-4 py-3">Aktif</th>
+            <th class="text-left px-4 py-3">Last sync</th>
+            <th class="text-left px-4 py-3">IP count</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-800">
+          <template x-if="!feedsList.length">
+            <tr><td colspan="5" class="px-4 py-8 text-center text-gray-600 text-sm">Tidak ada data feed (file tidak ada atau format berbeda).</td></tr>
+          </template>
+          <template x-for="(f, idx) in feedsList" :key="idx">
+            <tr class="hover:bg-gray-800/30">
+              <td class="px-4 py-3 text-gray-200" x-text="f.name || '—'"></td>
+              <td class="px-4 py-3 font-mono text-xs text-gray-500" x-text="f.type || '—'"></td>
+              <td class="px-4 py-3">
+                <span class="text-xs px-2 py-0.5 rounded border"
+                      :class="f.enabled ? 'text-emerald-300 border-emerald-500/30' : 'text-gray-500 border-gray-700'"
+                      x-text="f.enabled ? 'on' : 'off'"></span>
+              </td>
+              <td class="px-4 py-3 font-mono text-xs text-gray-500" x-text="f.last_sync || '—'"></td>
+              <td class="px-4 py-3 font-mono text-xs text-gray-400" x-text="f.ip_count ?? '—'"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function threatIntelApp() {
+  return {
+    loading: true,
+    formReady: false,
+    saving: false,
+    syncing: false,
+    errorBanner: '',
+    okBanner: '',
+    paths: { ip_rules: '', feeds: '' },
+    ipRules: {},
+    feedsFile: {},
+    feedsList: [],
+    feedsError: '',
+    whitelistText: '',
+    form: {
+      enabled: true,
+      update_interval: 24,
+      block_score: 90,
+      whitelist_ips: [],
+      last_sync: '',
+      ip_count: 0
+    },
+    parseWhitelist(s) {
+      return String(s || '').split(/[\n,]+/).map(x => x.trim()).filter(Boolean);
+    },
+    whitelistToText(arr) {
+      return Array.isArray(arr) ? arr.join('\n') : '';
+    },
+    async load() {
+      this.loading = true;
+      this.errorBanner = '';
+      try {
+        const r = await fetch('/api/threat-intel/status');
+        if (!r.ok) throw new Error(await r.text() || r.statusText);
+        const data = await r.json();
+        const cfg = data.config || {};
+        this.form = {
+          enabled: !!cfg.enabled,
+          update_interval: cfg.update_interval || 24,
+          block_score: cfg.block_score ?? 90,
+          whitelist_ips: cfg.whitelist_ips || [],
+          last_sync: cfg.last_sync || '',
+          ip_count: cfg.ip_count ?? 0
+        };
+        this.whitelistText = this.whitelistToText(cfg.whitelist_ips);
+        this.ipRules = data.ip_rules || {};
+        this.paths = data.paths || {};
+        this.feedsError = data.feeds_error || '';
+        this.feedsFile = (data.feeds_file && typeof data.feeds_file === 'object') ? data.feeds_file : {};
+        this.feedsList = Array.isArray(this.feedsFile.feeds) ? this.feedsFile.feeds : [];
+        this.formReady = true;
+      } catch (e) {
+        this.errorBanner = e.message || String(e);
+        this.formReady = false;
+      } finally {
+        this.loading = false;
+      }
+    },
+    async saveConfig() {
+      this.saving = true;
+      this.errorBanner = '';
+      this.okBanner = '';
+      const body = {
+        enabled: this.form.enabled,
+        update_interval: Number(this.form.update_interval),
+        block_score: Number(this.form.block_score),
+        whitelist_ips: this.parseWhitelist(this.whitelistText),
+        last_sync: this.form.last_sync,
+        ip_count: this.form.ip_count
+      };
+      try {
+        const r = await fetch('/api/threat-intel/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        if (!r.ok) throw new Error(await r.text() || r.statusText);
+        const saved = await r.json();
+        this.form.last_sync = saved.last_sync || this.form.last_sync;
+        this.form.ip_count = saved.ip_count ?? this.form.ip_count;
+        this.okBanner = 'Pengaturan disimpan.';
+        setTimeout(() => { this.okBanner = ''; }, 4000);
+      } catch (e) {
+        this.errorBanner = e.message || String(e);
+      } finally {
+        this.saving = false;
+      }
+    },
+    async refreshFromDisk() {
+      this.syncing = true;
+      this.errorBanner = '';
+      this.okBanner = '';
+      try {
+        const r = await fetch('/api/threat-intel/sync', { method: 'POST' });
+        if (!r.ok) throw new Error(await r.text() || r.statusText);
+        const data = await r.json();
+        const msg = (data.message || 'OK') + (data.last_sync ? ' — ' + data.last_sync : '');
+        this.okBanner = msg;
+        await this.load();
+      } catch (e) {
+        this.errorBanner = e.message || String(e);
+      } finally {
+        this.syncing = false;
+      }
+    }
+  };
+}
+</script>
+{{end}}
