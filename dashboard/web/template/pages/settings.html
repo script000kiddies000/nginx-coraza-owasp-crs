@@ -1,158 +1,31 @@
 {{define "content"}}
-<div class="max-w-3xl space-y-8" x-data="settingsApp()" x-init="load()">
-
-  <template x-if="loading">
-    <div class="flex items-center gap-3 text-gray-500 text-sm py-8">
-      <svg class="animate-spin w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"></path>
-      </svg>
-      Memuat pengaturan…
-    </div>
-  </template>
-
-  <div x-show="!loading" x-cloak class="space-y-8">
-
+<div class="max-w-3xl space-y-6">
   <p class="text-gray-400 text-sm">
-    Pengaturan global WAF dan CRS. Perubahan menulis ulang file di volume
-    <span class="font-mono text-gray-500">config/coraza/custom</span> lalu <span class="font-mono text-gray-500">nginx -s reload</span>.
+    Pengaturan sistem: kelola pengguna dashboard, atau buka penyetelan WAF/CRS di menu <span class="text-gray-300">WAF → WAF Settings</span>.
   </p>
 
-  <!-- Alerts -->
-  <div x-show="okMsg" x-cloak x-transition
-       class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-200 text-sm px-4 py-3"
-       x-text="okMsg"></div>
-  <div x-show="errMsg" x-cloak x-transition
-       class="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-200 text-sm px-4 py-3"
-       x-text="errMsg"></div>
-
-  <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-6">
-    <h2 class="text-sm font-semibold text-white border-b border-gray-800 pb-3">Mesin Coraza (global)</h2>
-
-    <div>
-      <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">SecRuleEngine</p>
-      <div class="grid sm:grid-cols-3 gap-2">
-        <template x-for="opt in modes" :key="opt.v">
-          <label class="cursor-pointer">
-            <input type="radio" class="peer sr-only" name="wafmode" :value="opt.v" x-model="form.mode">
-            <div class="rounded-lg border px-3 py-3 text-center text-sm transition-colors peer-checked:border-emerald-500/60 peer-checked:bg-emerald-500/10 peer-checked:text-emerald-300 border-gray-700 text-gray-400 hover:border-gray-600">
-              <span class="font-semibold block" x-text="opt.label"></span>
-              <span class="text-xs opacity-70 mt-1 block" x-text="opt.hint"></span>
-            </div>
-          </label>
-        </template>
+  <div class="grid sm:grid-cols-2 gap-4">
+    <a href="/waf/settings"
+       class="group rounded-xl border border-gray-800 bg-gray-900/60 p-5 hover:border-emerald-500/30 hover:bg-gray-900 transition-colors">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="text-emerald-400 text-lg">🛡</span>
+        <h2 class="text-sm font-semibold text-white group-hover:text-emerald-300">WAF Settings</h2>
       </div>
-    </div>
-  </div>
+      <p class="text-xs text-gray-500 leading-relaxed">Mode Coraza, paranoia CRS, threshold anomaly — sama dengan halaman di grup WAF.</p>
+    </a>
 
-  <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-6">
-    <h2 class="text-sm font-semibold text-white border-b border-gray-800 pb-3">OWASP CRS — penyetelan</h2>
-
-    <div>
-      <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Paranoia level (1–4)</label>
-      <input type="range" min="1" max="4" step="1" x-model.number="form.paranoia_level"
-             class="w-full accent-emerald-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer">
-      <div class="flex justify-between text-xs text-gray-600 mt-1">
-        <span>1 — default</span>
-        <span class="text-white font-mono font-semibold" x-text="form.paranoia_level"></span>
-        <span>4 — ketat</span>
+    <a href="/settings/users"
+       class="group rounded-xl border border-gray-800 bg-gray-900/60 p-5 hover:border-emerald-500/30 hover:bg-gray-900 transition-colors">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="text-sky-400 text-lg">👤</span>
+        <h2 class="text-sm font-semibold text-white group-hover:text-emerald-300">Manajemen pengguna</h2>
       </div>
-      <p class="text-xs text-gray-600 mt-2 leading-relaxed">
-        Level lebih tinggi mengaktifkan lebih banyak aturan CRS; risiko false positive naik. Disimpan ke
-        <span class="font-mono">flux_crs_tune.conf</span>.
-      </p>
-    </div>
-
-    <div>
-      <label for="anomaly_in" class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-        Inbound anomaly score threshold (1–999)
-      </label>
-      <input id="anomaly_in" type="number" min="1" max="999" x-model.number="form.anomaly_inbound"
-             class="w-full max-w-xs bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/50 outline-none">
-      <p class="text-xs text-gray-600 mt-2">
-        Skor anomali inbound kumulatif sebelum pemblokiran (mode scoring CRS). Default umum: <span class="font-mono">5</span>.
-      </p>
-    </div>
+      <p class="text-xs text-gray-500 leading-relaxed">Tambah, hapus, dan reset password akun dashboard (perlu role admin).</p>
+    </a>
   </div>
 
-  <div class="flex flex-wrap items-center gap-3">
-    <button type="button" @click="save()" :disabled="saving || loading"
-            class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:pointer-events-none text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors">
-      <svg x-show="!saving" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-        <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/>
-      </svg>
-      <span x-text="saving ? 'Menyimpan…' : 'Simpan & terapkan'"></span>
-    </button>
-    <button type="button" @click="load()" :disabled="saving || loading"
-            class="text-sm text-gray-500 hover:text-gray-300 transition-colors">
-      Batalkan / muat ulang
-    </button>
-  </div>
-
-  <div class="rounded-xl border border-gray-800 bg-gray-950/50 p-5 text-xs text-gray-600 space-y-2 font-mono leading-relaxed">
-    <p class="text-gray-500 font-sans font-medium text-sm mb-2">File terkait</p>
-    <p><span class="text-gray-500">Mode engine:</span> /etc/nginx/coraza/custom/flux_waf_mode.conf</p>
-    <p><span class="text-gray-500">CRS tune:</span> /etc/nginx/coraza/custom/flux_crs_tune.conf</p>
-    <p class="text-gray-500 font-sans pt-2">Outbound anomaly threshold tetap mengikuti <span class="font-mono">crs-setup.conf</span> kecuali Anda sunting manual.</p>
-  </div>
-
+  <div class="rounded-xl border border-gray-800 bg-gray-950/40 p-4 text-xs text-gray-600">
+    <p>Volume data: <span class="font-mono text-gray-500">flux-data/data.db</span> · Password admin awal dari env <span class="font-mono">FLUX_ADMIN_PASSWORD</span>.</p>
   </div>
 </div>
-
-<script>
-function settingsApp() {
-  return {
-    loading: true,
-    saving: false,
-    okMsg: '',
-    errMsg: '',
-    form: { mode: 'On', paranoia_level: 1, anomaly_inbound: 5 },
-    modes: [
-      { v: 'On', label: 'On', hint: 'Blokir pelanggaran' },
-      { v: 'DetectionOnly', label: 'Detection only', hint: 'Log saja' },
-      { v: 'Off', label: 'Off', hint: 'WAF engine mati' }
-    ],
-    async load() {
-      this.loading = true;
-      this.okMsg = '';
-      this.errMsg = '';
-      try {
-        const r = await fetch('/api/waf/settings');
-        if (!r.ok) throw new Error(await r.text() || r.statusText);
-        const d = await r.json();
-        this.form = {
-          mode: d.mode || 'On',
-          paranoia_level: Number(d.paranoia_level) || 1,
-          anomaly_inbound: Number(d.anomaly_inbound) || 5
-        };
-      } catch (e) {
-        this.errMsg = e.message || String(e);
-      } finally {
-        this.loading = false;
-      }
-    },
-    async save() {
-      this.saving = true;
-      this.okMsg = '';
-      this.errMsg = '';
-      try {
-        const r = await fetch('/api/waf/settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.form)
-        });
-        const t = await r.text();
-        let j = {};
-        try { j = JSON.parse(t); } catch (_) {}
-        if (!r.ok) throw new Error(j.error || t || r.statusText);
-        this.okMsg = 'Pengaturan disimpan dan nginx dimuat ulang.';
-      } catch (e) {
-        this.errMsg = e.message || String(e);
-      } finally {
-        this.saving = false;
-      }
-    }
-  };
-}
-</script>
 {{end}}

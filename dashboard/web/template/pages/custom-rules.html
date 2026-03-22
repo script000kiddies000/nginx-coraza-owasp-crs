@@ -1,0 +1,87 @@
+{{define "content"}}
+<div class="max-w-5xl space-y-6" x-data="customRulesApp()" x-init="init()">
+
+  <template x-if="checking">
+    <div class="text-gray-500 text-sm py-6">Memuat…</div>
+  </template>
+
+  <div x-show="!checking && !isAdmin" x-cloak class="rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-200 text-sm px-4 py-4">
+    Anda bisa <strong>membaca</strong> aturan. Hanya <strong>admin</strong> yang dapat menyimpan perubahan.
+  </div>
+
+  <div x-show="!checking" x-cloak class="space-y-4">
+    <p class="text-gray-400 text-sm">
+      File <span class="font-mono text-gray-500">flux_user_rules.conf</span> di-include dari Coraza sebelum CRS tuning.
+      Gunakan sintaks Coraza/ModSecurity (<span class="font-mono">SecRule</span>, dll.). ID disarankan ≥ 9900000.
+    </p>
+
+    <div x-show="msgOk" x-cloak class="text-sm text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-lg px-4 py-2" x-text="msgOk"></div>
+    <div x-show="msgErr" x-cloak class="text-sm text-rose-400 border border-rose-500/30 bg-rose-500/10 rounded-lg px-4 py-2" x-text="msgErr"></div>
+
+    <textarea x-model="content" rows="18"
+              class="w-full font-mono text-xs leading-relaxed bg-gray-950 border border-gray-800 rounded-xl p-4 text-gray-200 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+              placeholder="# SecRule ..."></textarea>
+
+    <div class="flex flex-wrap gap-3">
+      <button type="button" @click="save()" :disabled="saving || !isAdmin"
+              class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold px-5 py-2 rounded-lg">
+        Simpan &amp; reload nginx
+      </button>
+      <button type="button" @click="load()" class="text-sm text-gray-500 hover:text-gray-300">Muat ulang dari disk</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function customRulesApp() {
+  return {
+    checking: true,
+    isAdmin: false,
+    content: '',
+    saving: false,
+    msgOk: '',
+    msgErr: '',
+    async init() {
+      try {
+        const me = await fetch('/api/me').then(r => r.json());
+        this.isAdmin = me.role === 'admin';
+      } catch (_) {}
+      await this.load();
+      this.checking = false;
+    },
+    async load() {
+      this.msgErr = '';
+      const r = await fetch('/api/waf/custom-rules');
+      if (!r.ok) {
+        this.msgErr = await r.text();
+        return;
+      }
+      const d = await r.json();
+      this.content = d.content || '';
+    },
+    async save() {
+      if (!this.isAdmin) return;
+      this.saving = true;
+      this.msgOk = '';
+      this.msgErr = '';
+      try {
+        const r = await fetch('/api/waf/custom-rules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: this.content })
+        });
+        const t = await r.text();
+        let j = {};
+        try { j = JSON.parse(t); } catch (_) {}
+        if (!r.ok) throw new Error(j.error || t);
+        this.msgOk = 'Disimpan. Nginx reload dipicu.';
+      } catch (e) {
+        this.msgErr = e.message || String(e);
+      } finally {
+        this.saving = false;
+      }
+    }
+  };
+}
+</script>
+{{end}}

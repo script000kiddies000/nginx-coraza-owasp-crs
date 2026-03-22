@@ -1,0 +1,142 @@
+{{define "content"}}
+<div class="max-w-3xl space-y-8" x-data="wafSettingsApp()" x-init="load()">
+
+  <template x-if="loading">
+    <div class="flex items-center gap-3 text-gray-500 text-sm py-8">
+      <svg class="animate-spin w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      Memuat pengaturan…
+    </div>
+  </template>
+
+  <div x-show="!loading" x-cloak class="space-y-8">
+
+  <p class="text-gray-400 text-sm">
+    Pengaturan global WAF dan CRS. Perubahan menulis ulang file di volume
+    <span class="font-mono text-gray-500">config/coraza/custom</span> lalu <span class="font-mono text-gray-500">nginx -s reload</span>.
+  </p>
+
+  <div x-show="okMsg" x-cloak x-transition
+       class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-200 text-sm px-4 py-3"
+       x-text="okMsg"></div>
+  <div x-show="errMsg" x-cloak x-transition
+       class="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-200 text-sm px-4 py-3"
+       x-text="errMsg"></div>
+
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-6">
+    <h2 class="text-sm font-semibold text-white border-b border-gray-800 pb-3">Mesin Coraza (global)</h2>
+    <div>
+      <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">SecRuleEngine</p>
+      <div class="grid sm:grid-cols-3 gap-2">
+        <template x-for="opt in modes" :key="opt.v">
+          <label class="cursor-pointer">
+            <input type="radio" class="peer sr-only" name="wafmode" :value="opt.v" x-model="form.mode">
+            <div class="rounded-lg border px-3 py-3 text-center text-sm transition-colors peer-checked:border-emerald-500/60 peer-checked:bg-emerald-500/10 peer-checked:text-emerald-300 border-gray-700 text-gray-400 hover:border-gray-600">
+              <span class="font-semibold block" x-text="opt.label"></span>
+              <span class="text-xs opacity-70 mt-1 block" x-text="opt.hint"></span>
+            </div>
+          </label>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-6">
+    <h2 class="text-sm font-semibold text-white border-b border-gray-800 pb-3">OWASP CRS — penyetelan</h2>
+    <div>
+      <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Paranoia level (1–4)</label>
+      <input type="range" min="1" max="4" step="1" x-model.number="form.paranoia_level"
+             class="w-full accent-emerald-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer">
+      <div class="flex justify-between text-xs text-gray-600 mt-1">
+        <span>1 — default</span>
+        <span class="text-white font-mono font-semibold" x-text="form.paranoia_level"></span>
+        <span>4 — ketat</span>
+      </div>
+      <p class="text-xs text-gray-600 mt-2 leading-relaxed">
+        Disimpan ke <span class="font-mono">flux_crs_tune.conf</span>.
+      </p>
+    </div>
+    <div>
+      <label for="anomaly_in" class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+        Inbound anomaly score threshold (1–999)
+      </label>
+      <input id="anomaly_in" type="number" min="1" max="999" x-model.number="form.anomaly_inbound"
+             class="w-full max-w-xs bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono focus:ring-2 focus:ring-emerald-500/40 outline-none">
+    </div>
+  </div>
+
+  <div class="flex flex-wrap items-center gap-3">
+    <button type="button" @click="save()" :disabled="saving || loading"
+            class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors">
+      <span x-text="saving ? 'Menyimpan…' : 'Simpan & terapkan'"></span>
+    </button>
+    <button type="button" @click="load()" :disabled="saving || loading" class="text-sm text-gray-500 hover:text-gray-300">Muat ulang</button>
+  </div>
+
+  <div class="rounded-xl border border-gray-800 bg-gray-950/50 p-5 text-xs text-gray-600 space-y-2 font-mono">
+    <p><span class="text-gray-500">Mode:</span> flux_waf_mode.conf</p>
+    <p><span class="text-gray-500">CRS:</span> flux_crs_tune.conf</p>
+  </div>
+
+  </div>
+</div>
+
+<script>
+function wafSettingsApp() {
+  return {
+    loading: true,
+    saving: false,
+    okMsg: '',
+    errMsg: '',
+    form: { mode: 'On', paranoia_level: 1, anomaly_inbound: 5 },
+    modes: [
+      { v: 'On', label: 'On', hint: 'Blokir pelanggaran' },
+      { v: 'DetectionOnly', label: 'Detection only', hint: 'Log saja' },
+      { v: 'Off', label: 'Off', hint: 'WAF mati' }
+    ],
+    async load() {
+      this.loading = true;
+      this.okMsg = '';
+      this.errMsg = '';
+      try {
+        const r = await fetch('/api/waf/settings');
+        if (!r.ok) throw new Error(await r.text() || r.statusText);
+        const d = await r.json();
+        this.form = {
+          mode: d.mode || 'On',
+          paranoia_level: Number(d.paranoia_level) || 1,
+          anomaly_inbound: Number(d.anomaly_inbound) || 5
+        };
+      } catch (e) {
+        this.errMsg = e.message || String(e);
+      } finally {
+        this.loading = false;
+      }
+    },
+    async save() {
+      this.saving = true;
+      this.okMsg = '';
+      this.errMsg = '';
+      try {
+        const r = await fetch('/api/waf/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.form)
+        });
+        const t = await r.text();
+        let j = {};
+        try { j = JSON.parse(t); } catch (_) {}
+        if (!r.ok) throw new Error(j.error || t || r.statusText);
+        this.okMsg = 'Pengaturan disimpan dan nginx dimuat ulang.';
+      } catch (e) {
+        this.errMsg = e.message || String(e);
+      } finally {
+        this.saving = false;
+      }
+    }
+  };
+}
+</script>
+{{end}}

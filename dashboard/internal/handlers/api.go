@@ -213,7 +213,6 @@ func (app *App) APIDeleteHost(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) APIGetSSL(w http.ResponseWriter, r *http.Request)    { stubJSON(w) }
 func (app *App) APIUploadSSL(w http.ResponseWriter, r *http.Request) { stubJSON(w) }
-func (app *App) APIUsers(w http.ResponseWriter, r *http.Request)     { stubJSON(w) }
 
 // ── Bot Management ────────────────────────────────────────────────────────────
 

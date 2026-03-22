@@ -1,0 +1,56 @@
+{{define "content"}}
+<div class="max-w-4xl space-y-6" x-data="atkReportApp()" x-init="load()">
+  <p class="text-gray-400 text-sm">
+    Fokus pada pola serangan (rule ID, IP) dari sampel event. Export terperinci mengikuti pengembangan API laporan.
+  </p>
+
+  <div class="rounded-xl border border-gray-800 bg-gray-900/60 p-5">
+    <h2 class="text-sm font-semibold text-white mb-3">Top rule ID (dari sampel)</h2>
+    <template x-if="topRules.length === 0">
+      <p class="text-sm text-gray-600">Tidak cukup data.</p>
+    </template>
+    <ul class="space-y-2">
+      <template x-for="row in topRules" :key="row.id">
+        <li class="flex justify-between text-sm border-b border-gray-800/80 pb-2">
+          <span class="font-mono text-amber-400/90" x-text="row.id"></span>
+          <span class="text-gray-400" x-text="row.n + '×'"></span>
+        </li>
+      </template>
+    </ul>
+  </div>
+
+  <div class="flex flex-wrap gap-3">
+    <a href="/api/reports/attack/download" class="inline-flex items-center gap-2 bg-rose-600/90 hover:bg-rose-500 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+      Unduh laporan serangan (JSON stub)
+    </a>
+    <a href="/attack-map" class="text-sm text-gray-500 hover:text-gray-300">Attack map →</a>
+  </div>
+</div>
+
+<script>
+function atkReportApp() {
+  return {
+    events: [],
+    get topRules() {
+      const m = {};
+      for (const e of this.events) {
+        const id = e.rule_id || '—';
+        m[id] = (m[id] || 0) + 1;
+      }
+      return Object.entries(m)
+        .map(([id, n]) => ({ id, n }))
+        .sort((a, b) => b.n - a.n)
+        .slice(0, 12);
+    },
+    async load() {
+      try {
+        this.events = await fetch('/api/security-events').then(r => r.json());
+        if (!Array.isArray(this.events)) this.events = [];
+      } catch (_) {
+        this.events = [];
+      }
+    }
+  };
+}
+</script>
+{{end}}

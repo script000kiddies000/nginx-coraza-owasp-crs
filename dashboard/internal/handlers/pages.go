@@ -38,14 +38,22 @@ func (app *App) PageSSL(w http.ResponseWriter, r *http.Request) {
 
 // ── WAF ───────────────────────────────────────────────────────────────────────
 
+func (app *App) PageWAFSettings(w http.ResponseWriter, r *http.Request) {
+	app.render(w, r, "waf-settings", models.PageData{Title: "WAF Settings", ActiveMenu: "wafsettings"})
+}
+
 func (app *App) PageRules(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "_stub", models.PageData{Title: "Custom Rules", ActiveMenu: "rules"})
+	app.render(w, r, "custom-rules", models.PageData{Title: "Custom Rules", ActiveMenu: "rules"})
 }
 
 // ── Security Engines ──────────────────────────────────────────────────────────
 
 func (app *App) PageVirtualPatching(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, "_stub", models.PageData{Title: "Virtual Patching", ActiveMenu: "vpatch"})
+}
+
+func (app *App) PageGeoBlocking(w http.ResponseWriter, r *http.Request) {
+	app.render(w, r, "geo-blocking", models.PageData{Title: "Geo IP Blocking", ActiveMenu: "geoblock"})
 }
 
 func (app *App) PageBotManagement(w http.ResponseWriter, r *http.Request) {
@@ -81,11 +89,11 @@ func (app *App) PageAttackMap(w http.ResponseWriter, r *http.Request) {
 // ── Reports ───────────────────────────────────────────────────────────────────
 
 func (app *App) PageSecurityReport(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "_stub", models.PageData{Title: "Security Report", ActiveMenu: "secreport"})
+	app.render(w, r, "security-report", models.PageData{Title: "Security Report", ActiveMenu: "secreport"})
 }
 
 func (app *App) PageAttackReport(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "_stub", models.PageData{Title: "Attack Report", ActiveMenu: "atkreport"})
+	app.render(w, r, "attack-report", models.PageData{Title: "Attack Report", ActiveMenu: "atkreport"})
 }
 
 func (app *App) PageMalwareScan(w http.ResponseWriter, r *http.Request) {
@@ -108,6 +116,13 @@ func (app *App) PageSettings(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, "settings", models.PageData{
 		Title:      "Settings",
 		ActiveMenu: "settings",
+	})
+}
+
+func (app *App) PageSettingsUsers(w http.ResponseWriter, r *http.Request) {
+	app.render(w, r, "settings-users", models.PageData{
+		Title:      "User Management",
+		ActiveMenu: "users",
 	})
 }
 

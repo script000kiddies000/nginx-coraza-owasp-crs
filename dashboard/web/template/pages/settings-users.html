@@ -1,0 +1,169 @@
+{{define "content"}}
+<div class="max-w-4xl space-y-6" x-data="usersApp()" x-init="init()">
+
+  <template x-if="checking">
+    <div class="text-gray-500 text-sm py-8">Memeriksa akses…</div>
+  </template>
+
+  <template x-if="!checking && forbidden">
+    <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-200 text-sm px-4 py-4">
+      Hanya <strong>admin</strong> yang dapat mengelola pengguna. Hubungi administrator Flux WAF.
+    </div>
+  </template>
+
+  <div x-show="!checking && !forbidden" x-cloak class="space-y-6">
+
+  <p class="text-gray-400 text-sm">Akun untuk login dashboard (BoltDB). Tidak bisa menghapus akun sendiri atau admin terakhir.</p>
+
+  <div x-show="msgOk" x-cloak class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-200 text-sm px-4 py-3" x-text="msgOk"></div>
+  <div x-show="msgErr" x-cloak class="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-200 text-sm px-4 py-3" x-text="msgErr"></div>
+
+  <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-800 flex justify-between items-center flex-wrap gap-2">
+      <h2 class="text-sm font-semibold text-white">Daftar pengguna</h2>
+      <button type="button" @click="showAdd = !showAdd" class="text-xs font-medium text-emerald-400 hover:text-emerald-300">+ Tambah</button>
+    </div>
+    <div x-show="showAdd" x-cloak class="p-4 border-b border-gray-800 bg-gray-950/50 grid sm:grid-cols-4 gap-2">
+      <input x-model="newUser.username" placeholder="username" class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white">
+      <input x-model="newUser.password" type="password" placeholder="password" class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white">
+      <select x-model="newUser.role" class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white">
+        <option value="admin">admin</option>
+        <option value="operator">operator</option>
+      </select>
+      <button @click="createUser()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg py-2">Simpan</button>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="text-xs text-gray-500 uppercase border-b border-gray-800">
+        <tr>
+          <th class="text-left px-4 py-2">User</th>
+          <th class="text-left px-4 py-2">Role</th>
+          <th class="text-right px-4 py-2">Aksi</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-800">
+        <template x-for="u in users" :key="u.username">
+          <tr>
+            <td class="px-4 py-3 font-mono text-gray-200" x-text="u.username"></td>
+            <td class="px-4 py-3">
+              <span class="text-xs px-2 py-0.5 rounded border"
+                    :class="u.role === 'admin' ? 'text-amber-400 border-amber-500/30' : 'text-gray-400 border-gray-700'"
+                    x-text="u.role"></span>
+            </td>
+            <td class="px-4 py-3 text-right space-x-2">
+              <button type="button" @click="openPw(u.username)" class="text-xs text-sky-400 hover:text-sky-300">Password</button>
+              <button type="button" @click="removeUser(u.username)" class="text-xs text-rose-400 hover:text-rose-300">Hapus</button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+
+  <div x-show="pwUser" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" @click.self="pwUser = null">
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 max-w-sm w-full shadow-xl">
+      <h3 class="text-sm font-semibold text-white mb-3">Password baru — <span class="font-mono text-emerald-400" x-text="pwUser"></span></h3>
+      <input type="password" x-model="pwNew" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white mb-3">
+      <div class="flex gap-2 justify-end">
+        <button type="button" @click="pwUser = null" class="text-sm text-gray-500 px-3 py-2">Batal</button>
+        <button type="button" @click="savePw()" class="text-sm bg-emerald-600 text-white px-4 py-2 rounded-lg">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  </div>
+</div>
+
+<script>
+function usersApp() {
+  return {
+    checking: true,
+    forbidden: false,
+    users: [],
+    showAdd: false,
+    newUser: { username: '', password: '', role: 'operator' },
+    msgOk: '',
+    msgErr: '',
+    pwUser: null,
+    pwNew: '',
+    async init() {
+      try {
+        const me = await fetch('/api/me').then(r => r.json());
+        if (me.role !== 'admin') {
+          this.forbidden = true;
+          return;
+        }
+        await this.loadUsers();
+      } catch (e) {
+        this.forbidden = true;
+      } finally {
+        this.checking = false;
+      }
+    },
+    async loadUsers() {
+      this.msgErr = '';
+      const r = await fetch('/api/users');
+      if (!r.ok) {
+        this.msgErr = await r.text();
+        return;
+      }
+      this.users = await r.json();
+    },
+    async createUser() {
+      this.msgOk = '';
+      this.msgErr = '';
+      const r = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.newUser)
+      });
+      const t = await r.text();
+      let j = {};
+      try { j = JSON.parse(t); } catch (_) {}
+      if (!r.ok) {
+        this.msgErr = j.error || t;
+        return;
+      }
+      this.msgOk = 'Pengguna dibuat.';
+      this.newUser = { username: '', password: '', role: 'operator' };
+      this.showAdd = false;
+      await this.loadUsers();
+    },
+    async removeUser(name) {
+      if (!confirm('Hapus pengguna ' + name + '?')) return;
+      this.msgOk = '';
+      this.msgErr = '';
+      const r = await fetch('/api/users/' + encodeURIComponent(name), { method: 'DELETE' });
+      const t = await r.text();
+      let j = {};
+      try { j = JSON.parse(t); } catch (_) {}
+      if (!r.ok) {
+        this.msgErr = j.error || t;
+        return;
+      }
+      this.msgOk = 'Pengguna dihapus.';
+      await this.loadUsers();
+    },
+    openPw(name) {
+      this.pwUser = name;
+      this.pwNew = '';
+    },
+    async savePw() {
+      const r = await fetch('/api/users/' + encodeURIComponent(this.pwUser) + '/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: this.pwNew })
+      });
+      const t = await r.text();
+      let j = {};
+      try { j = JSON.parse(t); } catch (_) {}
+      if (!r.ok) {
+        this.msgErr = j.error || t;
+        return;
+      }
+      this.msgOk = 'Password diperbarui.';
+      this.pwUser = null;
+    }
+  };
+}
+</script>
+{{end}}

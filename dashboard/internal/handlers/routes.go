@@ -29,8 +29,10 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	mux.HandleFunc("GET /attack-map", app.RequireAuth(app.PageAttackMap))
 	mux.HandleFunc("GET /hosts", app.RequireAuth(app.PageHosts))
 	mux.HandleFunc("GET /ssl", app.RequireAuth(app.PageSSL))
+	mux.HandleFunc("GET /waf/settings", app.RequireAuth(app.PageWAFSettings))
 	mux.HandleFunc("GET /rules", app.RequireAuth(app.PageRules))
 	mux.HandleFunc("GET /virtual-patching", app.RequireAuth(app.PageVirtualPatching))
+	mux.HandleFunc("GET /geo-blocking", app.RequireAuth(app.PageGeoBlocking))
 	mux.HandleFunc("GET /bot-management", app.RequireAuth(app.PageBotManagement))
 	mux.HandleFunc("GET /ip-reputations", app.RequireAuth(app.PageIPReputations))
 	mux.HandleFunc("GET /wordpress-security", app.RequireAuth(app.PageWPSecurity))
@@ -44,10 +46,14 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	mux.HandleFunc("GET /monitoring/nginx", app.RequireAuth(app.PageNginxMonitoring))
 	mux.HandleFunc("GET /monitoring/server", app.RequireAuth(app.PageServerMonitoring))
 	mux.HandleFunc("GET /settings", app.RequireAuth(app.PageSettings))
+	mux.HandleFunc("GET /settings/users", app.RequireAuth(app.PageSettingsUsers))
 
 	// ── JSON API ──────────────────────────────────────────────────────────
 	mux.HandleFunc("GET /api/me", app.RequireAuth(app.APIMe))
-	mux.HandleFunc("GET /api/users", app.RequireAuth(app.APIUsers))
+	mux.HandleFunc("GET /api/users", app.RequireAuth(app.APIListUsers))
+	mux.HandleFunc("POST /api/users", app.RequireAuth(app.APICreateUser))
+	mux.HandleFunc("DELETE /api/users/{username}", app.RequireAuth(app.APIDeleteUser))
+	mux.HandleFunc("POST /api/users/{username}/password", app.RequireAuth(app.APISetUserPassword))
 	mux.HandleFunc("GET /api/stats", app.RequireAuth(app.APIStats))
 	mux.HandleFunc("GET /api/traffic", app.RequireAuth(app.APITraffic))
 	mux.HandleFunc("GET /api/security-events", app.RequireAuth(app.APISecurityEvents))
@@ -63,6 +69,8 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	mux.HandleFunc("POST /api/waf/settings", app.RequireAuth(app.APIPostWAFSettings))
 	mux.HandleFunc("POST /api/waf/toggle", app.RequireAuth(app.APIWafToggle))
 	mux.HandleFunc("GET /api/waf/top-messages", app.RequireAuth(app.APIWAFTopMessages))
+	mux.HandleFunc("GET /api/waf/custom-rules", app.RequireAuth(app.APIGetCustomRules))
+	mux.HandleFunc("POST /api/waf/custom-rules", app.RequireAuth(app.APIPostCustomRules))
 	mux.HandleFunc("POST /api/rules/custom", app.RequireAuth(app.APICustomRules))
 	mux.HandleFunc("POST /api/rules/configure", app.RequireAuth(app.APIConfigureRules))
 
@@ -95,6 +103,8 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 
 	mux.HandleFunc("GET /api/system/nginx-status", app.RequireAuth(app.APINginxStatus))
 	mux.HandleFunc("GET /api/system/server-health", app.RequireAuth(app.APIServerHealth))
+	mux.HandleFunc("GET /api/security/geo-block", app.RequireAuth(app.APIGetGeoBlock))
+	mux.HandleFunc("POST /api/security/geo-block", app.RequireAuth(app.APIPostGeoBlock))
 
 	mux.HandleFunc("GET /api/reports/security/download", app.RequireAuth(app.APIDownloadSecurityReport))
 	mux.HandleFunc("GET /api/reports/attack/download", app.RequireAuth(app.APIDownloadAttackReport))

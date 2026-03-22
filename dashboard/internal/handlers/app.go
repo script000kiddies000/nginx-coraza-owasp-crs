@@ -96,6 +96,16 @@ func withUsername(r *http.Request, username string) *http.Request {
 	return r.WithContext(ctx)
 }
 
+// requireAdmin responds with 403 JSON unless the current user has role "admin".
+func (app *App) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
+	u, err := store.GetUser(app.DB, usernameFromCtx(r))
+	if err != nil || u.Role != "admin" {
+		jsonError(w, "admin privileges required", http.StatusForbidden)
+		return false
+	}
+	return true
+}
+
 // RequireAuth wraps a handler and redirects to /login if no valid session exists.
 func (app *App) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

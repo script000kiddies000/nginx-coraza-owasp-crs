@@ -18,8 +18,8 @@ services:
       - ./config/errors:/etc/nginx/errors:ro
       # Threat intel — rw karena sync_threat_intel.py nulis ip_rules.conf dari host
       - ./config/threat-intel:/etc/nginx/threat-intel:rw
-      # GeoIP2 — ro, mmdb diupdate dari host dengan download-geolite2.sh
-      - ./config/geoip:/etc/nginx/geoip:ro
+      # GeoIP2 — rw agar dashboard bisa menulis geoip-blocked-countries.conf (Geo blocking)
+      - ./config/geoip:/etc/nginx/geoip:rw
       - ./config/coraza/coraza.conf:/etc/nginx/coraza/coraza.conf:ro
       - ./config/coraza/custom:/etc/nginx/coraza/custom:ro
       # CRS mounted as rw so s6 init can copy crs-setup.conf from example

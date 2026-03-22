@@ -1,0 +1,84 @@
+{{define "content"}}
+<div class="max-w-3xl space-y-6" x-data="geoApp()" x-init="init()">
+
+  <p class="text-gray-400 text-sm">
+    Negara dengan kode ISO 3166-1 alpha-2 (dua huruf) akan mendapat <span class="font-mono text-gray-500">403</span> lewat map
+    <span class="font-mono text-gray-500">$geoip2_blocked_country</span> di <span class="font-mono text-gray-500">nginx.conf</span>.
+    Pastikan volume <span class="font-mono text-gray-500">config/geoip</span> ter-mount <strong>rw</strong>.
+  </p>
+
+  <div x-show="!checking && !isAdmin" x-cloak class="rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-200 text-sm px-4 py-4">
+    Hanya <strong>admin</strong> yang dapat menyimpan daftar blokir.
+  </div>
+
+  <div x-show="!checking" x-cloak class="space-y-4">
+    <div x-show="msgOk" x-cloak class="text-sm text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-lg px-4 py-2" x-text="msgOk"></div>
+    <div x-show="msgErr" x-cloak class="text-sm text-rose-400 border border-rose-500/30 bg-rose-500/10 rounded-lg px-4 py-2" x-text="msgErr"></div>
+
+    <label class="block text-xs font-medium text-gray-500 uppercase mb-2">Kode negara (pisahkan koma atau spasi)</label>
+    <textarea x-model="codesText" rows="4" :readonly="!isAdmin"
+              class="w-full font-mono text-sm bg-gray-950 border border-gray-800 rounded-xl p-4 text-gray-200 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+              placeholder="CN, RU, KP, IR"></textarea>
+    <p class="text-xs text-gray-600">Contoh: <span class="font-mono">CN RU IR</span> — huruf besar, dua karakter per negara.</p>
+
+    <div class="flex flex-wrap gap-3">
+      <button type="button" @click="save()" :disabled="saving || !isAdmin"
+              class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold px-5 py-2 rounded-lg">
+        Simpan &amp; reload nginx
+      </button>
+      <button type="button" @click="load()" class="text-sm text-gray-500 hover:text-gray-300">Muat ulang</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function geoApp() {
+  return {
+    checking: true,
+    isAdmin: false,
+    codesText: '',
+    saving: false,
+    msgOk: '',
+    msgErr: '',
+    async init() {
+      try {
+        const me = await fetch('/api/me').then(r => r.json());
+        this.isAdmin = me.role === 'admin';
+      } catch (_) {}
+      await this.load();
+      this.checking = false;
+    },
+    async load() {
+      const r = await fetch('/api/security/geo-block');
+      if (!r.ok) return;
+      const d = await r.json();
+      this.codesText = (d.countries || []).join(', ');
+    },
+    async save() {
+      if (!this.isAdmin) return;
+      const parts = this.codesText.split(/[\s,;]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+      this.saving = true;
+      this.msgOk = '';
+      this.msgErr = '';
+      try {
+        const r = await fetch('/api/security/geo-block', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ countries: parts })
+        });
+        const t = await r.text();
+        let j = {};
+        try { j = JSON.parse(t); } catch (_) {}
+        if (!r.ok) throw new Error(j.error || t);
+        this.msgOk = 'Map GeoIP diperbarui dan nginx reload.';
+        await this.load();
+      } catch (e) {
+        this.msgErr = e.message || String(e);
+      } finally {
+        this.saving = false;
+      }
+    }
+  };
+}
+</script>
+{{end}}

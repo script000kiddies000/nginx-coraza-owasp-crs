@@ -1,0 +1,58 @@
+{{define "content"}}
+<div class="max-w-4xl space-y-6" x-data="secReportApp()" x-init="load()">
+  <p class="text-gray-400 text-sm">
+    Ringkasan keamanan dari statistik dashboard dan event terbaru. Unduh laporan lengkap saat endpoint export sudah tersedia.
+  </p>
+
+  <div class="grid sm:grid-cols-3 gap-4">
+    <div class="rounded-xl border border-gray-800 bg-gray-900/60 p-4">
+      <p class="text-xs text-gray-500 uppercase">Hosts</p>
+      <p class="text-2xl font-bold text-white mt-1" x-text="stats.host_count ?? '—'"></p>
+    </div>
+    <div class="rounded-xl border border-gray-800 bg-gray-900/60 p-4">
+      <p class="text-xs text-gray-500 uppercase">WAF mode</p>
+      <p class="text-lg font-semibold text-emerald-400 mt-1 font-mono" x-text="stats.waf_mode ?? '—'"></p>
+    </div>
+    <div class="rounded-xl border border-gray-800 bg-gray-900/60 p-4">
+      <p class="text-xs text-gray-500 uppercase">Event (sample)</p>
+      <p class="text-2xl font-bold text-white mt-1" x-text="events.length"></p>
+    </div>
+  </div>
+
+  <div class="rounded-xl border border-gray-800 bg-gray-900/60 p-5">
+    <h2 class="text-sm font-semibold text-white mb-3">Event keamanan terbaru</h2>
+    <ul class="text-xs font-mono text-gray-400 space-y-2 max-h-48 overflow-y-auto">
+      <template x-for="e in events.slice(0,8)" :key="e.time + e.rule_id">
+        <li><span class="text-gray-600" x-text="e.time"></span> · <span class="text-amber-400/90" x-text="e.rule_id"></span> · <span x-text="e.message || e.client_ip"></span></li>
+      </template>
+      <li x-show="events.length === 0" class="text-gray-600">Belum ada data.</li>
+    </ul>
+  </div>
+
+  <div class="flex flex-wrap gap-3">
+    <a href="/api/reports/security/download" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+      Unduh laporan (JSON stub)
+    </a>
+    <a href="/security-logs" class="text-sm text-gray-500 hover:text-gray-300">Lihat semua event →</a>
+  </div>
+</div>
+
+<script>
+function secReportApp() {
+  return {
+    stats: {},
+    events: [],
+    async load() {
+      try {
+        const [s, ev] = await Promise.all([
+          fetch('/api/stats').then(r => r.json()),
+          fetch('/api/security-events').then(r => r.json())
+        ]);
+        this.stats = s;
+        this.events = Array.isArray(ev) ? ev : [];
+      } catch (_) {}
+    }
+  };
+}
+</script>
+{{end}}
