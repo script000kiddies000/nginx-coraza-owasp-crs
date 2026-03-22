@@ -1,120 +1,284 @@
 {{define "content"}}
-<div class="space-y-4" x-data="attackMapApp()" x-init="init()">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  .flux-ct-map .leaflet-container { background: #0a0d12; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+  .flux-ct-map .leaflet-control-zoom a {
+    background: rgba(15, 23, 42, 0.92) !important;
+    color: #94a3b8 !important;
+    border: 1px solid rgba(51, 65, 85, 0.8) !important;
+  }
+  .flux-ct-map .leaflet-control-zoom a:hover { color: #22d3ee !important; }
+  .flux-ct-map .leaflet-control-attribution {
+    background: rgba(10, 13, 18, 0.85) !important;
+    color: #475569 !important;
+    font-size: 10px;
+    max-width: 40%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .flux-ct-map .leaflet-control-attribution a { color: #64748b; }
+  @keyframes flux-target-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(34, 211, 153, 0.55); }
+    50% { transform: scale(1.08); opacity: 0.95; box-shadow: 0 0 24px 10px rgba(34, 211, 153, 0.2); }
+  }
+  .flux-target-dot {
+    width: 14px; height: 14px; border-radius: 9999px;
+    background: #22c55e;
+    border: 2px solid rgba(167, 243, 208, 0.9);
+    animation: flux-target-pulse 2s ease-in-out infinite;
+  }
+  .flux-src-dot {
+    width: 8px; height: 8px; border-radius: 9999px;
+    background: #f97316;
+    border: 1px solid rgba(254, 215, 170, 0.9);
+    box-shadow: 0 0 12px rgba(249, 115, 22, 0.45);
+  }
+  .flux-digital { font-family: 'Share Tech Mono', ui-monospace, monospace; }
+  .flux-feed-scroll::-webkit-scrollbar { width: 6px; }
+  .flux-feed-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+</style>
 
-  <div class="flex flex-wrap items-center justify-between gap-3">
-    <p class="text-gray-400 text-sm max-w-2xl" x-text="label || 'Memuat…'"></p>
-    <span x-show="demo" class="text-xs font-medium text-amber-400/90 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full">Demo / sample</span>
-  </div>
+<div class="flux-ct-map -m-6 flex flex-col min-h-[calc(100vh-3.5rem)] bg-[#070a0f] text-slate-200 border-t border-slate-800/80"
+     x-data="attackMapApp()" x-init="init()">
 
-  <div class="grid lg:grid-cols-5 gap-4 min-h-[480px]">
+  <!-- HUD header (WafX-style) -->
+  <header class="flex flex-wrap items-center gap-4 px-4 py-3 border-b border-slate-800/90 bg-gradient-to-r from-[#0a0d12] via-[#0d1117] to-[#0a0d12] shrink-0">
+    <div class="flex items-center gap-3 min-w-0">
+      <span class="text-cyan-400 font-bold tracking-tight text-sm shrink-0">Flux<span class="text-white">WAF</span></span>
+      <span class="hidden sm:inline text-slate-600">|</span>
+      <div class="min-w-0">
+        <p class="text-[10px] sm:text-xs font-semibold tracking-[0.2em] text-cyan-500/90 uppercase truncate">Cyberthreat Live Map</p>
+        <p class="text-[10px] text-slate-500 hidden md:block">Flux WAF · security intelligence</p>
+      </div>
+    </div>
 
-    <!-- Map -->
-    <div class="lg:col-span-3 rounded-xl border border-gray-800 bg-gray-950 overflow-hidden relative">
-      <div class="absolute top-3 left-3 z-10 text-xs text-gray-500">Proyeksi equirectangular · lintang/bujur sampel</div>
-      <svg class="w-full h-full min-h-[420px] block" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet">
-        <!-- subtle grid -->
-        <defs>
-          <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" style="stop-color:rgb(16,185,129);stop-opacity:0.15" />
-            <stop offset="100%" style="stop-color:rgb(244,63,94);stop-opacity:0.35" />
-          </linearGradient>
-        </defs>
-        <rect width="1000" height="500" fill="#030712"/>
-        <g stroke="#1f2937" stroke-width="0.5" fill="none">
-          <line x1="0" y1="125" x2="1000" y2="125"/><line x1="0" y1="250" x2="1000" y2="250"/><line x1="0" y1="375" x2="1000" y2="375"/>
-          <line x1="250" y1="0" x2="250" y2="500"/><line x1="500" y1="0" x2="500" y2="500"/><line x1="750" y1="0" x2="750" y2="500"/>
-        </g>
+    <div class="flex flex-wrap items-center gap-4 md:gap-8 ml-auto">
+      <div class="text-right">
+        <p class="text-[9px] uppercase tracking-widest text-slate-500">Total attacks (24h demo)</p>
+        <p class="flux-digital text-2xl md:text-3xl text-emerald-400 leading-none tabular-nums drop-shadow-[0_0_12px_rgba(52,211,153,0.35)]"
+           x-text="totalToday.toLocaleString()">0</p>
+      </div>
+      <div class="text-right border-l border-slate-800 pl-4 md:pl-8">
+        <p class="flux-digital text-xl text-slate-300 tabular-nums" x-text="clockTime">00:00:00</p>
+        <p class="text-[10px] text-slate-500" x-text="clockDate">—</p>
+      </div>
+      <div class="flex items-center gap-2 text-[10px] sm:text-xs font-medium text-emerald-400/90 whitespace-nowrap">
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+        </span>
+        System online · detecting threats
+      </div>
+    </div>
+  </header>
 
-        <template x-for="(p, idx) in points" :key="idx">
-          <g>
-            <path :d="arcPath(p)" fill="none" stroke="url(#arcGrad)" stroke-width="1.2" class="opacity-80"/>
-            <circle :cx="lonX(p.source_lon)" :cy="latY(p.source_lat)" r="5" fill="#f43f5e" fill-opacity="0.85"/>
-            <circle :cx="lonX(p.target_lon)" :cy="latY(p.target_lat)" r="7" fill="#10b981" fill-opacity="0.9"/>
-          </g>
+  <div class="flex flex-1 flex-col lg:flex-row min-h-0 min-h-[560px] lg:min-h-[calc(100vh-7.5rem)]">
+
+    <!-- Left: real-time detection -->
+    <aside class="w-full lg:w-[270px] shrink-0 border-b lg:border-b-0 lg:border-r border-slate-800 bg-[#080b10]/95 flex flex-col max-h-[280px] lg:max-h-none">
+      <div class="px-3 py-2 border-b border-slate-800/80 flex items-center gap-2">
+        <span class="w-1.5 h-1.5 bg-cyan-500 rounded-sm"></span>
+        <h2 class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Real-time detection</h2>
+      </div>
+      <div class="flex-1 overflow-y-auto flux-feed-scroll px-2 py-2 space-y-1">
+        <template x-for="(c, idx) in categories" :key="c.code">
+          <div class="rounded-md px-2 py-1.5 hover:bg-slate-800/40 transition-colors">
+            <div class="flex justify-between gap-2 text-[11px] leading-tight">
+              <span class="text-cyan-600/90 font-mono w-8 shrink-0" x-text="c.code"></span>
+              <span class="text-slate-400 truncate" x-text="c.label"></span>
+              <span class="flux-digital text-amber-400/90 shrink-0 tabular-nums" x-text="c.count"></span>
+            </div>
+            <div class="mt-1 h-1 rounded-full bg-slate-800 overflow-hidden">
+              <div class="h-full rounded-full transition-all duration-500"
+                   :class="barColorClass(idx)"
+                   :style="'width:' + barPct(c.count) + '%'"></div>
+            </div>
+          </div>
         </template>
-
-        <circle :cx="lonX(originLon)" :cy="latY(originLat)" r="10" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="4 3" class="opacity-70"/>
-      </svg>
-    </div>
-
-    <!-- Feed -->
-    <div class="lg:col-span-2 flex flex-col rounded-xl border border-gray-800 bg-gray-900/50 min-h-[420px]">
-      <div class="px-4 py-3 border-b border-gray-800 flex justify-between items-center">
-        <h2 class="text-sm font-semibold text-white">Log serangan (24 jam)</h2>
-        <span class="text-xs text-gray-500">Loop demo</span>
       </div>
-      <div class="flex-1 overflow-hidden flex flex-col">
-        <div class="px-3 py-2 text-xs text-gray-600 border-b border-gray-800/80">Feed berputar — entri diambil bergantian dari sampel API</div>
-        <ul class="flex-1 overflow-y-auto divide-y divide-gray-800/80 font-mono text-xs">
-          <template x-for="row in feed" :key="row._key">
-            <li class="px-3 py-2.5 hover:bg-gray-800/30 transition-colors">
-              <div class="flex justify-between gap-2 text-gray-500 mb-0.5">
-                <span x-text="fmtTime(row.ts)"></span>
-                <span class="text-amber-400/90" x-text="row.rule_id"></span>
-              </div>
-              <div class="text-gray-300" x-text="row.attack_type"></div>
-              <div class="text-gray-500 mt-0.5 truncate" x-text="row.source + ' → ' + row.target"></div>
-            </li>
-          </template>
-        </ul>
+      <p class="px-3 py-2 text-[10px] text-slate-600 border-t border-slate-800/60" x-show="demo">
+        <span class="text-amber-500/80">Demo</span> · <span x-text="label"></span>
+      </p>
+    </aside>
+
+    <!-- Map + feed overlay -->
+    <div class="relative flex-1 min-h-[420px] lg:min-h-0 bg-[#0a0d12]">
+      <div id="flux-leaflet-map" class="absolute inset-0 z-0"></div>
+
+      <!-- Zoom hint -->
+      <div class="absolute bottom-3 left-3 z-[400] pointer-events-none text-[10px] text-slate-600 hidden lg:block">
+        Carto Dark · OpenStreetMap
+      </div>
+
+      <!-- Global attack feed -->
+      <div class="absolute bottom-0 right-0 top-auto lg:top-3 lg:bottom-3 left-0 lg:left-auto z-[500] w-full lg:w-[min(100%,380px)] max-h-[220px] lg:max-h-none flex flex-col m-0 lg:mr-3 lg:ml-0 pointer-events-auto">
+        <div class="mx-2 mb-2 lg:mx-0 flex-1 flex flex-col rounded-lg border border-cyan-950/50 bg-[#070a0f]/95 backdrop-blur-md shadow-[0_0_40px_rgba(8,145,178,0.08)] overflow-hidden">
+          <div class="px-3 py-2 border-b border-slate-800/80 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="w-1.5 h-1.5 bg-orange-500 rounded-sm"></span>
+              <h2 class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Global attack feed</h2>
+            </div>
+            <span class="text-[10px] text-cyan-600/80 font-mono uppercase">All</span>
+          </div>
+          <div class="flux-feed-scroll overflow-y-auto flex-1 min-h-0">
+            <table class="w-full text-left text-[11px]">
+              <thead class="text-slate-500 uppercase tracking-wider sticky top-0 bg-[#070a0f] z-10">
+                <tr class="border-b border-slate-800/80">
+                  <th class="px-2 py-1.5 font-semibold">Type</th>
+                  <th class="px-2 py-1.5 font-semibold">Time</th>
+                  <th class="px-2 py-1.5 font-semibold">IP</th>
+                  <th class="px-2 py-1.5 font-semibold">Country</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/60">
+                <template x-for="row in feed" :key="row._key">
+                  <tr class="hover:bg-slate-800/30 font-mono">
+                    <td class="px-2 py-1.5">
+                      <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-500/15 text-orange-300 border border-orange-500/25"
+                            x-text="row.type_code || '—'"></span>
+                    </td>
+                    <td class="px-2 py-1.5 text-slate-500 tabular-nums" x-text="row.time || fmtTime(row.ts)"></td>
+                    <td class="px-2 py-1.5 text-cyan-500/80" x-text="row.source_ip || '—'"></td>
+                    <td class="px-2 py-1.5 text-slate-400 truncate max-w-[100px]" x-text="row.country || '—'"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-
-  <div class="rounded-xl border border-gray-800 bg-gray-900/40 px-4 py-3 text-xs text-gray-600">
-    <strong class="text-gray-500">Catatan:</strong> Data di atas dihasilkan di server untuk pratinjau UI. Integrasi nyata: korelasi GeoIP dari access log + event audit Coraza.
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script>
 function attackMapApp() {
   return {
     demo: false,
     label: '',
+    totalToday: 0,
+    categories: [],
     points: [],
     allLogs: [],
     feed: [],
     originLat: -2.5,
     originLon: 118,
     loopTimer: null,
-    lonX(lon) {
-      return (lon + 180) / 360 * 1000;
+    clockTimer: null,
+    catMax: 1,
+    clockTime: '00:00:00',
+    clockDate: '—',
+    map: null,
+    layerGroup: null,
+
+    barPct(count) {
+      const m = this.catMax || 1;
+      return Math.min(100, Math.round((count / m) * 100));
     },
-    latY(lat) {
-      return (90 - lat) / 180 * 500;
+    barColorClass(i) {
+      const palette = ['bg-cyan-500/70', 'bg-sky-500/70', 'bg-orange-500/70', 'bg-amber-500/70', 'bg-emerald-500/70'];
+      return palette[i % palette.length];
     },
-    arcPath(p) {
-      const x1 = this.lonX(p.source_lon), y1 = this.latY(p.source_lat);
-      const x2 = this.lonX(p.target_lon), y2 = this.latY(p.target_lat);
-      const mx = (x1 + x2) / 2, my = Math.min(y1, y2) - 60;
-      return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`;
-    },
+
     fmtTime(ts) {
       try {
         const d = new Date(ts);
-        return d.toLocaleString(undefined, { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
       } catch (_) { return ts; }
     },
-    async init() {
-      try {
-        const r = await fetch('/api/attack-map');
-        const d = await r.json();
-        this.demo = !!d.demo;
-        this.label = d.label || '';
-        this.points = Array.isArray(d.points) ? d.points : [];
-        const logs = Array.isArray(d.logs_24h) ? d.logs_24h : [];
-        this.allLogs = logs.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts));
-        if (this.points.length && this.points[0].target_lat != null) {
-          this.originLat = this.points[0].target_lat;
-          this.originLon = this.points[0].target_lon;
-        }
-        // Isi awal feed
-        this.feed = this.allLogs.slice(0, 12).map((e, i) => ({ ...e, _key: 'init-' + i }));
-        this.startLoop();
-      } catch (e) {
-        this.label = 'Gagal memuat data: ' + (e.message || e);
+
+    curvedLatLngs(a, b, bulge) {
+      const midLat = (a[0] + b[0]) / 2 + Math.abs(b[0] - a[0]) * (bulge || 0.35);
+      const midLon = (a[1] + b[1]) / 2;
+      const steps = 56;
+      const pts = [];
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const lat = (1 - t) * (1 - t) * a[0] + 2 * (1 - t) * t * midLat + t * t * b[0];
+        const lon = (1 - t) * (1 - t) * a[1] + 2 * (1 - t) * t * midLon + t * t * b[1];
+        pts.push([lat, lon]);
       }
+      return pts;
     },
+
+    startClock() {
+      if (this.clockTimer) clearInterval(this.clockTimer);
+      const tick = () => {
+        const d = new Date();
+        this.clockTime = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        this.clockDate = d.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+      };
+      tick();
+      this.clockTimer = setInterval(tick, 1000);
+    },
+
+    drawMap() {
+      if (typeof L === 'undefined') return;
+      const el = document.getElementById('flux-leaflet-map');
+      if (!el) return;
+
+      if (this.map) {
+        this.map.remove();
+        this.map = null;
+      }
+
+      this.map = L.map(el, {
+        zoomControl: false,
+        worldCopyJump: true,
+        minZoom: 2,
+        maxZoom: 10,
+      }).setView([this.originLat, this.originLon], 2);
+
+      L.control.zoom({ position: 'bottomleft' }).addTo(this.map);
+
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20,
+      }).addTo(this.map);
+
+      this.layerGroup = L.layerGroup().addTo(this.map);
+
+      const targetLL = [this.originLat, this.originLon];
+      L.marker(targetLL, {
+        icon: L.divIcon({
+          className: 'flux-ct-target-marker',
+          html: '<div class="flux-target-dot"></div>',
+          iconSize: [18, 18],
+          iconAnchor: [9, 9],
+        }),
+        zIndexOffset: 1000,
+      }).addTo(this.layerGroup);
+
+      (this.points || []).forEach((p, idx) => {
+        const from = [p.source_lat, p.source_lon];
+        const to = [p.target_lat, p.target_lon];
+        const bulge = 0.26 + (idx % 9) * 0.028;
+        const arc = this.curvedLatLngs(from, to, bulge);
+
+        L.polyline(arc, { color: '#ea580c', weight: 5, opacity: 0.12, lineCap: 'round' }).addTo(this.layerGroup);
+        L.polyline(arc, { color: '#fb923c', weight: 2, opacity: 0.88, lineCap: 'round' }).addTo(this.layerGroup);
+
+        L.marker(from, {
+          icon: L.divIcon({
+            className: 'flux-ct-src-marker',
+            html: '<div class="flux-src-dot"></div>',
+            iconSize: [12, 12],
+            iconAnchor: [6, 6],
+          }),
+        }).addTo(this.layerGroup).bindPopup(
+          `<div class="text-xs"><strong>${p.source_city || ''}</strong> (${p.source_country || ''})<br/>${p.attack_type || ''} · hits ${p.count ?? ''}</div>`,
+          { className: 'flux-popup' }
+        );
+      });
+
+      setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 200);
+      setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 600);
+    },
+
     startLoop() {
       if (this.loopTimer) clearInterval(this.loopTimer);
       if (!this.allLogs.length) return;
@@ -122,10 +286,39 @@ function attackMapApp() {
       this.loopTimer = setInterval(() => {
         const e = this.allLogs[i % this.allLogs.length];
         this.feed.unshift({ ...e, _key: 't-' + Date.now() + '-' + i });
-        if (this.feed.length > 20) this.feed.pop();
+        if (this.feed.length > 18) this.feed.pop();
         i++;
-      }, 1300);
-    }
+      }, 1400);
+    },
+
+    async init() {
+      this.startClock();
+      try {
+        const r = await fetch('/api/attack-map');
+        const d = await r.json();
+        this.demo = !!d.demo;
+        this.label = d.label || '';
+        this.totalToday = d.total_today || 0;
+        this.categories = Array.isArray(d.categories) ? d.categories : [];
+        this.catMax = Math.max(1, ...this.categories.map((c) => c.count));
+
+        this.points = Array.isArray(d.points) ? d.points : [];
+        const logs = Array.isArray(d.logs_24h) ? d.logs_24h : [];
+        this.allLogs = logs.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts));
+
+        if (this.points.length && this.points[0].target_lat != null) {
+          this.originLat = this.points[0].target_lat;
+          this.originLon = this.points[0].target_lon;
+        }
+
+        this.feed = this.allLogs.slice(0, 14).map((e, i) => ({ ...e, _key: 'init-' + i }));
+        this.startLoop();
+
+        setTimeout(() => this.drawMap(), 50);
+      } catch (e) {
+        this.label = 'Gagal memuat data: ' + (e.message || e);
+      }
+    },
   };
 }
 </script>

@@ -83,7 +83,7 @@ func (app *App) PageLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) PageAttackMap(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "attack-map", models.PageData{Title: "Cyber Attack Map", ActiveMenu: "attackmap"})
+	app.render(w, r, "attack-map", models.PageData{Title: "Threat Live Map", ActiveMenu: "attackmap"})
 }
 
 // ── Reports ───────────────────────────────────────────────────────────────────
