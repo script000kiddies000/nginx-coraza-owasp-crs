@@ -132,11 +132,6 @@ func (app *App) APISecurityEvents(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(events)
 }
 
-func (app *App) APIAttackMapData(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprint(w, `[]`)
-}
-
 // ── Hosts ─────────────────────────────────────────────────────────────────────
 
 func (app *App) APIGetHosts(w http.ResponseWriter, r *http.Request) {

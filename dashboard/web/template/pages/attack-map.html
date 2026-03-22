@@ -1,0 +1,132 @@
+{{define "content"}}
+<div class="space-y-4" x-data="attackMapApp()" x-init="init()">
+
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <p class="text-gray-400 text-sm max-w-2xl" x-text="label || 'Memuat…'"></p>
+    <span x-show="demo" class="text-xs font-medium text-amber-400/90 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full">Demo / sample</span>
+  </div>
+
+  <div class="grid lg:grid-cols-5 gap-4 min-h-[480px]">
+
+    <!-- Map -->
+    <div class="lg:col-span-3 rounded-xl border border-gray-800 bg-gray-950 overflow-hidden relative">
+      <div class="absolute top-3 left-3 z-10 text-xs text-gray-500">Proyeksi equirectangular · lintang/bujur sampel</div>
+      <svg class="w-full h-full min-h-[420px] block" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet">
+        <!-- subtle grid -->
+        <defs>
+          <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:rgb(16,185,129);stop-opacity:0.15" />
+            <stop offset="100%" style="stop-color:rgb(244,63,94);stop-opacity:0.35" />
+          </linearGradient>
+        </defs>
+        <rect width="1000" height="500" fill="#030712"/>
+        <g stroke="#1f2937" stroke-width="0.5" fill="none">
+          <line x1="0" y1="125" x2="1000" y2="125"/><line x1="0" y1="250" x2="1000" y2="250"/><line x1="0" y1="375" x2="1000" y2="375"/>
+          <line x1="250" y1="0" x2="250" y2="500"/><line x1="500" y1="0" x2="500" y2="500"/><line x1="750" y1="0" x2="750" y2="500"/>
+        </g>
+
+        <template x-for="(p, idx) in points" :key="idx">
+          <g>
+            <path :d="arcPath(p)" fill="none" stroke="url(#arcGrad)" stroke-width="1.2" class="opacity-80"/>
+            <circle :cx="lonX(p.source_lon)" :cy="latY(p.source_lat)" r="5" fill="#f43f5e" fill-opacity="0.85"/>
+            <circle :cx="lonX(p.target_lon)" :cy="latY(p.target_lat)" r="7" fill="#10b981" fill-opacity="0.9"/>
+          </g>
+        </template>
+
+        <circle :cx="lonX(originLon)" :cy="latY(originLat)" r="10" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="4 3" class="opacity-70"/>
+      </svg>
+    </div>
+
+    <!-- Feed -->
+    <div class="lg:col-span-2 flex flex-col rounded-xl border border-gray-800 bg-gray-900/50 min-h-[420px]">
+      <div class="px-4 py-3 border-b border-gray-800 flex justify-between items-center">
+        <h2 class="text-sm font-semibold text-white">Log serangan (24 jam)</h2>
+        <span class="text-xs text-gray-500">Loop demo</span>
+      </div>
+      <div class="flex-1 overflow-hidden flex flex-col">
+        <div class="px-3 py-2 text-xs text-gray-600 border-b border-gray-800/80">Feed berputar — entri diambil bergantian dari sampel API</div>
+        <ul class="flex-1 overflow-y-auto divide-y divide-gray-800/80 font-mono text-xs">
+          <template x-for="row in feed" :key="row._key">
+            <li class="px-3 py-2.5 hover:bg-gray-800/30 transition-colors">
+              <div class="flex justify-between gap-2 text-gray-500 mb-0.5">
+                <span x-text="fmtTime(row.ts)"></span>
+                <span class="text-amber-400/90" x-text="row.rule_id"></span>
+              </div>
+              <div class="text-gray-300" x-text="row.attack_type"></div>
+              <div class="text-gray-500 mt-0.5 truncate" x-text="row.source + ' → ' + row.target"></div>
+            </li>
+          </template>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="rounded-xl border border-gray-800 bg-gray-900/40 px-4 py-3 text-xs text-gray-600">
+    <strong class="text-gray-500">Catatan:</strong> Data di atas dihasilkan di server untuk pratinjau UI. Integrasi nyata: korelasi GeoIP dari access log + event audit Coraza.
+  </div>
+</div>
+
+<script>
+function attackMapApp() {
+  return {
+    demo: false,
+    label: '',
+    points: [],
+    allLogs: [],
+    feed: [],
+    originLat: -2.5,
+    originLon: 118,
+    loopTimer: null,
+    lonX(lon) {
+      return (lon + 180) / 360 * 1000;
+    },
+    latY(lat) {
+      return (90 - lat) / 180 * 500;
+    },
+    arcPath(p) {
+      const x1 = this.lonX(p.source_lon), y1 = this.latY(p.source_lat);
+      const x2 = this.lonX(p.target_lon), y2 = this.latY(p.target_lat);
+      const mx = (x1 + x2) / 2, my = Math.min(y1, y2) - 60;
+      return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`;
+    },
+    fmtTime(ts) {
+      try {
+        const d = new Date(ts);
+        return d.toLocaleString(undefined, { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+      } catch (_) { return ts; }
+    },
+    async init() {
+      try {
+        const r = await fetch('/api/attack-map');
+        const d = await r.json();
+        this.demo = !!d.demo;
+        this.label = d.label || '';
+        this.points = Array.isArray(d.points) ? d.points : [];
+        const logs = Array.isArray(d.logs_24h) ? d.logs_24h : [];
+        this.allLogs = logs.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts));
+        if (this.points.length && this.points[0].target_lat != null) {
+          this.originLat = this.points[0].target_lat;
+          this.originLon = this.points[0].target_lon;
+        }
+        // Isi awal feed
+        this.feed = this.allLogs.slice(0, 12).map((e, i) => ({ ...e, _key: 'init-' + i }));
+        this.startLoop();
+      } catch (e) {
+        this.label = 'Gagal memuat data: ' + (e.message || e);
+      }
+    },
+    startLoop() {
+      if (this.loopTimer) clearInterval(this.loopTimer);
+      if (!this.allLogs.length) return;
+      let i = 0;
+      this.loopTimer = setInterval(() => {
+        const e = this.allLogs[i % this.allLogs.length];
+        this.feed.unshift({ ...e, _key: 't-' + Date.now() + '-' + i });
+        if (this.feed.length > 20) this.feed.pop();
+        i++;
+      }, 1300);
+    }
+  };
+}
+</script>
+{{end}}
