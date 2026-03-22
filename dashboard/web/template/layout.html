@@ -5,236 +5,281 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{.Title}} — Flux WAF</title>
+  <!-- x-cloak MUST come before Alpine to avoid flash of unstyled content -->
+  <style>[x-cloak]{display:none!important}</style>
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: { sans: ['Inter', 'sans-serif'] }
-        }
-      }
-    }
+    tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter','sans-serif'] } } } }
   </script>
-  <style>
-    [x-cloak] { display: none !important; }
-    .nav-link { @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150; }
-    .nav-link:not(.active) { @apply text-gray-400 hover:text-white hover:bg-gray-800; }
-    .nav-link.active { @apply text-emerald-400 bg-emerald-500/10 border border-emerald-500/20; }
-    .nav-section { @apply text-xs font-semibold text-gray-600 uppercase tracking-wider px-3 py-2 mt-4 mb-1; }
-  </style>
 </head>
-<body class="h-full bg-gray-950 text-white font-sans" x-data="{ open: true }">
+<body class="h-full bg-gray-950 text-white" style="font-family:'Inter',sans-serif"
+      x-data="{ sidebarOpen: true }">
 
-  <!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
-  <aside :class="open ? 'w-60' : 'w-14'"
-         class="fixed inset-y-0 left-0 z-40 bg-gray-900 border-r border-gray-800 flex flex-col transition-all duration-200 overflow-hidden">
+<!-- ── Sidebar ───────────────────────────────────────────────────────────── -->
+<aside :class="sidebarOpen ? 'w-60' : 'w-14'"
+       class="fixed inset-y-0 left-0 z-40 bg-gray-900 border-r border-gray-800 flex flex-col transition-all duration-200 overflow-hidden">
 
-    <!-- Brand -->
-    <div class="flex items-center h-14 px-3 border-b border-gray-800 flex-shrink-0">
-      <div class="flex items-center gap-2.5 min-w-0 flex-1">
-        <span class="text-emerald-400 text-lg flex-shrink-0">⚡</span>
-        <span x-show="open" x-cloak class="text-white font-bold text-base truncate">Flux WAF</span>
-      </div>
-      <button @click="open = !open"
-              class="flex-shrink-0 p-1 rounded text-gray-500 hover:text-white hover:bg-gray-800 transition-colors">
-        <svg x-show="open" x-cloak xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-          <path fill-rule="evenodd" d="M17 10a.75.75 0 0 1-.75.75H5.612l4.158 3.96a.75.75 0 1 1-1.04 1.08l-5.5-5.25a.75.75 0 0 1 0-1.08l5.5-5.25a.75.75 0 1 1 1.04 1.08L5.612 9.25H16.25A.75.75 0 0 1 17 10Z" clip-rule="evenodd" />
-        </svg>
-        <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-          <path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd" />
-        </svg>
-      </button>
-    </div>
-
-    <!-- Nav -->
-    <nav class="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2 space-y-0.5">
-
-      <!-- Dashboard -->
-      <a href="/" class="nav-link {{if eq .ActiveMenu "dashboard"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path fill-rule="evenodd" d="M9.293 2.293a1 1 0 0 1 1.414 0l7 7A1 1 0 0 1 17 11h-1v6a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6H3a1 1 0 0 1-.707-1.707l7-7Z" clip-rule="evenodd" />
-        </svg>
-        <span x-show="open" x-cloak>Dashboard</span>
-      </a>
-
-      <!-- Attack Map -->
-      <a href="/attack-map" class="nav-link {{if eq .ActiveMenu "attackmap"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path fill-rule="evenodd" d="M8.157 2.176a1.5 1.5 0 0 1 1.686 0l4.746 3.162A1.5 1.5 0 0 1 15 6.638v7.724a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 5 14.362V6.638a1.5 1.5 0 0 1 .411-1.3l2.746-3.162ZM10 8a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z" clip-rule="evenodd" />
-        </svg>
-        <span x-show="open" x-cloak>Attack Map</span>
-      </a>
-
-      <div x-show="open" x-cloak class="nav-section">Edge Network</div>
-      <a href="/hosts" class="nav-link {{if eq .ActiveMenu "hosts"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path d="M4 5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5ZM4 13a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2Z" />
-        </svg>
-        <span x-show="open" x-cloak>Hosts & Upstreams</span>
-      </a>
-      <a href="/ssl" class="nav-link {{if eq .ActiveMenu "ssl"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z" clip-rule="evenodd" />
-        </svg>
-        <span x-show="open" x-cloak>SSL / TLS</span>
-      </a>
-
-      <div x-show="open" x-cloak class="nav-section">WAF</div>
-      <a href="/rules" class="nav-link {{if eq .ActiveMenu "rules"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd" />
-        </svg>
-        <span x-show="open" x-cloak>Custom Rules</span>
-      </a>
-      <a href="/virtual-patching" class="nav-link {{if eq .ActiveMenu "vpatch"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path d="M12.232 4.232a2.5 2.5 0 0 1 3.536 3.536l-1.225 1.224a.75.75 0 0 0 1.061 1.06l1.224-1.224a4 4 0 0 0-5.656-5.656l-3 3a4 4 0 0 0 .225 5.865.75.75 0 0 0 .977-1.138 2.5 2.5 0 0 1-.142-3.667l3-3Z" />
-          <path d="M11.603 7.963a.75.75 0 0 0-.977 1.138 2.5 2.5 0 0 1 .142 3.667l-3 3a2.5 2.5 0 0 1-3.536-3.536l1.225-1.224a.75.75 0 0 0-1.061-1.06l-1.224 1.224a4 4 0 1 0 5.656 5.656l3-3a4 4 0 0 0-.225-5.865Z" />
-        </svg>
-        <span x-show="open" x-cloak>Virtual Patching</span>
-      </a>
-
-      <div x-show="open" x-cloak class="nav-section">Security Engines</div>
-      <a href="/bot-management" class="nav-link {{if eq .ActiveMenu "botmgmt"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" />
-        </svg>
-        <span x-show="open" x-cloak>Bot Management</span>
-      </a>
-      <a href="/threat-intel" class="nav-link {{if eq .ActiveMenu "threatintel"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
-        </svg>
-        <span x-show="open" x-cloak>Threat Intel</span>
-      </a>
-      <a href="/ip-reputations" class="nav-link {{if eq .ActiveMenu "iprep"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-1.5 0a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" clip-rule="evenodd" />
-        </svg>
-        <span x-show="open" x-cloak>IP Reputations</span>
-      </a>
-      <a href="/data-guard" class="nav-link {{if eq .ActiveMenu "dlp"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path fill-rule="evenodd" d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l14.5 14.5a.75.75 0 1 0 1.06-1.06l-1.745-1.745a10.029 10.029 0 0 0 3.3-4.38 1.651 1.651 0 0 0 0-1.185A10.004 10.004 0 0 0 9.999 3a9.956 9.956 0 0 0-4.744 1.194L3.28 2.22ZM7.752 6.69l1.092 1.092a2.5 2.5 0 0 1 3.374 3.373l1.091 1.092a4 4 0 0 0-5.557-5.557Z" clip-rule="evenodd" />
-          <path d="M10.748 13.93l2.523 2.523a9.987 9.987 0 0 1-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 0 1 0-1.186A10.007 10.007 0 0 1 2.839 6.02L6.07 9.252a4 4 0 0 0 4.678 4.678Z" />
-        </svg>
-        <span x-show="open" x-cloak>Data Guard (DLP)</span>
-      </a>
-      <a href="/wordpress-security" class="nav-link {{if eq .ActiveMenu "wpsec"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path fill-rule="evenodd" d="M9.661 2.237a.531.531 0 0 1 .678 0 11.947 11.947 0 0 0 7.078 2.749.5.5 0 0 1 .479.425c.069.52.104 1.05.104 1.589 0 5.162-3.26 9.563-7.834 11.256a.48.48 0 0 1-.332 0C5.26 16.564 2 12.163 2 7c0-.538.035-1.069.104-1.589a.5.5 0 0 1 .48-.425 11.947 11.947 0 0 0 7.077-2.749Z" clip-rule="evenodd" />
-        </svg>
-        <span x-show="open" x-cloak>WordPress Security</span>
-      </a>
-
-      <div x-show="open" x-cloak class="nav-section">Logs & Analytics</div>
-      <a href="/security-logs" class="nav-link {{if eq .ActiveMenu "seclogs"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path fill-rule="evenodd" d="M8.5 3.528v4.644c0 .729-.29 1.428-.805 1.944l-1.217 1.217a8.493 8.493 0 0 1 5.71 5.157c.55-.587 1.123-1.337 1.123-2.18V3.528A9.944 9.944 0 0 1 10 3c-.515 0-1.022.034-1.5.101Zm5.5.35V9.31c0 1.18-.528 2.31-1.456 3.076l-.137.113a8.492 8.492 0 0 1 1.53 5.1.75.75 0 0 1-.75.75H6.813a.75.75 0 0 1-.75-.75 8.5 8.5 0 0 1 1.52-4.883L6.5 11.638A8.49 8.49 0 0 1 5 9.31V3.878A9.975 9.975 0 0 0 0 13c0 5.523 4.477 10 10 10s10-4.477 10-10a9.975 9.975 0 0 0-6-9.122Z" clip-rule="evenodd" />
-        </svg>
-        <span x-show="open" x-cloak>Security Events</span>
-      </a>
-      <a href="/logs" class="nav-link {{if eq .ActiveMenu "logs"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h11a1.5 1.5 0 0 0 1.5-1.5V7.621a1.5 1.5 0 0 0-.44-1.06l-4.12-4.122A1.5 1.5 0 0 0 11.378 2H4.5ZM7 11a.75.75 0 0 0 0 1.5h6a.75.75 0 0 0 0-1.5H7Zm0-3a.75.75 0 0 0 0 1.5h6a.75.75 0 0 0 0-1.5H7Z" clip-rule="evenodd" />
-        </svg>
-        <span x-show="open" x-cloak>Access Logs</span>
-      </a>
-
-      <div x-show="open" x-cloak class="nav-section">Reports</div>
-      <a href="/security-report" class="nav-link {{if eq .ActiveMenu "secreport"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path d="M15.5 2A1.5 1.5 0 0 0 14 3.5v13a1.5 1.5 0 0 0 1.5 1.5h1a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 16.5 2h-1ZM9.5 6A1.5 1.5 0 0 0 8 7.5v9A1.5 1.5 0 0 0 9.5 18h1a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 10.5 6h-1ZM3.5 10A1.5 1.5 0 0 0 2 11.5v5A1.5 1.5 0 0 0 3.5 18h1A1.5 1.5 0 0 0 6 16.5v-5A1.5 1.5 0 0 0 4.5 10h-1Z" />
-        </svg>
-        <span x-show="open" x-cloak>Security Report</span>
-      </a>
-      <a href="/attack-report" class="nav-link {{if eq .ActiveMenu "atkreport"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path fill-rule="evenodd" d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v11.75A2.75 2.75 0 0 0 16.75 18h-12A2.75 2.75 0 0 1 2 15.25V3.5Zm3.75 7a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5Zm0 3a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5ZM5 5.75A.75.75 0 0 1 5.75 5h4.5a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-.75.75h-4.5A.75.75 0 0 1 5 8.25v-2.5Z" clip-rule="evenodd" />
-        </svg>
-        <span x-show="open" x-cloak>Attack Report</span>
-      </a>
-      <a href="/malware-scan" class="nav-link {{if eq .ActiveMenu "malware"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path d="M10 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM1.49 15.326a.78.78 0 0 1-.358-.442 3 3 0 0 1 4.308-3.516 6.484 6.484 0 0 0-1.905 3.959c-.023.222-.014.442.025.654a4.97 4.97 0 0 1-2.07-.655ZM16.44 15.98a4.97 4.97 0 0 0 2.07-.654.78.78 0 0 0 .357-.442 3 3 0 0 0-4.308-3.517 6.484 6.484 0 0 1 1.907 3.96 2.32 2.32 0 0 1-.026.654ZM18 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM5.304 16.19a.844.844 0 0 1-.277-.71 5 5 0 0 1 9.947 0 .843.843 0 0 1-.277.71A6.975 6.975 0 0 1 10 18a6.974 6.974 0 0 1-4.696-1.81Z" />
-        </svg>
-        <span x-show="open" x-cloak>Malware Scan</span>
-      </a>
-
-      <div x-show="open" x-cloak class="nav-section">Monitoring</div>
-      <a href="/monitoring/nginx" class="nav-link {{if eq .ActiveMenu "nginx-mon"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 0 1 4.25 2h11.5A2.25 2.25 0 0 1 18 4.25v8.5A2.25 2.25 0 0 1 15.75 15h-3.105a3.501 3.501 0 0 0 1.1 1.677A.75.75 0 0 1 13.26 18H6.74a.75.75 0 0 1-.484-1.323A3.501 3.501 0 0 0 7.355 15H4.25A2.25 2.25 0 0 1 2 12.75v-8.5Z" clip-rule="evenodd" />
-        </svg>
-        <span x-show="open" x-cloak>Nginx Status</span>
-      </a>
-      <a href="/monitoring/server" class="nav-link {{if eq .ActiveMenu "srv-mon"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path d="M14 6H6a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2ZM7 9h6v1H7V9Z" />
-          <path fill-rule="evenodd" d="M2 4.5A2.5 2.5 0 0 1 4.5 2h11A2.5 2.5 0 0 1 18 4.5v1A2.5 2.5 0 0 1 15.5 8h-11A2.5 2.5 0 0 1 2 5.5v-1Zm13 .25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM4.5 14H4a2 2 0 0 0-2 2v.5A2.5 2.5 0 0 0 4.5 19h11a2.5 2.5 0 0 0 2.5-2.5V16a2 2 0 0 0-2-2h-.5a2.5 2.5 0 0 1-2.5 2.5h-6A2.5 2.5 0 0 1 4.5 14Z" clip-rule="evenodd" />
-        </svg>
-        <span x-show="open" x-cloak>Server Health</span>
-      </a>
-
-      <div x-show="open" x-cloak class="nav-section">System</div>
-      <a href="/settings" class="nav-link {{if eq .ActiveMenu "settings"}}active{{end}}">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-          <path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
-        </svg>
-        <span x-show="open" x-cloak>Settings</span>
-      </a>
-    </nav>
-
-    <!-- User & Logout -->
-    <div class="flex-shrink-0 border-t border-gray-800 p-3">
-      <div x-show="open" x-cloak class="flex items-center gap-2 mb-2">
-        <div class="w-7 h-7 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center flex-shrink-0">
-          <span class="text-emerald-400 text-xs font-bold">{{if .Username}}{{slice .Username 0 1 | printf "%s"}}{{else}}A{{end}}</span>
-        </div>
-        <div class="min-w-0">
-          <p class="text-white text-xs font-medium truncate">{{if .Username}}{{.Username}}{{else}}admin{{end}}</p>
-          <p class="text-gray-500 text-xs">Administrator</p>
-        </div>
-      </div>
-      <form action="/api/logout" method="POST">
-        <button type="submit"
-                class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors text-sm">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 flex-shrink-0">
-            <path fill-rule="evenodd" d="M3 4.25A2.25 2.25 0 0 1 5.25 2h5.5A2.25 2.25 0 0 1 13 4.25v2a.75.75 0 0 1-1.5 0v-2a.75.75 0 0 0-.75-.75h-5.5a.75.75 0 0 0-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 0 0 .75-.75v-2a.75.75 0 0 1 1.5 0v2A2.25 2.25 0 0 1 10.75 18h-5.5A2.25 2.25 0 0 1 3 15.75V4.25Z" clip-rule="evenodd" />
-            <path fill-rule="evenodd" d="M19 10a.75.75 0 0 0-.75-.75H8.704l1.048-.943a.75.75 0 1 0-1.004-1.114l-2.5 2.25a.75.75 0 0 0 0 1.114l2.5 2.25a.75.75 0 1 0 1.004-1.114l-1.048-.943h9.546A.75.75 0 0 0 19 10Z" clip-rule="evenodd" />
-          </svg>
-          <span x-show="open" x-cloak>Logout</span>
-        </button>
-      </form>
-    </div>
-  </aside>
-
-  <!-- ── Main content ────────────────────────────────────────────────────── -->
-  <div :class="open ? 'ml-60' : 'ml-14'" class="transition-all duration-200 min-h-screen flex flex-col">
-
-    <!-- Topbar -->
-    <header class="h-14 bg-gray-900/80 backdrop-blur border-b border-gray-800 flex items-center px-6 gap-4 sticky top-0 z-30">
-      <h1 class="text-sm font-semibold text-white">{{.Title}}</h1>
-      <div class="ml-auto flex items-center gap-3">
-        <!-- WAF status badge -->
-        <span class="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full
-          {{if eq .Data nil}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-          {{else}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20{{end}}">
-          <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
-          WAF Active
-        </span>
-        <span class="text-gray-600 text-xs">Flux WAF v1.0</span>
-      </div>
-    </header>
-
-    <!-- Page content -->
-    <main class="flex-1 p-6">
-      {{template "content" .}}
-    </main>
+  <!-- Brand -->
+  <div class="flex items-center h-14 px-3 border-b border-gray-800 flex-shrink-0 gap-2">
+    <span class="text-emerald-400 text-lg flex-shrink-0">⚡</span>
+    <span x-show="sidebarOpen" x-cloak class="text-white font-bold text-sm truncate flex-1">Flux WAF</span>
+    <button @click="sidebarOpen = !sidebarOpen"
+            class="flex-shrink-0 text-gray-500 hover:text-white p-1 rounded hover:bg-gray-800 transition-colors">
+      <svg x-show="sidebarOpen" x-cloak xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4">
+        <path d="M3.22 7.47a.75.75 0 0 0 0 1.06l3.25 3.25a.75.75 0 0 0 1.06-1.06L5.06 8l2.47-2.47a.75.75 0 0 0-1.06-1.06L3.22 7.47ZM12 4.75a.75.75 0 0 0-1.5 0v6.5a.75.75 0 0 0 1.5 0v-6.5Z"/>
+      </svg>
+      <svg x-show="!sidebarOpen" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4">
+        <path d="M12.78 7.47a.75.75 0 0 1 0 1.06l-3.25 3.25a.75.75 0 0 1-1.06-1.06L10.94 8 8.47 5.53a.75.75 0 0 1 1.06-1.06l3.25 3.25ZM4 4.75a.75.75 0 0 1 1.5 0v6.5a.75.75 0 0 1-1.5 0v-6.5Z"/>
+      </svg>
+    </button>
   </div>
+
+  <!-- Nav -->
+  <nav class="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-0.5">
+
+    {{/* helper macro — active class is set by Go template, open/close by Alpine */}}
+
+    <a href="/"
+       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+              {{if eq .ActiveMenu "dashboard"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
+        <path fill-rule="evenodd" d="M9.293 2.293a1 1 0 0 1 1.414 0l7 7A1 1 0 0 1 17 11h-1v6a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6H3a1 1 0 0 1-.707-1.707l7-7Z" clip-rule="evenodd"/>
+      </svg>
+      <span x-show="sidebarOpen" x-cloak class="truncate">Dashboard</span>
+    </a>
+
+    <a href="/attack-map"
+       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+              {{if eq .ActiveMenu "attackmap"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
+        <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-1.5 0a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" clip-rule="evenodd"/>
+      </svg>
+      <span x-show="sidebarOpen" x-cloak class="truncate">Attack Map</span>
+    </a>
+
+    <!-- Section: Edge Network -->
+    <div x-show="sidebarOpen" x-cloak class="pt-3 pb-1 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">Edge Network</div>
+
+    <a href="/hosts"
+       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+              {{if eq .ActiveMenu "hosts"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
+        <path d="M4 5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5ZM4 13a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2Z"/>
+      </svg>
+      <span x-show="sidebarOpen" x-cloak class="truncate">Hosts & Upstreams</span>
+    </a>
+
+    <a href="/ssl"
+       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+              {{if eq .ActiveMenu "ssl"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
+        <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z" clip-rule="evenodd"/>
+      </svg>
+      <span x-show="sidebarOpen" x-cloak class="truncate">SSL / TLS</span>
+    </a>
+
+    <!-- Section: WAF -->
+    <div x-show="sidebarOpen" x-cloak class="pt-3 pb-1 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">WAF</div>
+
+    <a href="/rules"
+       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+              {{if eq .ActiveMenu "rules"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
+        <path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/>
+      </svg>
+      <span x-show="sidebarOpen" x-cloak class="truncate">Custom Rules</span>
+    </a>
+
+    <a href="/virtual-patching"
+       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+              {{if eq .ActiveMenu "vpatch"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
+        <path d="M12.232 4.232a2.5 2.5 0 0 1 3.536 3.536l-1.225 1.224a.75.75 0 0 0 1.061 1.06l1.224-1.224a4 4 0 0 0-5.656-5.656l-3 3a4 4 0 0 0 .225 5.865.75.75 0 0 0 .977-1.138 2.5 2.5 0 0 1-.142-3.667l3-3ZM11.603 7.963a.75.75 0 0 0-.977 1.138 2.5 2.5 0 0 1 .142 3.667l-3 3a2.5 2.5 0 0 1-3.536-3.536l1.225-1.224a.75.75 0 0 0-1.061-1.06l-1.224 1.224a4 4 0 1 0 5.656 5.656l3-3a4 4 0 0 0-.225-5.865Z"/>
+      </svg>
+      <span x-show="sidebarOpen" x-cloak class="truncate">Virtual Patching</span>
+    </a>
+
+    <!-- Section: Security Engines -->
+    <div x-show="sidebarOpen" x-cloak class="pt-3 pb-1 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">Security Engines</div>
+
+    <a href="/bot-management"
+       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+              {{if eq .ActiveMenu "botmgmt"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
+        <path d="M10 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM1.49 15.326a.78.78 0 0 1-.358-.442 3 3 0 0 1 4.308-3.516 6.484 6.484 0 0 0-1.905 3.959c-.023.222-.014.442.025.654a4.97 4.97 0 0 1-2.07-.655ZM16.44 15.98a4.97 4.97 0 0 0 2.07-.654.78.78 0 0 0 .357-.442 3 3 0 0 0-4.308-3.517 6.484 6.484 0 0 1 1.907 3.96 2.32 2.32 0 0 1-.026.654ZM18 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM5.304 16.19a.844.844 0 0 1-.277-.71 5 5 0 0 1 9.947 0 .843.843 0 0 1-.277.71A6.975 6.975 0 0 1 10 18a6.974 6.974 0 0 1-4.696-1.81Z"/>
+      </svg>
+      <span x-show="sidebarOpen" x-cloak class="truncate">Bot Management</span>
+    </a>
+
+    <a href="/threat-intel"
+       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+              {{if eq .ActiveMenu "threatintel"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
+        <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/>
+      </svg>
+      <span x-show="sidebarOpen" x-cloak class="truncate">Threat Intel</span>
+    </a>
+
+    <a href="/ip-reputations"
+       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+              {{if eq .ActiveMenu "iprep"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
+        <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-1.5 0a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" clip-rule="evenodd"/>
+      </svg>
+      <span x-show="sidebarOpen" x-cloak class="truncate">IP Reputations</span>
+    </a>
+
+    <a href="/data-guard"
+       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+              {{if eq .ActiveMenu "dlp"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
+        <path fill-rule="evenodd" d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l14.5 14.5a.75.75 0 1 0 1.06-1.06l-1.745-1.745a10.029 10.029 0 0 0 3.3-4.38 1.651 1.651 0 0 0 0-1.185A10.004 10.004 0 0 0 9.999 3a9.956 9.956 0 0 0-4.744 1.194L3.28 2.22ZM7.752 6.69l1.092 1.092a2.5 2.5 0 0 1 3.374 3.373l1.091 1.092a4 4 0 0 0-5.557-5.557Z" clip-rule="evenodd"/>
+        <path d="M10.748 13.93l2.523 2.523a9.987 9.987 0 0 1-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 0 1 0-1.186A10.007 10.007 0 0 1 2.839 6.02L6.07 9.252a4 4 0 0 0 4.678 4.678Z"/>
+      </svg>
+      <span x-show="sidebarOpen" x-cloak class="truncate">Data Guard (DLP)</span>
+    </a>
+
+    <a href="/wordpress-security"
+       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+              {{if eq .ActiveMenu "wpsec"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
+        <path fill-rule="evenodd" d="M9.661 2.237a.531.531 0 0 1 .678 0 11.947 11.947 0 0 0 7.078 2.749.5.5 0 0 1 .479.425c.069.52.104 1.05.104 1.589 0 5.162-3.26 9.563-7.834 11.256a.48.48 0 0 1-.332 0C5.26 16.564 2 12.163 2 7c0-.538.035-1.069.104-1.589a.5.5 0 0 1 .48-.425 11.947 11.947 0 0 0 7.077-2.749Z" clip-rule="evenodd"/>
+      </svg>
+      <span x-show="sidebarOpen" x-cloak class="truncate">WordPress Security</span>
+    </a>
+
+    <!-- Section: Logs -->
+    <div x-show="sidebarOpen" x-cloak class="pt-3 pb-1 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">Logs & Analytics</div>
+
+    <a href="/security-logs"
+       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+              {{if eq .ActiveMenu "seclogs"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
+        <path fill-rule="evenodd" d="M9.661 2.237a.531.531 0 0 1 .678 0 11.947 11.947 0 0 0 7.078 2.749.5.5 0 0 1 .479.425C17.465 5.695 17.5 6.225 17.5 6.764c0 5.162-3.26 9.563-7.834 11.256a.48.48 0 0 1-.332 0C4.76 16.327 2 12.162 2 7c0-.538.035-1.07.104-1.59a.5.5 0 0 1 .48-.424 11.947 11.947 0 0 0 7.077-2.749ZM10 11a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm-.25-5.25a.25.25 0 0 1 .5 0v3a.25.25 0 0 1-.5 0v-3Z" clip-rule="evenodd"/>
+      </svg>
+      <span x-show="sidebarOpen" x-cloak class="truncate">Security Events</span>
+    </a>
+
+    <a href="/logs"
+       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+              {{if eq .ActiveMenu "logs"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
+        <path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h11a1.5 1.5 0 0 0 1.5-1.5V7.621a1.5 1.5 0 0 0-.44-1.06l-4.12-4.122A1.5 1.5 0 0 0 11.378 2H4.5ZM7 11a.75.75 0 0 0 0 1.5h6a.75.75 0 0 0 0-1.5H7Zm0-3a.75.75 0 0 0 0 1.5h6a.75.75 0 0 0 0-1.5H7Z" clip-rule="evenodd"/>
+      </svg>
+      <span x-show="sidebarOpen" x-cloak class="truncate">Access Logs</span>
+    </a>
+
+    <!-- Section: Monitoring -->
+    <div x-show="sidebarOpen" x-cloak class="pt-3 pb-1 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">Monitoring</div>
+
+    <a href="/monitoring/nginx"
+       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+              {{if eq .ActiveMenu "nginx-mon"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
+        <path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 0 1 4.25 2h11.5A2.25 2.25 0 0 1 18 4.25v8.5A2.25 2.25 0 0 1 15.75 15h-3.105a3.501 3.501 0 0 0 1.1 1.677A.75.75 0 0 1 13.26 18H6.74a.75.75 0 0 1-.484-1.323A3.501 3.501 0 0 0 7.355 15H4.25A2.25 2.25 0 0 1 2 12.75v-8.5Z" clip-rule="evenodd"/>
+      </svg>
+      <span x-show="sidebarOpen" x-cloak class="truncate">Nginx Status</span>
+    </a>
+
+    <a href="/monitoring/server"
+       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+              {{if eq .ActiveMenu "srv-mon"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
+        <path d="M4 5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5ZM4 13a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2Z"/>
+      </svg>
+      <span x-show="sidebarOpen" x-cloak class="truncate">Server Health</span>
+    </a>
+
+    <!-- Section: System -->
+    <div x-show="sidebarOpen" x-cloak class="pt-3 pb-1 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">System</div>
+
+    <a href="/settings"
+       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+              {{if eq .ActiveMenu "settings"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
+        <path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd"/>
+      </svg>
+      <span x-show="sidebarOpen" x-cloak class="truncate">Settings</span>
+    </a>
+  </nav>
+
+  <!-- User & Logout -->
+  <div class="flex-shrink-0 border-t border-gray-800 p-2">
+    <div x-show="sidebarOpen" x-cloak class="flex items-center gap-2 px-2 py-1.5 mb-1">
+      <div class="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
+        <span class="text-emerald-400 text-xs font-bold">{{printf "%.1s" .Username}}</span>
+      </div>
+      <div class="min-w-0">
+        <p class="text-white text-xs font-medium truncate">{{if .Username}}{{.Username}}{{else}}admin{{end}}</p>
+        <p class="text-gray-600 text-xs">Administrator</p>
+      </div>
+    </div>
+    <form action="/api/logout" method="POST">
+      <button type="submit"
+              :class="sidebarOpen ? 'px-3 gap-2 justify-start' : 'px-0 justify-center'"
+              class="w-full flex items-center h-9 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors text-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
+          <path fill-rule="evenodd" d="M3 4.25A2.25 2.25 0 0 1 5.25 2h5.5A2.25 2.25 0 0 1 13 4.25v2a.75.75 0 0 1-1.5 0v-2a.75.75 0 0 0-.75-.75h-5.5a.75.75 0 0 0-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 0 0 .75-.75v-2a.75.75 0 0 1 1.5 0v2A2.25 2.25 0 0 1 10.75 18h-5.5A2.25 2.25 0 0 1 3 15.75V4.25Z" clip-rule="evenodd"/>
+          <path fill-rule="evenodd" d="M19 10a.75.75 0 0 0-.75-.75H8.704l1.048-.943a.75.75 0 1 0-1.004-1.114l-2.5 2.25a.75.75 0 0 0 0 1.114l2.5 2.25a.75.75 0 1 0 1.004-1.114l-1.048-.943h9.546A.75.75 0 0 0 19 10Z" clip-rule="evenodd"/>
+        </svg>
+        <span x-show="sidebarOpen" x-cloak class="font-medium">Logout</span>
+      </button>
+    </form>
+  </div>
+</aside>
+
+<!-- ── Main content ──────────────────────────────────────────────────────── -->
+<div :class="sidebarOpen ? 'ml-60' : 'ml-14'" class="transition-all duration-200 min-h-screen flex flex-col">
+  <!-- Topbar -->
+  <header class="h-14 bg-gray-900/80 backdrop-blur border-b border-gray-800 flex items-center px-6 gap-4 sticky top-0 z-30">
+    <h1 class="text-sm font-semibold text-white">{{.Title}}</h1>
+    <div class="ml-auto flex items-center gap-3">
+      <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
+        <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+        WAF Active
+      </span>
+    </div>
+  </header>
+  <!-- Page -->
+  <main class="flex-1 p-6">
+    {{template "content" .}}
+  </main>
+</div>
 
 </body>
 </html>

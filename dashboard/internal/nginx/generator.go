@@ -98,9 +98,14 @@ func DeleteHostConf(domain string) error {
 	return nil
 }
 
-// ReloadNginx sends SIGHUP to the nginx master process via `nginx -s reload`.
+// ReloadNginx sends SIGHUP to the nginx master process.
+// Uses /usr/sbin/nginx directly to avoid PATH issues inside s6-overlay.
 func ReloadNginx() error {
-	out, err := exec.Command("nginx", "-s", "reload").CombinedOutput()
+	bin := "/usr/sbin/nginx"
+	if p, err := exec.LookPath("nginx"); err == nil {
+		bin = p
+	}
+	out, err := exec.Command(bin, "-s", "reload").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("nginx reload: %w — %s", err, out)
 	}

@@ -26,11 +26,9 @@ func (app *App) PageDashboard(w http.ResponseWriter, r *http.Request) {
 // ── Edge Network ──────────────────────────────────────────────────────────────
 
 func (app *App) PageHosts(w http.ResponseWriter, r *http.Request) {
-	hosts, _ := store.ListHosts(app.DB)
-	app.render(w, r, "_stub", models.PageData{
+	app.render(w, r, "hosts", models.PageData{
 		Title:      "Hosts & Upstreams",
 		ActiveMenu: "hosts",
-		Data:       hosts,
 	})
 }
 

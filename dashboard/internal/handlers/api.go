@@ -3,8 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
+	"flux-waf/internal/models"
+	"flux-waf/internal/nginx"
 	"flux-waf/internal/store"
 )
 
@@ -80,12 +83,76 @@ func (app *App) APIAttackMapData(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) APIGetHosts(w http.ResponseWriter, r *http.Request) {
 	hosts, _ := store.ListHosts(app.DB)
+	if hosts == nil {
+		hosts = []models.HostConfig{}
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(hosts)
 }
 
-func (app *App) APISaveHost(w http.ResponseWriter, r *http.Request) { stubJSON(w) }
-func (app *App) APIDeleteHost(w http.ResponseWriter, r *http.Request) { stubJSON(w) }
+// APISaveHost handles POST /api/hosts — add or update a host, write nginx conf, reload.
+func (app *App) APISaveHost(w http.ResponseWriter, r *http.Request) {
+	var h models.HostConfig
+	if err := json.NewDecoder(r.Body).Decode(&h); err != nil {
+		jsonError(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if h.Domain == "" {
+		jsonError(w, "domain is required", http.StatusBadRequest)
+		return
+	}
+	if len(h.UpstreamServers) == 0 {
+		jsonError(w, "at least one upstream server is required", http.StatusBadRequest)
+		return
+	}
+	if h.WAFMode == "" {
+		h.WAFMode = "On"
+	}
+	if h.LBAlgorithm == "" {
+		h.LBAlgorithm = "round_robin"
+	}
+
+	if err := store.SaveHost(app.DB, h); err != nil {
+		jsonError(w, "db: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if h.Enabled {
+		if err := nginx.WriteHostConf(h); err != nil {
+			jsonError(w, "nginx conf: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := nginx.ReloadNginx(); err != nil {
+			// Config is written; log the reload warning but don't fail the request.
+			log.Printf("[hosts] nginx reload warning: %v", err)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprint(w, `{"ok":true}`)
+}
+
+// APIDeleteHost handles DELETE /api/hosts/{domain} — remove host from DB + nginx conf.
+func (app *App) APIDeleteHost(w http.ResponseWriter, r *http.Request) {
+	domain := r.PathValue("domain")
+	if domain == "" {
+		jsonError(w, "domain required", http.StatusBadRequest)
+		return
+	}
+	if err := store.DeleteHost(app.DB, domain); err != nil {
+		jsonError(w, "db: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := nginx.DeleteHostConf(domain); err != nil {
+		log.Printf("[hosts] delete conf %q: %v", domain, err)
+	}
+	if err := nginx.ReloadNginx(); err != nil {
+		log.Printf("[hosts] nginx reload after delete: %v", err)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprint(w, `{"ok":true}`)
+}
+
 func (app *App) APIGetSSL(w http.ResponseWriter, r *http.Request)    { stubJSON(w) }
 func (app *App) APIUploadSSL(w http.ResponseWriter, r *http.Request) { stubJSON(w) }
 func (app *App) APIUsers(w http.ResponseWriter, r *http.Request)     { stubJSON(w) }
