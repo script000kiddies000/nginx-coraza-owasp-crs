@@ -14,9 +14,45 @@
   <script>
     tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter','sans-serif'] } } } }
   </script>
+  <script>
+    function fluxSidebar() {
+      return {
+        sidebarOpen: true,
+        navG: { edge: false, waf: false, engines: false, logs: false, mon: false, sys: false },
+        loadNavState() {
+          try {
+            const raw = localStorage.getItem('flux_nav_g');
+            if (raw) Object.assign(this.navG, JSON.parse(raw));
+          } catch (e) {}
+        },
+        saveNavState() {
+          try { localStorage.setItem('flux_nav_g', JSON.stringify(this.navG)); } catch (e) {}
+        },
+        toggleG(k) {
+          this.navG[k] = !this.navG[k];
+          this.saveNavState();
+        },
+        initNav() {
+          this.loadNavState();
+          const active = document.body.getAttribute('data-flux-active') || '';
+          const open = { hosts: 'edge', ssl: 'edge', rules: 'waf', vpatch: 'waf', botmgmt: 'engines', threatintel: 'engines', iprep: 'engines', dlp: 'engines', wpsec: 'engines', seclogs: 'logs', logs: 'logs', 'nginx-mon': 'mon', 'srv-mon': 'mon', settings: 'sys' };
+          const g = open[active];
+          if (g) this.navG[g] = true;
+        },
+        navRow(sidebarOpen, inGroup, groupKey) {
+          if (!sidebarOpen) return 'px-0 justify-center';
+          if (inGroup && this.navG[groupKey]) return 'pl-8 px-3 gap-3';
+          if (inGroup) return 'px-3 gap-3';
+          return 'px-3 gap-3';
+        }
+      };
+    }
+  </script>
 </head>
 <body class="h-full bg-gray-950 text-white" style="font-family:'Inter',sans-serif"
-      x-data="{ sidebarOpen: true }">
+      data-flux-active="{{.ActiveMenu}}"
+      x-data="fluxSidebar()"
+      x-init="initNav()">
 
 <!-- ── Sidebar ───────────────────────────────────────────────────────────── -->
 <aside :class="sidebarOpen ? 'w-60' : 'w-14'"
@@ -26,7 +62,7 @@
   <div class="flex items-center h-14 px-3 border-b border-gray-800 flex-shrink-0 gap-2">
     <span class="text-emerald-400 text-lg flex-shrink-0">⚡</span>
     <span x-show="sidebarOpen" x-cloak class="text-white font-bold text-sm truncate flex-1">Flux WAF</span>
-    <button @click="sidebarOpen = !sidebarOpen"
+    <button type="button" @click="sidebarOpen = !sidebarOpen"
             class="flex-shrink-0 text-gray-500 hover:text-white p-1 rounded hover:bg-gray-800 transition-colors">
       <svg x-show="sidebarOpen" x-cloak xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4">
         <path d="M3.22 7.47a.75.75 0 0 0 0 1.06l3.25 3.25a.75.75 0 0 0 1.06-1.06L5.06 8l2.47-2.47a.75.75 0 0 0-1.06-1.06L3.22 7.47ZM12 4.75a.75.75 0 0 0-1.5 0v6.5a.75.75 0 0 0 1.5 0v-6.5Z"/>
@@ -37,13 +73,10 @@
     </button>
   </div>
 
-  <!-- Nav -->
   <nav class="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-0.5">
 
-    {{/* helper macro — active class is set by Go template, open/close by Alpine */}}
-
-    <a href="/"
-       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+    <a href="/" title="Dashboard"
+       :class="navRow(sidebarOpen, false, '')"
        class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "dashboard"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
@@ -53,8 +86,8 @@
       <span x-show="sidebarOpen" x-cloak class="truncate">Dashboard</span>
     </a>
 
-    <a href="/attack-map"
-       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+    <a href="/attack-map" title="Attack Map"
+       :class="navRow(sidebarOpen, false, '')"
        class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "attackmap"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
@@ -64,11 +97,18 @@
       <span x-show="sidebarOpen" x-cloak class="truncate">Attack Map</span>
     </a>
 
-    <!-- Section: Edge Network -->
-    <div x-show="sidebarOpen" x-cloak class="pt-3 pb-1 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">Edge Network</div>
-
-    <a href="/hosts"
-       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+    <!-- Edge Network -->
+    <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('edge')"
+            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-2">
+      <span>Edge Network</span>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+           class="w-4 h-4 text-gray-600 transition-transform shrink-0" :class="navG.edge ? 'rotate-180' : ''">
+        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/>
+      </svg>
+    </button>
+    <a href="/hosts" title="Hosts"
+       x-show="!sidebarOpen || navG.edge"
+       :class="navRow(sidebarOpen, true, 'edge')"
        class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "hosts"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
@@ -77,9 +117,9 @@
       </svg>
       <span x-show="sidebarOpen" x-cloak class="truncate">Hosts & Upstreams</span>
     </a>
-
-    <a href="/ssl"
-       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+    <a href="/ssl" title="SSL"
+       x-show="!sidebarOpen || navG.edge"
+       :class="navRow(sidebarOpen, true, 'edge')"
        class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "ssl"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
@@ -89,11 +129,18 @@
       <span x-show="sidebarOpen" x-cloak class="truncate">SSL / TLS</span>
     </a>
 
-    <!-- Section: WAF -->
-    <div x-show="sidebarOpen" x-cloak class="pt-3 pb-1 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">WAF</div>
-
-    <a href="/rules"
-       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+    <!-- WAF -->
+    <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('waf')"
+            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-2">
+      <span>WAF</span>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+           class="w-4 h-4 text-gray-600 transition-transform shrink-0" :class="navG.waf ? 'rotate-180' : ''">
+        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/>
+      </svg>
+    </button>
+    <a href="/rules" title="Rules"
+       x-show="!sidebarOpen || navG.waf"
+       :class="navRow(sidebarOpen, true, 'waf')"
        class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "rules"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
@@ -102,9 +149,9 @@
       </svg>
       <span x-show="sidebarOpen" x-cloak class="truncate">Custom Rules</span>
     </a>
-
-    <a href="/virtual-patching"
-       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+    <a href="/virtual-patching" title="Virtual Patching"
+       x-show="!sidebarOpen || navG.waf"
+       :class="navRow(sidebarOpen, true, 'waf')"
        class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "vpatch"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
@@ -114,11 +161,18 @@
       <span x-show="sidebarOpen" x-cloak class="truncate">Virtual Patching</span>
     </a>
 
-    <!-- Section: Security Engines -->
-    <div x-show="sidebarOpen" x-cloak class="pt-3 pb-1 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">Security Engines</div>
-
-    <a href="/bot-management"
-       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+    <!-- Security engines -->
+    <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('engines')"
+            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-2">
+      <span>Security Engines</span>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+           class="w-4 h-4 text-gray-600 transition-transform shrink-0" :class="navG.engines ? 'rotate-180' : ''">
+        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/>
+      </svg>
+    </button>
+    <a href="/bot-management" title="Bot"
+       x-show="!sidebarOpen || navG.engines"
+       :class="navRow(sidebarOpen, true, 'engines')"
        class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "botmgmt"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
@@ -127,9 +181,9 @@
       </svg>
       <span x-show="sidebarOpen" x-cloak class="truncate">Bot Management</span>
     </a>
-
-    <a href="/threat-intel"
-       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+    <a href="/threat-intel" title="Threat Intel"
+       x-show="!sidebarOpen || navG.engines"
+       :class="navRow(sidebarOpen, true, 'engines')"
        class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "threatintel"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
@@ -138,9 +192,9 @@
       </svg>
       <span x-show="sidebarOpen" x-cloak class="truncate">Threat Intel</span>
     </a>
-
-    <a href="/ip-reputations"
-       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+    <a href="/ip-reputations" title="IP Rep"
+       x-show="!sidebarOpen || navG.engines"
+       :class="navRow(sidebarOpen, true, 'engines')"
        class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "iprep"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
@@ -149,9 +203,9 @@
       </svg>
       <span x-show="sidebarOpen" x-cloak class="truncate">IP Reputations</span>
     </a>
-
-    <a href="/data-guard"
-       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+    <a href="/data-guard" title="DLP"
+       x-show="!sidebarOpen || navG.engines"
+       :class="navRow(sidebarOpen, true, 'engines')"
        class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "dlp"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
@@ -161,9 +215,9 @@
       </svg>
       <span x-show="sidebarOpen" x-cloak class="truncate">Data Guard (DLP)</span>
     </a>
-
-    <a href="/wordpress-security"
-       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+    <a href="/wordpress-security" title="WordPress"
+       x-show="!sidebarOpen || navG.engines"
+       :class="navRow(sidebarOpen, true, 'engines')"
        class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "wpsec"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
@@ -173,11 +227,18 @@
       <span x-show="sidebarOpen" x-cloak class="truncate">WordPress Security</span>
     </a>
 
-    <!-- Section: Logs -->
-    <div x-show="sidebarOpen" x-cloak class="pt-3 pb-1 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">Logs & Analytics</div>
-
-    <a href="/security-logs"
-       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+    <!-- Logs -->
+    <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('logs')"
+            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-2">
+      <span>Logs & Analytics</span>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+           class="w-4 h-4 text-gray-600 transition-transform shrink-0" :class="navG.logs ? 'rotate-180' : ''">
+        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/>
+      </svg>
+    </button>
+    <a href="/security-logs" title="Security Events"
+       x-show="!sidebarOpen || navG.logs"
+       :class="navRow(sidebarOpen, true, 'logs')"
        class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "seclogs"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
@@ -186,9 +247,9 @@
       </svg>
       <span x-show="sidebarOpen" x-cloak class="truncate">Security Events</span>
     </a>
-
-    <a href="/logs"
-       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+    <a href="/logs" title="Access Logs"
+       x-show="!sidebarOpen || navG.logs"
+       :class="navRow(sidebarOpen, true, 'logs')"
        class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "logs"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
@@ -198,11 +259,18 @@
       <span x-show="sidebarOpen" x-cloak class="truncate">Access Logs</span>
     </a>
 
-    <!-- Section: Monitoring -->
-    <div x-show="sidebarOpen" x-cloak class="pt-3 pb-1 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">Monitoring</div>
-
-    <a href="/monitoring/nginx"
-       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+    <!-- Monitoring -->
+    <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('mon')"
+            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-2">
+      <span>Monitoring</span>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+           class="w-4 h-4 text-gray-600 transition-transform shrink-0" :class="navG.mon ? 'rotate-180' : ''">
+        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/>
+      </svg>
+    </button>
+    <a href="/monitoring/nginx" title="Nginx"
+       x-show="!sidebarOpen || navG.mon"
+       :class="navRow(sidebarOpen, true, 'mon')"
        class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "nginx-mon"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
@@ -211,9 +279,9 @@
       </svg>
       <span x-show="sidebarOpen" x-cloak class="truncate">Nginx Status</span>
     </a>
-
-    <a href="/monitoring/server"
-       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+    <a href="/monitoring/server" title="Server"
+       x-show="!sidebarOpen || navG.mon"
+       :class="navRow(sidebarOpen, true, 'mon')"
        class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "srv-mon"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
@@ -223,11 +291,18 @@
       <span x-show="sidebarOpen" x-cloak class="truncate">Server Health</span>
     </a>
 
-    <!-- Section: System -->
-    <div x-show="sidebarOpen" x-cloak class="pt-3 pb-1 px-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">System</div>
-
-    <a href="/settings"
-       :class="sidebarOpen ? 'px-3 gap-3' : 'px-0 justify-center'"
+    <!-- System -->
+    <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('sys')"
+            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-2">
+      <span>System</span>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+           class="w-4 h-4 text-gray-600 transition-transform shrink-0" :class="navG.sys ? 'rotate-180' : ''">
+        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/>
+      </svg>
+    </button>
+    <a href="/settings" title="Settings"
+       x-show="!sidebarOpen || navG.sys"
+       :class="navRow(sidebarOpen, true, 'sys')"
        class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "settings"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
@@ -265,7 +340,6 @@
 
 <!-- ── Main content ──────────────────────────────────────────────────────── -->
 <div :class="sidebarOpen ? 'ml-60' : 'ml-14'" class="transition-all duration-200 min-h-screen flex flex-col">
-  <!-- Topbar -->
   <header class="h-14 bg-gray-900/80 backdrop-blur border-b border-gray-800 flex items-center px-6 gap-4 sticky top-0 z-30">
     <h1 class="text-sm font-semibold text-white">{{.Title}}</h1>
     <div class="ml-auto flex items-center gap-3">
@@ -275,7 +349,6 @@
       </span>
     </div>
   </header>
-  <!-- Page -->
   <main class="flex-1 p-6">
     {{template "content" .}}
   </main>

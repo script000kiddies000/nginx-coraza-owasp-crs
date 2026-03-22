@@ -141,3 +141,13 @@ type PageData struct {
 	Flash      FlashMsg
 	Data       any
 }
+
+// SecurityEvent — satu baris ringkas dari coraza_audit.log (disimpan di BoltDB).
+type SecurityEvent struct {
+	Time     string `json:"time"`
+	ClientIP string `json:"client_ip"`
+	RuleID   string `json:"rule_id"`
+	Message  string `json:"message"`
+	Action   string `json:"action"`
+	URI      string `json:"uri"`
+}

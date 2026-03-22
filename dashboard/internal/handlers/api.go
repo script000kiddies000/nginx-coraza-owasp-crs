@@ -47,11 +47,25 @@ func (app *App) APIWafToggle(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "bad request", http.StatusBadRequest)
 		return
 	}
+	switch body.Mode {
+	case "On", "Off", "DetectionOnly":
+	default:
+		jsonError(w, "mode must be On, Off, or DetectionOnly", http.StatusBadRequest)
+		return
+	}
 	cfg := store.GetWAFSettings(app.DB)
 	cfg.Mode = body.Mode
 	if err := store.SaveWAFSettings(app.DB, cfg); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if err := nginx.WriteWAFMode(body.Mode); err != nil {
+		log.Printf("[waf] write mode file: %v", err)
+		jsonError(w, "could not write WAF mode file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := nginx.ReloadNginx(); err != nil {
+		log.Printf("[waf] nginx reload after mode change: %v", err)
 	}
 	jsonOK(w, nil)
 }
@@ -70,8 +84,16 @@ func (app *App) APIConfigureRules(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) APISecurityEvents(w http.ResponseWriter, r *http.Request) {
+	events, err := store.ListSecurityEvents(app.DB, 500)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if events == nil {
+		events = []models.SecurityEvent{}
+	}
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprint(w, `[]`)
+	_ = json.NewEncoder(w).Encode(events)
 }
 
 func (app *App) APIAttackMapData(w http.ResponseWriter, r *http.Request) {

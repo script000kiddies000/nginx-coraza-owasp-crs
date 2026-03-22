@@ -39,6 +39,13 @@ func main() {
 		log.Printf("[flux-waf] nginx sync warning: %v", err)
 	}
 
+	waf := store.GetWAFSettings(db)
+	if err := nginx.WriteWAFMode(waf.Mode); err != nil {
+		log.Printf("[flux-waf] sync WAF mode file: %v", err)
+	} else if err := nginx.ReloadNginx(); err != nil {
+		log.Printf("[flux-waf] nginx reload after WAF mode sync: %v", err)
+	}
+
 	// ── Background workers ────────────────────────────────────────────────
 	workers.Start(db)
 

@@ -67,7 +67,7 @@ func (app *App) PageDataGuard(w http.ResponseWriter, r *http.Request) {
 // ── Logs ──────────────────────────────────────────────────────────────────────
 
 func (app *App) PageSecurityLogs(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "_stub", models.PageData{Title: "Security Events", ActiveMenu: "seclogs"})
+	app.render(w, r, "security-logs", models.PageData{Title: "Security Events", ActiveMenu: "seclogs"})
 }
 
 func (app *App) PageLogs(w http.ResponseWriter, r *http.Request) {
