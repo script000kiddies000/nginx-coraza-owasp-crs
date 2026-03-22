@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"flux-waf/internal/models"
+	"flux-waf/internal/monitor"
 	"flux-waf/internal/nginx"
 	"flux-waf/internal/store"
 )
@@ -39,6 +40,44 @@ func (app *App) APITraffic(w http.ResponseWriter, r *http.Request) {
 
 // ── WAF ───────────────────────────────────────────────────────────────────────
 
+func (app *App) APIGetWAFSettings(w http.ResponseWriter, r *http.Request) {
+	cfg := store.GetWAFSettings(app.DB)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(cfg)
+}
+
+func (app *App) APIPostWAFSettings(w http.ResponseWriter, r *http.Request) {
+	var body models.WAFSettings
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	switch body.Mode {
+	case "On", "Off", "DetectionOnly":
+	default:
+		jsonError(w, "mode must be On, Off, or DetectionOnly", http.StatusBadRequest)
+		return
+	}
+	if body.ParanoiaLevel < 1 || body.ParanoiaLevel > 4 {
+		jsonError(w, "paranoia_level must be between 1 and 4", http.StatusBadRequest)
+		return
+	}
+	if body.AnomalyInbound < 1 || body.AnomalyInbound > 999 {
+		jsonError(w, "anomaly_inbound must be between 1 and 999", http.StatusBadRequest)
+		return
+	}
+	if err := store.SaveWAFSettings(app.DB, body); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := nginx.ApplyWAFConfig(body); err != nil {
+		log.Printf("[waf] apply config: %v", err)
+		jsonError(w, "saved to database but nginx apply failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, nil)
+}
+
 func (app *App) APIWafToggle(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Mode string `json:"mode"`
@@ -59,13 +98,10 @@ func (app *App) APIWafToggle(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if err := nginx.WriteWAFMode(body.Mode); err != nil {
-		log.Printf("[waf] write mode file: %v", err)
-		jsonError(w, "could not write WAF mode file: "+err.Error(), http.StatusInternalServerError)
+	if err := nginx.ApplyWAFConfig(cfg); err != nil {
+		log.Printf("[waf] apply config: %v", err)
+		jsonError(w, "could not apply WAF config: "+err.Error(), http.StatusInternalServerError)
 		return
-	}
-	if err := nginx.ReloadNginx(); err != nil {
-		log.Printf("[waf] nginx reload after mode change: %v", err)
 	}
 	jsonOK(w, nil)
 }
@@ -235,8 +271,26 @@ func (app *App) APIMalwareScanHistory(w http.ResponseWriter, r *http.Request) { 
 
 // ── System ────────────────────────────────────────────────────────────────────
 
-func (app *App) APINginxStatus(w http.ResponseWriter, r *http.Request)  { stubJSON(w) }
-func (app *App) APIServerHealth(w http.ResponseWriter, r *http.Request) { stubJSON(w) }
+func (app *App) APINginxStatus(w http.ResponseWriter, r *http.Request) {
+	st, err := monitor.FetchNginxStatus(nil)
+	w.Header().Set("Content-Type", "application/json")
+	type resp struct {
+		models.NginxStatus
+		Reachable bool   `json:"reachable"`
+		Detail    string `json:"detail,omitempty"`
+	}
+	out := resp{NginxStatus: st, Reachable: err == nil}
+	if err != nil {
+		out.Detail = err.Error()
+	}
+	_ = json.NewEncoder(w).Encode(out)
+}
+
+func (app *App) APIServerHealth(w http.ResponseWriter, r *http.Request) {
+	h := monitor.CollectServerHealthWithNginx()
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(h)
+}
 
 // ── Reports ───────────────────────────────────────────────────────────────────
 

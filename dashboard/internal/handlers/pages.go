@@ -95,21 +95,19 @@ func (app *App) PageMalwareScan(w http.ResponseWriter, r *http.Request) {
 // ── Monitoring ────────────────────────────────────────────────────────────────
 
 func (app *App) PageNginxMonitoring(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "_stub", models.PageData{Title: "Nginx Status", ActiveMenu: "nginx-mon"})
+	app.render(w, r, "nginx-monitoring", models.PageData{Title: "Nginx Status", ActiveMenu: "nginx-mon"})
 }
 
 func (app *App) PageServerMonitoring(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "_stub", models.PageData{Title: "Server Health", ActiveMenu: "srv-mon"})
+	app.render(w, r, "server-health", models.PageData{Title: "Server Health", ActiveMenu: "srv-mon"})
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 func (app *App) PageSettings(w http.ResponseWriter, r *http.Request) {
-	waf := store.GetWAFSettings(app.DB)
-	app.render(w, r, "_stub", models.PageData{
+	app.render(w, r, "settings", models.PageData{
 		Title:      "Settings",
 		ActiveMenu: "settings",
-		Data:       waf,
 	})
 }
 

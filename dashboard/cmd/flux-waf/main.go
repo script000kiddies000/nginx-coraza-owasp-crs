@@ -40,10 +40,8 @@ func main() {
 	}
 
 	waf := store.GetWAFSettings(db)
-	if err := nginx.WriteWAFMode(waf.Mode); err != nil {
-		log.Printf("[flux-waf] sync WAF mode file: %v", err)
-	} else if err := nginx.ReloadNginx(); err != nil {
-		log.Printf("[flux-waf] nginx reload after WAF mode sync: %v", err)
+	if err := nginx.ApplyWAFConfig(waf); err != nil {
+		log.Printf("[flux-waf] apply WAF config (mode + CRS tune + reload): %v", err)
 	}
 
 	// ── Background workers ────────────────────────────────────────────────

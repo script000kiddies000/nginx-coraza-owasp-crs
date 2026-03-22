@@ -1,0 +1,149 @@
+{{define "content"}}
+<div x-data="serverHealth()" x-init="start()">
+
+  <p class="text-gray-400 text-sm mb-6 max-w-2xl">
+    Metrik host dari <span class="font-mono text-gray-500">/proc</span> (Linux). CPU dihitung dari sampel singkat; nginx dianggap hidup jika
+    <span class="font-mono text-gray-500">stub_status</span> merespons.
+  </p>
+
+  <div class="flex items-center gap-3 mb-6">
+    <button type="button" @click="load()"
+            class="text-sm font-medium text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/10 px-3 py-2 rounded-lg transition-colors">
+      Refresh sekarang
+    </button>
+    <label class="flex items-center gap-2 text-xs text-gray-500 cursor-pointer select-none">
+      <input type="checkbox" x-model="auto" class="rounded border-gray-700 bg-gray-900 text-emerald-500 focus:ring-emerald-500/40">
+      Auto-refresh
+    </label>
+    <span x-show="loading" x-cloak class="text-xs text-gray-600">Memuat…</span>
+  </div>
+
+  <template x-if="error">
+    <div class="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-200 text-sm px-4 py-3 mb-4" x-text="error"></div>
+  </template>
+
+  <div class="grid gap-4 lg:grid-cols-2">
+    <div class="rounded-xl border border-gray-800 bg-gray-900/60 p-5">
+      <h3 class="text-sm font-semibold text-white mb-4">Sumber daya</h3>
+      <div class="space-y-4">
+        <div>
+          <div class="flex justify-between text-xs text-gray-500 mb-1">
+            <span>CPU (estimasi)</span>
+            <span class="font-mono text-gray-400" x-text="pct(data?.cpu_usage_percent)"></span>
+          </div>
+          <div class="h-2 rounded-full bg-gray-800 overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-300"
+                 :class="barClass(data?.cpu_usage_percent)"
+                 :style="'width:' + Math.min(100, data?.cpu_usage_percent || 0) + '%'"></div>
+          </div>
+        </div>
+        <div>
+          <div class="flex justify-between text-xs text-gray-500 mb-1">
+            <span>RAM</span>
+            <span class="font-mono text-gray-400"
+                  x-text="memLine(data?.memory_used_gb, data?.memory_total_gb)"></span>
+          </div>
+          <div class="h-2 rounded-full bg-gray-800 overflow-hidden">
+            <div class="h-full rounded-full bg-violet-500/80 transition-all duration-300"
+                 :style="'width:' + memPct(data?.memory_used_gb, data?.memory_total_gb) + '%'"></div>
+          </div>
+        </div>
+        <div>
+          <div class="flex justify-between text-xs text-gray-500 mb-1">
+            <span>Disk /</span>
+            <span class="font-mono text-gray-400"
+                  x-text="memLine(data?.disk_used_gb, data?.disk_total_gb)"></span>
+          </div>
+          <div class="h-2 rounded-full bg-gray-800 overflow-hidden">
+            <div class="h-full rounded-full bg-cyan-500/80 transition-all duration-300"
+                 :style="'width:' + memPct(data?.disk_used_gb, data?.disk_total_gb) + '%'"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rounded-xl border border-gray-800 bg-gray-900/60 p-5">
+      <h3 class="text-sm font-semibold text-white mb-4">Status</h3>
+      <dl class="space-y-3 text-sm">
+        <div class="flex justify-between gap-4 border-b border-gray-800/80 pb-3">
+          <dt class="text-gray-500">Uptime</dt>
+          <dd class="font-mono text-gray-200 text-right" x-text="fmtUptime(data?.uptime_seconds)"></dd>
+        </div>
+        <div class="flex justify-between gap-4 border-b border-gray-800/80 pb-3">
+          <dt class="text-gray-500">Nginx (stub_status)</dt>
+          <dd>
+            <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-1 rounded-md border"
+                  :class="data?.nginx_daemon_up ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' : 'text-rose-400 border-rose-500/30 bg-rose-500/10'"
+                  x-text="data?.nginx_daemon_up ? 'Up' : 'Down / unreachable'"></span>
+          </dd>
+        </div>
+        <div class="text-xs text-gray-600 leading-relaxed pt-1">
+          Di Windows / macOS (go run lokal), hanya status nginx yang tersedia; metrik /proc hanya di container Linux.
+        </div>
+      </dl>
+    </div>
+  </div>
+</div>
+
+<script>
+function serverHealth() {
+  return {
+    loading: false,
+    auto: true,
+    error: '',
+    data: null,
+    pct(v) {
+      if (v === undefined || v === null) return '—';
+      return Number(v).toFixed(1) + '%';
+    },
+    memLine(used, total) {
+      if (!total) return '—';
+      return Number(used || 0).toFixed(2) + ' / ' + Number(total).toFixed(2) + ' GiB';
+    },
+    memPct(used, total) {
+      if (!total) return 0;
+      return Math.min(100, (Number(used || 0) / Number(total)) * 100);
+    },
+    barClass(pct) {
+      const p = Number(pct) || 0;
+      if (p > 85) return 'bg-rose-500';
+      if (p > 65) return 'bg-amber-500';
+      return 'bg-emerald-500';
+    },
+    fmtUptime(sec) {
+      if (sec === undefined || sec === null) return '—';
+      let s = Number(sec);
+      const d = Math.floor(s / 86400);
+      s -= d * 86400;
+      const h = Math.floor(s / 3600);
+      s -= h * 3600;
+      const m = Math.floor(s / 60);
+      const parts = [];
+      if (d) parts.push(d + 'd');
+      if (h) parts.push(h + 'h');
+      parts.push(m + 'm');
+      return parts.join(' ');
+    },
+    async load() {
+      this.loading = true;
+      this.error = '';
+      try {
+        const r = await fetch('/api/system/server-health');
+        if (!r.ok) throw new Error(await r.text() || r.statusText);
+        this.data = await r.json();
+      } catch (e) {
+        this.error = e.message || String(e);
+      } finally {
+        this.loading = false;
+      }
+    },
+    start() {
+      this.load();
+      setInterval(() => {
+        if (this.auto) this.load();
+      }, 5000);
+    }
+  };
+}
+</script>
+{{end}}

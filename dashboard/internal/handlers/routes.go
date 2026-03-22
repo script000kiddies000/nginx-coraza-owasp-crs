@@ -59,6 +59,8 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	mux.HandleFunc("GET /api/ssl", app.RequireAuth(app.APIGetSSL))
 	mux.HandleFunc("POST /api/ssl/upload", app.RequireAuth(app.APIUploadSSL))
 
+	mux.HandleFunc("GET /api/waf/settings", app.RequireAuth(app.APIGetWAFSettings))
+	mux.HandleFunc("POST /api/waf/settings", app.RequireAuth(app.APIPostWAFSettings))
 	mux.HandleFunc("POST /api/waf/toggle", app.RequireAuth(app.APIWafToggle))
 	mux.HandleFunc("GET /api/waf/top-messages", app.RequireAuth(app.APIWAFTopMessages))
 	mux.HandleFunc("POST /api/rules/custom", app.RequireAuth(app.APICustomRules))
