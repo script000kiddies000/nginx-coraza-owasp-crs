@@ -4,7 +4,7 @@
 set -e
 
 # ── Self-signed TLS cert (untuk test HTTPS/JA3) ──────────────────────────────
-CERT_DIR="/etc/nginx/certs"
+CERT_DIR="/etc/nginx/ssl_certs"
 CERT_CRT="${CERT_DIR}/localhost.crt"
 CERT_KEY="${CERT_DIR}/localhost.key"
 if [ ! -s "$CERT_CRT" ] || [ ! -s "$CERT_KEY" ]; then
@@ -44,7 +44,7 @@ fi
 mkdir -p /var/lib/flux-waf
 
 # ── Flux WAF SSL certs directory ─────────────────────────────────────────────
-# Directory dibuat di Dockerfile, di sini hanya pastikan ada (ro mount dari host)
 mkdir -p /etc/nginx/ssl_certs 2>/dev/null || true
+chown www-data:www-data /etc/nginx/ssl_certs 2>/dev/null || true
 
 echo "[s6-init] Setup complete."

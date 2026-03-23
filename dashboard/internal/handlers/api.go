@@ -3,9 +3,13 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -212,8 +216,209 @@ func (app *App) APIDeleteHost(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, `{"ok":true}`)
 }
 
-func (app *App) APIGetSSL(w http.ResponseWriter, r *http.Request)    { stubJSON(w) }
-func (app *App) APIUploadSSL(w http.ResponseWriter, r *http.Request) { stubJSON(w) }
+func sslCertDir() string {
+	if p := os.Getenv("FLUX_SSL_DIR"); p != "" {
+		return p
+	}
+	return "/etc/nginx/ssl_certs"
+}
+
+var reSSLBaseName = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
+func sanitizeSSLBaseName(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "localhost"
+	}
+	if !reSSLBaseName.MatchString(s) {
+		return "localhost"
+	}
+	return s
+}
+
+type sslPair struct {
+	Name    string `json:"name"`
+	CRTPath string `json:"crt_path,omitempty"`
+	KeyPath string `json:"key_path,omitempty"`
+	HasCRT  bool   `json:"has_crt"`
+	HasKey  bool   `json:"has_key"`
+	ModTime string `json:"mod_time,omitempty"`
+}
+
+// APIGetSSL lists available cert/key pairs in /etc/nginx/ssl_certs.
+func (app *App) APIGetSSL(w http.ResponseWriter, r *http.Request) {
+	dir := sslCertDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"dir":   dir,
+				"pairs": []sslPair{},
+			})
+			return
+		}
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	type pairParts struct {
+		hasCRT bool
+		hasKey bool
+	}
+	parts := map[string]*pairParts{}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if strings.HasSuffix(name, ".crt") {
+			base := strings.TrimSuffix(name, ".crt")
+			p := parts[base]
+			if p == nil {
+				p = &pairParts{}
+				parts[base] = p
+			}
+			p.hasCRT = true
+		} else if strings.HasSuffix(name, ".key") {
+			base := strings.TrimSuffix(name, ".key")
+			p := parts[base]
+			if p == nil {
+				p = &pairParts{}
+				parts[base] = p
+			}
+			p.hasKey = true
+		}
+	}
+
+	bases := make([]string, 0, len(parts))
+	for b := range parts {
+		bases = append(bases, b)
+	}
+	sort.Strings(bases)
+
+	pairs := make([]sslPair, 0, len(bases))
+	for _, base := range bases {
+		p := parts[base]
+		crtPath := filepath.Join(dir, base+".crt")
+		keyPath := filepath.Join(dir, base+".key")
+
+		pair := sslPair{
+			Name:   base,
+			HasCRT: p.hasCRT,
+			HasKey: p.hasKey,
+		}
+		if p.hasCRT {
+			pair.CRTPath = crtPath
+		}
+		if p.hasKey {
+			pair.KeyPath = keyPath
+		}
+		// Use CRT mtime as display time when available.
+		if p.hasCRT {
+			if st, err := os.Stat(crtPath); err == nil {
+				pair.ModTime = st.ModTime().UTC().Format(time.RFC3339)
+			}
+		}
+		pairs = append(pairs, pair)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"dir":   dir,
+		"pairs": pairs,
+	})
+}
+
+// APIUploadSSL accepts multipart form fields:
+// - name (basename, default "localhost")
+// - crt (certificate file)
+// - key (private key file)
+func (app *App) APIUploadSSL(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		jsonError(w, "invalid multipart form: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	name := sanitizeSSLBaseName(r.FormValue("name"))
+	dir := sslCertDir()
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		jsonError(w, "mkdir ssl dir: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	crtFile, _, err := r.FormFile("crt")
+	if err != nil {
+		jsonError(w, "crt file is required: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer crtFile.Close()
+
+	keyFile, _, err := r.FormFile("key")
+	if err != nil {
+		jsonError(w, "key file is required: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer keyFile.Close()
+
+	crtPath := filepath.Join(dir, name+".crt")
+	keyPath := filepath.Join(dir, name+".key")
+
+	writeTo := func(path string, src io.Reader, mode os.FileMode) error {
+		tmp := path + ".tmp"
+		f, err := os.Create(tmp)
+		if err != nil {
+			return err
+		}
+		_, cpErr := io.Copy(f, src)
+		closeErr := f.Close()
+		if cpErr != nil {
+			_ = os.Remove(tmp)
+			return cpErr
+		}
+		if closeErr != nil {
+			_ = os.Remove(tmp)
+			return closeErr
+		}
+		if err := os.Chmod(tmp, mode); err != nil {
+			_ = os.Remove(tmp)
+			return err
+		}
+		return os.Rename(tmp, path)
+	}
+
+	if err := writeTo(crtPath, crtFile, 0644); err != nil {
+		jsonError(w, "write crt: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// keyFile is separate reader; already at start.
+	if err := writeTo(keyPath, keyFile, 0600); err != nil {
+		jsonError(w, "write key: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Default server uses localhost cert; reload nginx so changes apply.
+	reloadErr := nginx.ReloadNginx()
+	w.Header().Set("Content-Type", "application/json")
+	if reloadErr != nil {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok":         true,
+			"name":       name,
+			"crt_path":  crtPath,
+			"key_path":  keyPath,
+			"reload_err": reloadErr.Error(),
+		})
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"ok":        true,
+		"name":      name,
+		"crt_path":  crtPath,
+		"key_path":  keyPath,
+		"reloaded":  true,
+	})
+}
 
 // ── Bot Management ────────────────────────────────────────────────────────────
 
@@ -248,6 +453,34 @@ func (app *App) APIGetAccessLogs(w http.ResponseWriter, r *http.Request) {
 		"path":    path,
 		"count":   len(entries),
 		"entries": entries,
+	})
+}
+
+// ── Event Logs (nginx error.log) ─────────────────────────────────────────────
+
+func (app *App) APIGetEventLogs(w http.ResponseWriter, r *http.Request) {
+	limit := 200
+	if q := r.URL.Query().Get("limit"); q != "" {
+		if n, err := strconv.Atoi(q); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	path := os.Getenv("FLUX_NGINX_ERROR_LOG")
+	if path == "" {
+		path = logs.DefaultNginxErrorLog
+	}
+
+	lines, err := logs.ReadNginxErrorLogTail(path, limit)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"path":  path,
+		"count": len(lines),
+		"lines": lines,
 	})
 }
 

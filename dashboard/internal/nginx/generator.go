@@ -16,6 +16,12 @@ import (
 
 const confDir = "/etc/nginx/conf.d"
 
+const (
+	defaultSSLDir  = "/etc/nginx/ssl_certs"
+	defaultSSLCrt  = defaultSSLDir + "/localhost.crt"
+	defaultSSLKey  = defaultSSLDir + "/localhost.key"
+)
+
 // upstreamName converts a domain like "example.com" to "flux_example_com"
 // for use as an nginx upstream block name.
 func upstreamName(domain string) string {
@@ -26,6 +32,20 @@ func upstreamName(domain string) string {
 // hostTemplate is the nginx server block template for a managed host.
 var hostTemplate = template.Must(template.New("host").Funcs(template.FuncMap{
 	"upstreamName": upstreamName,
+	"sslCertPath": func(p string) string {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			return defaultSSLCrt
+		}
+		return p
+	},
+	"sslKeyPath": func(p string) string {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			return defaultSSLKey
+		}
+		return p
+	},
 	"join":         strings.Join,
 }).Parse(`# Managed by Flux WAF — do not edit manually
 # Domain: {{.Domain}}
@@ -47,8 +67,8 @@ server {
 {{- if .SSLEnabled}}
     listen 443 ssl;
     http2 on;
-    ssl_certificate     {{.SSLCert}};
-    ssl_certificate_key {{.SSLKey}};
+    ssl_certificate     {{sslCertPath .SSLCert}};
+    ssl_certificate_key {{sslKeyPath .SSLKey}};
 {{- end}}
     server_name {{.Domain}};
 

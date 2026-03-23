@@ -33,7 +33,7 @@ func (app *App) PageHosts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) PageSSL(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "_stub", models.PageData{Title: "SSL / TLS", ActiveMenu: "ssl"})
+	app.render(w, r, "ssl", models.PageData{Title: "SSL / TLS", ActiveMenu: "ssl"})
 }
 
 // ── WAF ───────────────────────────────────────────────────────────────────────
@@ -80,6 +80,10 @@ func (app *App) PageSecurityLogs(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) PageLogs(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, "access-logs", models.PageData{Title: "Access Logs", ActiveMenu: "logs"})
+}
+
+func (app *App) PageEventLogs(w http.ResponseWriter, r *http.Request) {
+	app.render(w, r, "event-logs", models.PageData{Title: "Event Logs", ActiveMenu: "eventlogs"})
 }
 
 func (app *App) PageAttackMap(w http.ResponseWriter, r *http.Request) {

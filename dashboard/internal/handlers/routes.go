@@ -40,6 +40,7 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	mux.HandleFunc("GET /threat-intel", app.RequireAuth(app.PageThreatIntel))
 	mux.HandleFunc("GET /security-logs", app.RequireAuth(app.PageSecurityLogs))
 	mux.HandleFunc("GET /logs", app.RequireAuth(app.PageLogs))
+	mux.HandleFunc("GET /event-logs", app.RequireAuth(app.PageEventLogs))
 	mux.HandleFunc("GET /security-report", app.RequireAuth(app.PageSecurityReport))
 	mux.HandleFunc("GET /attack-report", app.RequireAuth(app.PageAttackReport))
 	mux.HandleFunc("GET /malware-scan", app.RequireAuth(app.PageMalwareScan))
@@ -58,6 +59,7 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	mux.HandleFunc("GET /api/traffic", app.RequireAuth(app.APITraffic))
 	mux.HandleFunc("GET /api/security-events", app.RequireAuth(app.APISecurityEvents))
 	mux.HandleFunc("GET /api/logs/access", app.RequireAuth(app.APIGetAccessLogs))
+	mux.HandleFunc("GET /api/logs/events", app.RequireAuth(app.APIGetEventLogs))
 	mux.HandleFunc("GET /api/attack-map", app.RequireAuth(app.APIAttackMapData))
 
 	mux.HandleFunc("GET /api/hosts", app.RequireAuth(app.APIGetHosts))
