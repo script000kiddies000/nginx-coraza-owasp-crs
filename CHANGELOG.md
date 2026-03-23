@@ -8,6 +8,10 @@ This project does not currently enforce Semantic Versioning.
 ## Unreleased
 
 ### Added
+- **GeoIP bootstrap auto-download (P3TERX mirror)** — `s6/cont-init.d/01-setup.sh` sekarang otomatis download `GeoLite2-Country.mmdb` saat startup jika file belum ada, dengan fallback URL (`github.com` → `raw.githubusercontent.com`). Optional DB `GeoLite2-City.mmdb` dan `GeoLite2-ASN.mmdb` juga di-fetch best-effort.
+- **Fail-fast GeoIP validation** — startup sekarang memberi error jelas jika `GeoLite2-Country.mmdb` tetap tidak tersedia, sehingga penyebab crash `MMDB_open(...) failed` langsung terlihat.
+- **3D Globe renderer fallback ke `globe.gl` (Three.js)** — halaman `attack-map` mode Globe dipindah ke renderer library yang lebih stabil, tetap mempertahankan fallback canvas lama jika CDN library gagal load.
+- **Attack-map visual tuning (globe mode)** — globe dibuat lebih terang (Blue Marble + atmosphere tuning) dan warna arc disamakan gaya mode plane (warna sumber serangan + fade tail).
 - **s6-overlay v3 process manager** — `entrypoint.sh` dihapus, digantikan oleh s6-overlay (`ENTRYPOINT ["/init"]`). Nginx berjalan sebagai supervised longrun service (`/etc/services.d/nginx/run`). Init logic (cert gen, CRS setup, ip_rules placeholder, flux-data dir) dipindahkan ke `/etc/cont-init.d/01-setup.sh` dan `02-nginx-test.sh`. s6 otomatis restart nginx jika exit tidak terduga.
 - **`--with-http_stub_status_module`** — dikompilasi ke nginx. Endpoint `GET /nginx_status` tersedia di `127.0.0.1:8888` (internal container saja, via `config/conf.d/flux-internal.conf`). Akan dibaca Go dashboard untuk metrics aktif connections/requests.
 - **`flux_json` log format** — log paralel JSON di `access_json.log`. Field: `time`, `request_id`, `remote_addr`, `method`, `uri`, `status`, `bytes_sent`, `request_time`, `upstream_time`, `host`, `user_agent`, `country` (GeoIP2), `ssl_protocol`, `ssl_ja3`. Akan di-parse oleh Go dashboard.
