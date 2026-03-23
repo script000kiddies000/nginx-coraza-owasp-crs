@@ -47,4 +47,60 @@ mkdir -p /var/lib/flux-waf
 mkdir -p /etc/nginx/ssl_certs 2>/dev/null || true
 chown www-data:www-data /etc/nginx/ssl_certs 2>/dev/null || true
 
+# ── GeoIP2 MMDB bootstrap (auto-download fallback) ───────────────────────────
+GEOIP_DIR="/etc/nginx/geoip"
+COUNTRY_DB="${GEOIP_DIR}/GeoLite2-Country.mmdb"
+CITY_DB="${GEOIP_DIR}/GeoLite2-City.mmdb"
+ASN_DB="${GEOIP_DIR}/GeoLite2-ASN.mmdb"
+
+mkdir -p "$GEOIP_DIR"
+
+download_mmdb_if_missing() {
+    dest_file="$1"
+    name="$2"
+    shift 2
+
+    if [ -s "$dest_file" ]; then
+        echo "[s6-init] ${name} already exists."
+        return 0
+    fi
+
+    for url in "$@"; do
+        [ -n "$url" ] || continue
+        echo "[s6-init] Downloading ${name} from: $url"
+        if curl -fsSL --retry 3 --connect-timeout 8 --max-time 90 "$url" -o "${dest_file}.tmp"; then
+            if [ -s "${dest_file}.tmp" ]; then
+                mv "${dest_file}.tmp" "$dest_file"
+                chmod 644 "$dest_file" 2>/dev/null || true
+                echo "[s6-init] ${name} downloaded."
+                return 0
+            fi
+        fi
+        rm -f "${dest_file}.tmp"
+    done
+
+    echo "[s6-init] WARN: ${name} is missing and download failed."
+    return 1
+}
+
+download_mmdb_if_missing "$COUNTRY_DB" "GeoLite2-Country.mmdb" \
+    "https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-Country.mmdb" \
+    "https://raw.githubusercontent.com/P3TERX/GeoLite.mmdb/download/GeoLite2-Country.mmdb"
+
+# Optional DBs (currently not required by nginx.conf, but useful for future features).
+download_mmdb_if_missing "$CITY_DB" "GeoLite2-City.mmdb" \
+    "https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-City.mmdb" \
+    "https://raw.githubusercontent.com/P3TERX/GeoLite.mmdb/download/GeoLite2-City.mmdb" || true
+
+download_mmdb_if_missing "$ASN_DB" "GeoLite2-ASN.mmdb" \
+    "https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-ASN.mmdb" \
+    "https://raw.githubusercontent.com/P3TERX/GeoLite.mmdb/download/GeoLite2-ASN.mmdb" || true
+
+# Country DB is mandatory by nginx.conf (geoip2 directive).
+if [ ! -s "$COUNTRY_DB" ]; then
+    echo "[s6-init] ERROR: GeoLite2-Country.mmdb not found."
+    echo "[s6-init] Please check internet access or place file manually at: $COUNTRY_DB"
+    exit 1
+fi
+
 echo "[s6-init] Setup complete."

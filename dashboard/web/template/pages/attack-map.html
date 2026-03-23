@@ -121,7 +121,8 @@
     <!-- Map + feed overlay -->
     <div class="relative flex-1 min-h-[420px] lg:min-h-0 bg-[#0a0d12]">
       <div id="flux-leaflet-map" class="absolute inset-0 z-0"></div>
-      <canvas id="flux-globe-canvas" class="absolute inset-0 z-0 hidden pointer-events-none"></canvas>
+      <div id="flux-globe-container" class="absolute inset-0 z-0 hidden"></div>
+      <canvas id="flux-globe-canvas" class="absolute inset-0 z-0 hidden"></canvas>
 
       <!-- Zoom hint -->
       <div class="absolute bottom-3 left-3 z-[400] pointer-events-none text-[10px] text-slate-600 hidden lg:block">
@@ -170,6 +171,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-geo@3"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/globe.gl@2.33.1/dist/globe.gl.min.js"></script>
 <script>
 function attackMapApp() {
   return {
@@ -198,6 +203,15 @@ function attackMapApp() {
     globeW: 0,
     globeH: 0,
     globeR: 0,
+    globeLandFeatures: null,
+    globeRotateLon: 0,
+    globeRotateLat: 0,
+    globeDragging: false,
+    globeDragStartX: 0,
+    globeDragStartY: 0,
+    globeDragStartLon: 0,
+    globeDragStartLat: 0,
+    globe3d: null,
 
     barPct(count) {
       const m = this.catMax || 1;
@@ -215,15 +229,56 @@ function attackMapApp() {
       } catch (_) { return ts; }
     },
 
+    colorForCountry(code) {
+      // Deterministic per-country color (same country always same hue).
+      const palette = [
+        '#fb923c', '#38bdf8', '#a78bfa', '#34d399', '#f472b6',
+        '#f59e0b', '#22d3ee', '#60a5fa', '#f97316', '#10b981',
+        '#e879f9', '#f43f5e', '#84cc16', '#facc15', '#06b6d4',
+      ];
+      const s = String(code || 'ZZ');
+      let h = 0;
+      for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i);
+      const idx = Math.abs(h) % palette.length;
+      return palette[idx];
+    },
+
+    approxDistanceKm(a, b) {
+      const toRad = (d) => d * Math.PI / 180;
+      const R = 6371;
+      const dLat = toRad(b[0] - a[0]);
+      const dLon = toRad(b[1] - a[1]);
+      const lat1 = toRad(a[0]);
+      const lat2 = toRad(b[0]);
+      const x = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(x));
+    },
+
+    hexToRgb(hex) {
+      const raw = String(hex || '').replace('#', '');
+      const val = raw.length === 3
+        ? raw.split('').map((c) => c + c).join('')
+        : raw.padEnd(6, '0').slice(0, 6);
+      const n = parseInt(val, 16);
+      return {
+        r: (n >> 16) & 255,
+        g: (n >> 8) & 255,
+        b: n & 255,
+      };
+    },
+
     curvedLatLngs(a, b, bulge) {
       const midLat = (a[0] + b[0]) / 2 + Math.abs(b[0] - a[0]) * (bulge || 0.35);
-      const midLon = (a[1] + b[1]) / 2;
-      const steps = 56;
+      // Plane mode: keep non-shortest interpolation as requested by user.
+      const lon1 = a[1];
+      const lon2 = b[1];
+      const midLon = (lon1 + lon2) / 2;
+      const steps = 140;
       const pts = [];
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
         const lat = (1 - t) * (1 - t) * a[0] + 2 * (1 - t) * t * midLat + t * t * b[0];
-        const lon = (1 - t) * (1 - t) * a[1] + 2 * (1 - t) * t * midLon + t * t * b[1];
+        const lon = (1 - t) * (1 - t) * lon1 + 2 * (1 - t) * t * midLon + t * t * lon2;
         pts.push([lat, lon]);
       }
       return pts;
@@ -247,6 +302,8 @@ function attackMapApp() {
 
       const canvas = document.getElementById('flux-globe-canvas');
       if (canvas) canvas.classList.add('hidden');
+      const globeContainer = document.getElementById('flux-globe-container');
+      if (globeContainer) globeContainer.classList.add('hidden');
       if (el) el.classList.remove('hidden');
 
       if (this.rocketTimer) {
@@ -298,35 +355,35 @@ function attackMapApp() {
         const to = [p.target_lat, p.target_lon];
         const bulge = 0.26 + (idx % 9) * 0.028;
         const arc = this.curvedLatLngs(from, to, bulge);
-
-        // Faint base arcs for context; rocket tail will be the main visual.
-        L.polyline(arc, { color: '#ea580c', weight: 5, opacity: 0.06, lineCap: 'round' }).addTo(this.layerGroup);
-        L.polyline(arc, { color: '#fb923c', weight: 2, opacity: 0.18, lineCap: 'round' }).addTo(this.layerGroup);
+        const color = this.colorForCountry(p.source_country);
+        const distKm = this.approxDistanceKm(from, to);
+        // Closer routes move faster.
+        const speed = distKm < 2500 ? 4 : distKm < 7000 ? 3 : 2;
 
         // Rocket-stream animation: moving dot along the arc.
         const dot = L.circleMarker(arc[0], {
           radius: 3.3,
-          color: '#fb923c',
-          fillColor: '#fb923c',
+          color,
+          fillColor: color,
           fillOpacity: 0.95,
           weight: 1,
           opacity: 0.95,
         }).addTo(this.layerGroup);
         const tailLen = 12 + (idx % 5);
-        const trail = L.polyline([], { color: '#fb923c', weight: 3, opacity: 0.95, lineCap: 'round' }).addTo(this.layerGroup);
+        const trail = L.polyline([], { color, weight: 3, opacity: 0.95, lineCap: 'round' }).addTo(this.layerGroup);
         this.rocketAnims.push({
           arc,
           dot,
           trail,
           t: idx % arc.length,
-          step: 1 + (idx % 3),
+          step: speed + (idx % 2),
           tailLen,
         });
 
         L.marker(from, {
           icon: L.divIcon({
             className: 'flux-ct-src-marker',
-            html: '<div class="flux-src-dot"></div>',
+            html: '<div class="flux-src-dot" style="background:' + color + ';box-shadow:0 0 12px ' + color + ';border-color:rgba(255,255,255,.6)"></div>',
             iconSize: [12, 12],
             iconAnchor: [6, 6],
           }),
@@ -340,52 +397,92 @@ function attackMapApp() {
       this.rocketTimer = setInterval(() => {
         if (this.viewMode !== 'plane') return;
         for (const a of this.rocketAnims) {
-          a.t = (a.t + a.step) % a.arc.length;
+          a.t += a.step;
+          if (a.t >= a.arc.length) a.t = 0;
           a.dot.setLatLng(a.arc[a.t]);
 
           // Update rocket tail polyline.
           const len = a.arc.length;
-          const tailLen = Math.min(a.tailLen || 12, len);
+          const tailLen = Math.min(a.tailLen || 12, len - 1);
           const tail = [];
-          for (let k = tailLen - 1; k >= 0; k--) {
-            const idx = (a.t - k + len) % len;
+          const start = Math.max(0, a.t - tailLen + 1);
+          for (let idx = start; idx <= a.t; idx++) {
             tail.push(a.arc[idx]);
           }
           if (a.trail) a.trail.setLatLngs(tail);
         }
-      }, 80);
+      }, 55);
 
       setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 200);
       setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 600);
     },
 
     projectGlobe(lat, lon) {
-      // Orthographic projection onto a visible hemisphere centered at (originLat, originLon).
-      // Returns {x,y} in canvas space, or null if the point is on the far side.
+      if (this.globeProjection) {
+        const p = this.globeProjection([lon, lat]);
+        if (!p) return null;
+        return { x: p[0], y: p[1] };
+      }
+      // Fallback projection when d3 isn't available.
       const toRad = (d) => d * Math.PI / 180;
       const latRad = toRad(lat);
       const lonRad = toRad(lon);
       const lat0 = toRad(this.originLat);
       const lon0 = toRad(this.originLon);
-
       const dLon = lonRad - lon0;
+
       const cosc = Math.sin(lat0) * Math.sin(latRad) + Math.cos(lat0) * Math.cos(latRad) * Math.cos(dLon);
       if (cosc < 0) return null;
 
       const x = Math.cos(latRad) * Math.sin(dLon);
       const y = Math.cos(lat0) * Math.sin(latRad) - Math.sin(lat0) * Math.cos(latRad) * Math.cos(dLon);
-
       const cx = this.globeW / 2;
       const cy = this.globeH / 2;
       const R = this.globeR;
       return { x: cx + x * R, y: cy - y * R };
     },
 
+    drawFallbackContinents(c) {
+      // Coarse continent silhouettes for offline/no-CDN fallback.
+      const polys = [
+        [[72, -150],[60,-130],[50,-120],[45,-110],[40,-100],[30,-90],[20,-85],[15,-95],[20,-110],[25,-120],[35,-130],[50,-140],[65,-150]], // N. America
+        [[10,-82],[5,-80],[-5,-75],[-15,-70],[-25,-65],[-35,-60],[-45,-64],[-55,-70],[-50,-78],[-35,-75],[-20,-70],[-5,-72],[6,-78]], // S. America
+        [[72,-10],[70,10],[65,25],[60,40],[55,55],[52,70],[50,90],[45,110],[40,130],[35,150],[25,160],[15,145],[10,120],[20,95],[25,80],[30,60],[35,40],[40,25],[45,10],[52,-2],[60,-8],[68,-12]], // Eurasia
+        [[35,-18],[30,-5],[24,10],[18,20],[10,28],[2,32],[-8,35],[-18,30],[-25,20],[-30,12],[-35,5],[-30,-5],[-22,-10],[-10,-5],[5,-2],[15,-5],[25,-10],[32,-15]], // Africa
+        [[-12,113],[-18,120],[-24,130],[-30,140],[-36,150],[-40,146],[-42,136],[-38,126],[-30,118],[-22,112],[-15,110]], // Australia
+      ];
+      for (const poly of polys) {
+        let started = false;
+        c.beginPath();
+        for (const [lat, lon] of poly) {
+          const pr = this.projectGlobe(lat, lon);
+          if (!pr) continue;
+          if (!started) { c.moveTo(pr.x, pr.y); started = true; }
+          else c.lineTo(pr.x, pr.y);
+        }
+        if (started) {
+          c.closePath();
+          c.fillStyle = 'rgba(71,85,105,0.30)';
+          c.fill();
+          c.strokeStyle = 'rgba(100,116,139,0.22)';
+          c.lineWidth = 0.6;
+          c.stroke();
+        }
+      }
+    },
+
     drawGlobe() {
+      if (typeof Globe !== 'undefined') {
+        this.drawGlobe3dLib();
+        return;
+      }
+
       const canvas = document.getElementById('flux-globe-canvas');
       if (!canvas) return;
       const leafletEl = document.getElementById('flux-leaflet-map');
       if (leafletEl) leafletEl.classList.add('hidden');
+      const globeContainer = document.getElementById('flux-globe-container');
+      if (globeContainer) globeContainer.classList.add('hidden');
       canvas.classList.remove('hidden');
 
       if (this.globeTimer) {
@@ -398,7 +495,8 @@ function attackMapApp() {
       if (!ctx) return;
 
       const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
+      const parent = canvas.parentElement;
+      const rect = parent ? parent.getBoundingClientRect() : canvas.getBoundingClientRect();
       const w = Math.max(1, Math.floor(rect.width));
       const h = Math.max(1, Math.floor(rect.height));
 
@@ -413,27 +511,38 @@ function attackMapApp() {
       this.globeCtx = ctx;
       this.globeW = w;
       this.globeH = h;
-      this.globeR = Math.floor(Math.min(w, h) * 0.42);
+      this.globeR = Math.floor(Math.min(w, h) * 0.46);
 
-      const maxArcs = Math.min(12, (this.points || []).length);
+      let geoPath = null;
+      if (typeof d3 !== 'undefined' && d3.geoOrthographic) {
+        this.globeProjection = d3.geoOrthographic()
+          .center([0, 0])
+          .rotate([this.globeRotateLon, this.globeRotateLat, 0])
+          .translate([this.globeW / 2, this.globeH / 2])
+          .scale(this.globeR)
+          .clipAngle(90);
+        geoPath = d3.geoPath(this.globeProjection, ctx);
+      } else {
+        this.globeProjection = null;
+      }
+
+      const maxArcs = Math.min(18, (this.points || []).length);
       for (let i = 0; i < maxArcs; i++) {
         const p = this.points[i];
         const from = [p.source_lat, p.source_lon];
         const to = [p.target_lat, p.target_lon];
         const bulge = 0.26 + (i % 9) * 0.028;
         const arcLatLng = this.curvedLatLngs(from, to, bulge);
-
-        const arcPts = [];
-        for (const ll of arcLatLng) {
-          const pr = this.projectGlobe(ll[0], ll[1]);
-          if (pr) arcPts.push(pr);
-        }
-        if (arcPts.length < 2) continue;
+        const color = this.colorForCountry(p.source_country);
+        const distKm = this.approxDistanceKm(from, to);
+        const speed = distKm < 2500 ? 4 : distKm < 7000 ? 3 : 2;
 
         this.globeArcs.push({
-          pts: arcPts,
-          t: i % arcPts.length,
-          step: 1 + (i % 3),
+          latlng: arcLatLng,
+          pts: [],
+          t: i % arcLatLng.length,
+          step: speed + (i % 2),
+          color,
         });
       }
 
@@ -448,15 +557,35 @@ function attackMapApp() {
 
         c.clearRect(0, 0, this.globeW, this.globeH);
 
-        // Background sphere.
-        const g = c.createRadialGradient(cx - R * 0.2, cy - R * 0.2, 10, cx, cy, R);
-        g.addColorStop(0, 'rgba(16,185,129,0.14)');
-        g.addColorStop(0.35, 'rgba(56,189,248,0.08)');
-        g.addColorStop(1, 'rgba(2,6,23,0.0)');
+        // Ocean sphere (stronger so globe mode looks distinct from plane mode).
+        const g = c.createRadialGradient(cx - R * 0.35, cy - R * 0.35, 8, cx, cy, R);
+        g.addColorStop(0, 'rgba(14,165,233,0.32)');
+        g.addColorStop(0.5, 'rgba(8,47,73,0.72)');
+        g.addColorStop(1, 'rgba(2,6,23,0.96)');
         c.beginPath();
         c.arc(cx, cy, R, 0, Math.PI * 2);
         c.fillStyle = g;
         c.fill();
+
+        // Landmass map on globe (if loaded).
+        if (geoPath && this.globeLandFeatures && this.globeLandFeatures.length) {
+          c.save();
+          c.beginPath();
+          c.arc(cx, cy, R, 0, Math.PI * 2);
+          c.clip();
+          for (const f of this.globeLandFeatures) {
+            c.beginPath();
+            geoPath(f);
+            c.fillStyle = 'rgba(34,197,94,0.28)';
+            c.fill();
+            c.strokeStyle = 'rgba(134,239,172,0.26)';
+            c.lineWidth = 0.6;
+            c.stroke();
+          }
+          c.restore();
+        } else {
+          this.drawFallbackContinents(c);
+        }
 
         // Sphere edge + 3D shading.
         c.beginPath();
@@ -526,53 +655,169 @@ function attackMapApp() {
         // Rocket arcs: tail + head.
         for (let i = 0; i < this.globeArcs.length; i++) {
           const a = this.globeArcs[i];
+          a.pts = [];
+          for (const ll of a.latlng || []) {
+            const pr = this.projectGlobe(ll[0], ll[1]);
+            if (pr) a.pts.push(pr);
+          }
           const len = a.pts.length;
-          const head = a.t;
+          if (len < 2) continue;
+          const head = Math.min(a.t, len - 1);
           const tailLen = Math.min(18, len - 1);
 
-          // Very faint base (context)
-          c.beginPath();
-          c.moveTo(a.pts[0].x, a.pts[0].y);
-          for (let k = 1; k < len; k++) c.lineTo(a.pts[k].x, a.pts[k].y);
-          c.strokeStyle = 'rgba(251,146,60,0.05)';
-          c.lineWidth = 2;
-          c.lineCap = 'round';
-          c.stroke();
-
           // Tail segments with fading alpha
-          for (let j = tailLen; j >= 1; j--) {
-            const idx1 = (head - j + len) % len;
-            const idx2 = (head - (j - 1) + len) % len;
-            const alpha = (j / tailLen) * 0.6;
+          const start = Math.max(0, head - tailLen + 1);
+          for (let idx = start + 1; idx <= head; idx++) {
+            const idx1 = idx - 1;
+            const idx2 = idx;
+            const seg = idx - start;
+            const alpha = (seg / Math.max(1, tailLen)) * 0.6;
 
             c.beginPath();
             c.moveTo(a.pts[idx1].x, a.pts[idx1].y);
             c.lineTo(a.pts[idx2].x, a.pts[idx2].y);
-            c.strokeStyle = `rgba(251,146,60,${alpha})`;
+            const rgb = this.hexToRgb(a.color || '#fb923c');
+            c.strokeStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})`;
             c.lineWidth = 3;
             c.stroke();
           }
 
           // Head glow
           const pt = a.pts[head];
+          const rgb = this.hexToRgb(a.color || '#fb923c');
           c.save();
           c.shadowBlur = 16;
-          c.shadowColor = 'rgba(251,146,60,0.55)';
+          c.shadowColor = `rgba(${rgb.r},${rgb.g},${rgb.b},0.55)`;
           c.beginPath();
           c.arc(pt.x, pt.y, 3.5, 0, Math.PI * 2);
-          c.fillStyle = 'rgba(251,146,60,0.98)';
+          c.fillStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},0.98)`;
           c.fill();
           c.restore();
         }
 
         // Advance dots.
         for (const a of this.globeArcs) {
-          a.t = (a.t + a.step) % a.pts.length;
+          a.t += a.step;
+          if (a.t >= (a.latlng || []).length) a.t = 0;
         }
       };
 
       renderFrame();
-      this.globeTimer = setInterval(renderFrame, 80);
+      this.globeTimer = setInterval(renderFrame, 55);
+      this.bindGlobeInteractions(canvas);
+    },
+
+    drawGlobe3dLib() {
+      const container = document.getElementById('flux-globe-container');
+      if (!container) return;
+      const leafletEl = document.getElementById('flux-leaflet-map');
+      if (leafletEl) leafletEl.classList.add('hidden');
+      const canvas = document.getElementById('flux-globe-canvas');
+      if (canvas) canvas.classList.add('hidden');
+      container.classList.remove('hidden');
+
+      if (this.globeTimer) {
+        clearInterval(this.globeTimer);
+        this.globeTimer = null;
+      }
+
+      const rect = container.getBoundingClientRect();
+      const width = Math.max(320, Math.floor(rect.width || container.clientWidth || 0));
+      const height = Math.max(280, Math.floor(rect.height || container.clientHeight || 0));
+      if (width < 10 || height < 10) return;
+
+      if (!this.globe3d) {
+        this.globe3d = Globe()(container)
+          .backgroundColor('rgba(0,0,0,0)')
+          .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
+          .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
+          .atmosphereColor('#67e8f9')
+          .atmosphereAltitude(0.19)
+          .arcStroke(0.6)
+          .arcDashLength(0.42)
+          .arcDashGap(0.8)
+          .arcDashInitialGap(() => Math.random())
+          .arcDashAnimateTime(1400)
+          .pointAltitude(0.03)
+          .pointRadius(0.2)
+          .pointResolution(12);
+      }
+
+      this.globe3d.width(width).height(height);
+      this.globe3d.pointOfView({ lat: this.originLat || -2.5, lng: this.originLon || 118, altitude: 2.15 }, 900);
+
+      const points = (this.points || []).map((p) => ({
+        lat: Number(p.source_lat),
+        lng: Number(p.source_lon),
+        color: this.colorForCountry(p.source_country),
+      })).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+
+      const arcs = (this.points || []).slice(0, 120).map((p) => {
+        const color = this.colorForCountry(p.source_country);
+        return {
+        startLat: Number(p.source_lat),
+        startLng: Number(p.source_lon),
+        endLat: Number(p.target_lat),
+        endLng: Number(p.target_lon),
+        // Keep line color style close to plane mode: same hue, fading tail.
+        color: [color, color + '55'],
+        };
+      }).filter((a) =>
+        Number.isFinite(a.startLat) && Number.isFinite(a.startLng) &&
+        Number.isFinite(a.endLat) && Number.isFinite(a.endLng)
+      );
+
+      const targetPoint = Number.isFinite(this.originLat) && Number.isFinite(this.originLon)
+        ? [{ lat: this.originLat, lng: this.originLon, color: '#22c55e' }]
+        : [];
+
+      this.globe3d
+        .pointsData(points.concat(targetPoint))
+        .pointColor('color')
+        .arcsData(arcs);
+    },
+
+    bindGlobeInteractions(canvas) {
+      const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+      const startDrag = (x, y) => {
+        this.globeDragging = true;
+        this.globeDragStartX = x;
+        this.globeDragStartY = y;
+        this.globeDragStartLon = this.globeRotateLon;
+        this.globeDragStartLat = this.globeRotateLat;
+      };
+      const moveDrag = (x, y) => {
+        if (!this.globeDragging || this.viewMode !== 'globe') return;
+        const dx = x - this.globeDragStartX;
+        const dy = y - this.globeDragStartY;
+        this.globeRotateLon = this.globeDragStartLon + dx * 0.35;
+        this.globeRotateLat = clamp(this.globeDragStartLat - dy * 0.28, -75, 75);
+        if (this.globeProjection) {
+          this.globeProjection.rotate([this.globeRotateLon, this.globeRotateLat, 0]);
+        }
+      };
+      const endDrag = () => {
+        this.globeDragging = false;
+      };
+
+      // Mouse
+      canvas.onmousedown = (e) => startDrag(e.clientX, e.clientY);
+      window.onmousemove = (e) => moveDrag(e.clientX, e.clientY);
+      window.onmouseup = () => endDrag();
+
+      // Touch
+      canvas.ontouchstart = (e) => {
+        if (!e.touches || !e.touches[0]) return;
+        const t = e.touches[0];
+        startDrag(t.clientX, t.clientY);
+      };
+      canvas.ontouchmove = (e) => {
+        if (!e.touches || !e.touches[0]) return;
+        const t = e.touches[0];
+        moveDrag(t.clientX, t.clientY);
+      };
+      canvas.ontouchend = () => endDrag();
     },
 
     renderView() {
@@ -583,6 +828,15 @@ function attackMapApp() {
     setViewMode(mode) {
       this.viewMode = mode === 'globe' ? 'globe' : 'plane';
       this.renderView();
+    },
+
+    onWindowResize() {
+      if (this.viewMode !== 'globe') return;
+      if (typeof Globe !== 'undefined' && this.globe3d) {
+        this.drawGlobe3dLib();
+        return;
+      }
+      this.drawGlobe();
     },
 
     startLoop() {
@@ -599,7 +853,16 @@ function attackMapApp() {
 
     async init() {
       this.startClock();
+      window.addEventListener('resize', () => this.onWindowResize());
       try {
+        // Optional world landmass for globe (non-blocking).
+        try {
+          const topo = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(r => r.json());
+          this.globeLandFeatures = topojson.feature(topo, topo.objects.countries).features || [];
+        } catch (_) {
+          this.globeLandFeatures = null;
+        }
+
         const r = await fetch('/api/attack-map');
         const d = await r.json();
         this.demo = !!d.demo;
@@ -616,11 +879,15 @@ function attackMapApp() {
           this.originLat = this.points[0].target_lat;
           this.originLon = this.points[0].target_lon;
         }
+        // Start globe looking at protected origin.
+        this.globeRotateLon = -this.originLon;
+        this.globeRotateLat = -this.originLat;
 
         this.feed = this.allLogs.slice(0, 14).map((e, i) => ({ ...e, _key: 'init-' + i }));
         this.startLoop();
 
         setTimeout(() => this.renderView(), 50);
+        setTimeout(() => this.renderView(), 280);
       } catch (e) {
         this.label = 'Gagal memuat data: ' + (e.message || e);
       }
