@@ -1,8 +1,8 @@
 {{define "content"}}
-<div class="max-w-5xl space-y-6" x-data="sslApp()" x-init="init()">
+<div class="w-full min-h-[calc(100vh-6.5rem)] flex flex-col space-y-6" x-data="sslApp()" x-init="init()">
 
   <div class="flex items-center justify-between gap-4 flex-wrap">
-    <p class="text-gray-400 text-sm max-w-2xl">
+    <p class="text-gray-400 text-sm">
       Upload sertifikat TLS ke folder mount
       <span class="font-mono text-gray-500">/etc/nginx/ssl_certs</span>.
       Default server akan memakai <span class="font-mono text-gray-500">localhost.crt</span> &amp;
@@ -16,77 +16,79 @@
   <div x-show="msgOk" x-cloak class="text-sm text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-lg px-4 py-2" x-text="msgOk"></div>
   <div x-show="msgErr" x-cloak class="text-sm text-rose-400 border border-rose-500/30 bg-rose-500/10 rounded-lg px-4 py-2" x-text="msgErr"></div>
 
-  <div class="grid lg:grid-cols-2 gap-6">
-    <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-4">
-      <h2 class="text-sm font-semibold text-white">Upload</h2>
-      <div>
-        <label class="block text-xs text-gray-500 mb-1">Nama sertifikat (basename)</label>
-        <input type="text" x-model="form.name" placeholder="localhost"
-               class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200 font-mono">
-        <p class="text-xs text-gray-600 mt-1">
-          Output akan jadi <span class="font-mono">NAME.crt</span> dan <span class="font-mono">NAME.key</span>.
+  <div class="flex-1 min-h-0 overflow-y-auto">
+    <div class="grid lg:grid-cols-2 gap-6">
+      <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-4">
+        <h2 class="text-sm font-semibold text-white">Upload</h2>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Nama sertifikat (basename)</label>
+          <input type="text" x-model="form.name" placeholder="localhost"
+                 class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200 font-mono">
+          <p class="text-xs text-gray-600 mt-1">
+            Output akan jadi <span class="font-mono">NAME.crt</span> dan <span class="font-mono">NAME.key</span>.
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">File .crt</label>
+          <input type="file" @change="setFile('crt', $event)" accept=".crt,.pem,.cer" class="w-full text-sm text-gray-300">
+        </div>
+
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">File .key</label>
+          <input type="file" @change="setFile('key', $event)" accept=".key,.pem" class="w-full text-sm text-gray-300">
+        </div>
+
+        <button type="button" @click="upload()" :disabled="uploading || !form.crt || !form.key"
+                class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold px-5 py-2 rounded-lg">
+          <span x-show="!uploading">Upload &amp; reload nginx</span>
+          <span x-show="uploading">Mengupload…</span>
+        </button>
+      </div>
+
+      <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-3">
+        <h2 class="text-sm font-semibold text-white">Daftar pasangan sertifikat</h2>
+        <div class="text-xs text-gray-500 font-mono" x-show="dir">
+          Dir: <span x-text="dir"></span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="border-b border-gray-800">
+              <tr class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th class="text-left px-3 py-2">Name</th>
+                <th class="text-left px-3 py-2">CRT</th>
+                <th class="text-left px-3 py-2">KEY</th>
+                <th class="text-left px-3 py-2">Mod</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800/70 font-mono text-xs">
+              <template x-for="p in pairs" :key="p.name">
+                <tr class="hover:bg-gray-800/30">
+                  <td class="px-3 py-2">
+                    <span class="text-cyan-400" x-text="p.name"></span>
+                  </td>
+                  <td class="px-3 py-2">
+                    <span :class="p.has_crt ? 'text-emerald-400' : 'text-rose-400'" x-text="p.has_crt ? 'OK' : 'missing'"></span>
+                  </td>
+                  <td class="px-3 py-2">
+                    <span :class="p.has_key ? 'text-emerald-400' : 'text-rose-400'" x-text="p.has_key ? 'OK' : 'missing'"></span>
+                  </td>
+                  <td class="px-3 py-2 text-gray-500" x-text="p.mod_time || '—'"></td>
+                </tr>
+              </template>
+              <tr x-show="pairs.length === 0">
+                <td colspan="4" class="px-3 py-8 text-center text-gray-600">Belum ada sertifikat.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="text-xs text-gray-600">
+          Catatan: jika host mengaktifkan SSL, pastikan config host memakai paths cert/key yang valid.
+          Worker default saat ini akan diarahkan ke <span class="font-mono">localhost</span>.
         </p>
       </div>
-
-      <div>
-        <label class="block text-xs text-gray-500 mb-1">File .crt</label>
-        <input type="file" @change="setFile('crt', $event)" accept=".crt,.pem,.cer" class="w-full text-sm text-gray-300">
-      </div>
-
-      <div>
-        <label class="block text-xs text-gray-500 mb-1">File .key</label>
-        <input type="file" @change="setFile('key', $event)" accept=".key,.pem" class="w-full text-sm text-gray-300">
-      </div>
-
-      <button type="button" @click="upload()" :disabled="uploading || !form.crt || !form.key"
-              class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold px-5 py-2 rounded-lg">
-        <span x-show="!uploading">Upload &amp; reload nginx</span>
-        <span x-show="uploading">Mengupload…</span>
-      </button>
-    </div>
-
-    <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-3">
-      <h2 class="text-sm font-semibold text-white">Daftar pasangan sertifikat</h2>
-      <div class="text-xs text-gray-500 font-mono" x-show="dir">
-        Dir: <span x-text="dir"></span>
-      </div>
-
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead class="border-b border-gray-800">
-            <tr class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              <th class="text-left px-3 py-2">Name</th>
-              <th class="text-left px-3 py-2">CRT</th>
-              <th class="text-left px-3 py-2">KEY</th>
-              <th class="text-left px-3 py-2">Mod</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-800/70 font-mono text-xs">
-            <template x-for="p in pairs" :key="p.name">
-              <tr class="hover:bg-gray-800/30">
-                <td class="px-3 py-2">
-                  <span class="text-cyan-400" x-text="p.name"></span>
-                </td>
-                <td class="px-3 py-2">
-                  <span :class="p.has_crt ? 'text-emerald-400' : 'text-rose-400'" x-text="p.has_crt ? 'OK' : 'missing'"></span>
-                </td>
-                <td class="px-3 py-2">
-                  <span :class="p.has_key ? 'text-emerald-400' : 'text-rose-400'" x-text="p.has_key ? 'OK' : 'missing'"></span>
-                </td>
-                <td class="px-3 py-2 text-gray-500" x-text="p.mod_time || '—'"></td>
-              </tr>
-            </template>
-            <tr x-show="pairs.length === 0">
-              <td colspan="4" class="px-3 py-8 text-center text-gray-600">Belum ada sertifikat.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p class="text-xs text-gray-600">
-        Catatan: jika host mengaktifkan SSL, pastikan config host memakai paths cert/key yang valid.
-        Worker default saat ini akan diarahkan ke <span class="font-mono">localhost</span>.
-      </p>
     </div>
   </div>
 </div>

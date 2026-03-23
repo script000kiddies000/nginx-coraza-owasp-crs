@@ -71,6 +71,21 @@
         </span>
         System online · detecting threats
       </div>
+
+      <div class="flex items-center gap-2 text-[10px] sm:text-xs ml-0 sm:ml-2">
+        <button type="button"
+                @click="setViewMode('plane')"
+                :class="viewMode === 'plane' ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' : 'text-slate-300 hover:text-white bg-slate-900/20 border border-slate-800'"
+                class="px-2 py-1 rounded-lg font-semibold transition-colors">
+          Plane
+        </button>
+        <button type="button"
+                @click="setViewMode('globe')"
+                :class="viewMode === 'globe' ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' : 'text-slate-300 hover:text-white bg-slate-900/20 border border-slate-800'"
+                class="px-2 py-1 rounded-lg font-semibold transition-colors">
+          Globe
+        </button>
+      </div>
     </div>
   </header>
 
@@ -106,6 +121,7 @@
     <!-- Map + feed overlay -->
     <div class="relative flex-1 min-h-[420px] lg:min-h-0 bg-[#0a0d12]">
       <div id="flux-leaflet-map" class="absolute inset-0 z-0"></div>
+      <canvas id="flux-globe-canvas" class="absolute inset-0 z-0 hidden pointer-events-none"></canvas>
 
       <!-- Zoom hint -->
       <div class="absolute bottom-3 left-3 z-[400] pointer-events-none text-[10px] text-slate-600 hidden lg:block">
@@ -173,6 +189,15 @@ function attackMapApp() {
     clockDate: '—',
     map: null,
     layerGroup: null,
+    rocketTimer: null,
+    rocketAnims: [],
+    globeTimer: null,
+    globeArcs: [],
+    viewMode: 'plane',
+    globeCtx: null,
+    globeW: 0,
+    globeH: 0,
+    globeR: 0,
 
     barPct(count) {
       const m = this.catMax || 1;
@@ -220,6 +245,21 @@ function attackMapApp() {
       const el = document.getElementById('flux-leaflet-map');
       if (!el) return;
 
+      const canvas = document.getElementById('flux-globe-canvas');
+      if (canvas) canvas.classList.add('hidden');
+      if (el) el.classList.remove('hidden');
+
+      if (this.rocketTimer) {
+        clearInterval(this.rocketTimer);
+        this.rocketTimer = null;
+      }
+      this.rocketAnims = [];
+
+      if (this.globeTimer) {
+        clearInterval(this.globeTimer);
+        this.globeTimer = null;
+      }
+
       if (this.map) {
         this.map.remove();
         this.map = null;
@@ -262,6 +302,22 @@ function attackMapApp() {
         L.polyline(arc, { color: '#ea580c', weight: 5, opacity: 0.12, lineCap: 'round' }).addTo(this.layerGroup);
         L.polyline(arc, { color: '#fb923c', weight: 2, opacity: 0.88, lineCap: 'round' }).addTo(this.layerGroup);
 
+        // Rocket-stream animation: moving dot along the arc.
+        const dot = L.circleMarker(arc[0], {
+          radius: 3.3,
+          color: '#fb923c',
+          fillColor: '#fb923c',
+          fillOpacity: 0.95,
+          weight: 1,
+          opacity: 0.95,
+        }).addTo(this.layerGroup);
+        this.rocketAnims.push({
+          arc,
+          dot,
+          t: idx % arc.length,
+          step: 1 + (idx % 3),
+        });
+
         L.marker(from, {
           icon: L.divIcon({
             className: 'flux-ct-src-marker',
@@ -275,8 +331,169 @@ function attackMapApp() {
         );
       });
 
+      // Single animation loop for all rocket dots.
+      this.rocketTimer = setInterval(() => {
+        if (this.viewMode !== 'plane') return;
+        for (const a of this.rocketAnims) {
+          a.t = (a.t + a.step) % a.arc.length;
+          a.dot.setLatLng(a.arc[a.t]);
+        }
+      }, 80);
+
       setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 200);
       setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 600);
+    },
+
+    projectGlobe(lat, lon) {
+      // Orthographic projection. Visible hemisphere when z >= 0.
+      const toRad = (d) => d * Math.PI / 180;
+      const phi = toRad(lat);
+      const lam = toRad(lon);
+      const phi0 = toRad(this.originLat);
+      const lam0 = toRad(this.originLon);
+
+      const cosPhi = Math.cos(phi);
+      const sinPhi = Math.sin(phi);
+      const dLam = lam - lam0;
+      const cosDL = Math.cos(dLam);
+      const sinDL = Math.sin(dLam);
+
+      const x = cosPhi * sinDL;
+      const y = sinPhi * Math.cos(phi0) - cosPhi * cosDL * Math.sin(phi0);
+      const z = sinPhi * Math.sin(phi0) + cosPhi * cosDL * Math.cos(0);
+      if (z < 0) return null;
+
+      const cx = this.globeW / 2;
+      const cy = this.globeH / 2;
+      const R = this.globeR;
+      return { x: cx + x * R, y: cy - y * R };
+    },
+
+    drawGlobe() {
+      const canvas = document.getElementById('flux-globe-canvas');
+      if (!canvas) return;
+      const leafletEl = document.getElementById('flux-leaflet-map');
+      if (leafletEl) leafletEl.classList.add('hidden');
+      canvas.classList.remove('hidden');
+
+      if (this.globeTimer) {
+        clearInterval(this.globeTimer);
+        this.globeTimer = null;
+      }
+      this.globeArcs = [];
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const w = Math.max(1, Math.floor(rect.width));
+      const h = Math.max(1, Math.floor(rect.height));
+
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+
+      // Work in CSS pixels for simpler math.
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      this.globeCtx = ctx;
+      this.globeW = w;
+      this.globeH = h;
+      this.globeR = Math.floor(Math.min(w, h) * 0.42);
+
+      const maxArcs = Math.min(12, (this.points || []).length);
+      for (let i = 0; i < maxArcs; i++) {
+        const p = this.points[i];
+        const from = [p.source_lat, p.source_lon];
+        const to = [p.target_lat, p.target_lon];
+        const bulge = 0.26 + (i % 9) * 0.028;
+        const arcLatLng = this.curvedLatLngs(from, to, bulge);
+
+        const arcPts = [];
+        for (const ll of arcLatLng) {
+          const pr = this.projectGlobe(ll[0], ll[1]);
+          if (pr) arcPts.push(pr);
+        }
+        if (arcPts.length < 2) continue;
+
+        this.globeArcs.push({
+          pts: arcPts,
+          t: i % arcPts.length,
+          step: 1 + (i % 3),
+        });
+      }
+
+      const renderFrame = () => {
+        if (this.viewMode !== 'globe') return;
+        const c = this.globeCtx;
+        if (!c) return;
+
+        const cx = this.globeW / 2;
+        const cy = this.globeH / 2;
+        const R = this.globeR;
+
+        c.clearRect(0, 0, this.globeW, this.globeH);
+
+        // Background sphere.
+        const g = c.createRadialGradient(cx - R * 0.2, cy - R * 0.2, 10, cx, cy, R);
+        g.addColorStop(0, 'rgba(16,185,129,0.14)');
+        g.addColorStop(0.35, 'rgba(56,189,248,0.08)');
+        g.addColorStop(1, 'rgba(2,6,23,0.0)');
+        c.beginPath();
+        c.arc(cx, cy, R, 0, Math.PI * 2);
+        c.fillStyle = g;
+        c.fill();
+
+        // Sphere edge.
+        c.beginPath();
+        c.arc(cx, cy, R, 0, Math.PI * 2);
+        c.strokeStyle = 'rgba(148,163,184,0.22)';
+        c.lineWidth = 1;
+        c.stroke();
+
+        // Arcs + moving dots.
+        for (let i = 0; i < this.globeArcs.length; i++) {
+          const a = this.globeArcs[i];
+
+          // Base arc.
+          c.beginPath();
+          c.moveTo(a.pts[0].x, a.pts[0].y);
+          for (let k = 1; k < a.pts.length; k++) {
+            c.lineTo(a.pts[k].x, a.pts[k].y);
+          }
+          c.strokeStyle = 'rgba(251,146,60,0.14)';
+          c.lineWidth = 3;
+          c.lineCap = 'round';
+          c.stroke();
+
+          // Rocket dot.
+          const pt = a.pts[a.t];
+          c.beginPath();
+          c.arc(pt.x, pt.y, 3.2, 0, Math.PI * 2);
+          c.fillStyle = 'rgba(251,146,60,0.95)';
+          c.fill();
+        }
+
+        // Advance dots.
+        for (const a of this.globeArcs) {
+          a.t = (a.t + a.step) % a.pts.length;
+        }
+      };
+
+      renderFrame();
+      this.globeTimer = setInterval(renderFrame, 80);
+    },
+
+    renderView() {
+      if (this.viewMode === 'globe') this.drawGlobe();
+      else this.drawMap();
+    },
+
+    setViewMode(mode) {
+      this.viewMode = mode === 'globe' ? 'globe' : 'plane';
+      this.renderView();
     },
 
     startLoop() {
@@ -314,7 +531,7 @@ function attackMapApp() {
         this.feed = this.allLogs.slice(0, 14).map((e, i) => ({ ...e, _key: 'init-' + i }));
         this.startLoop();
 
-        setTimeout(() => this.drawMap(), 50);
+        setTimeout(() => this.renderView(), 50);
       } catch (e) {
         this.label = 'Gagal memuat data: ' + (e.message || e);
       }

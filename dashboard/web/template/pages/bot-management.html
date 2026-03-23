@@ -1,5 +1,5 @@
 {{define "content"}}
-<div class="max-w-4xl space-y-6" x-data="botApp()" x-init="init()">
+<div class="w-full min-h-[calc(100vh-6.5rem)] flex flex-col space-y-6" x-data="botApp()" x-init="init()">
   <p class="text-gray-400 text-sm">
     Konfigurasi disimpan di BoltDB. Daftar IP terblokir untuk modul bot (manual / integrasi worker mendatang).
     Setelah simpan, nginx di-<strong>reload</strong>.

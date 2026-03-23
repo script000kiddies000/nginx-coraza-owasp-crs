@@ -1,5 +1,5 @@
 {{define "content"}}
-<div class="max-w-3xl space-y-6" x-data="wpApp()" x-init="load()">
+<div class="w-full min-h-[calc(100vh-6.5rem)] flex flex-col space-y-6" x-data="wpApp()" x-init="load()">
   <p class="text-gray-400 text-sm">
     Menulis snippet nginx ke <span class="font-mono text-gray-500">/etc/nginx/snippets/flux-wp-managed.conf</span>.
     Anda harus menambahkan <span class="font-mono">include /etc/nginx/snippets/flux-wp-managed.conf;</span> di dalam <span class="font-mono">server { }</span> yang mem-proxy WordPress.

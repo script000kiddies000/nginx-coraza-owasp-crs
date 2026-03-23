@@ -1,5 +1,5 @@
 {{define "content"}}
-<div class="max-w-3xl space-y-6" x-data="vpatchApp()" x-init="load()">
+<div class="w-full min-h-[calc(100vh-6.5rem)] flex flex-col space-y-6" x-data="vpatchApp()" x-init="load()">
   <p class="text-gray-400 text-sm">
     Aturan virtual patch di-load dari <span class="font-mono text-gray-500">/etc/nginx/coraza/custom/vpatch.rules</span> (lihat <span class="font-mono">coraza.conf</span>).
     Panel ini menyimpan preferensi di database dan memicu <strong>nginx reload</strong> — isi file CVE tetap Anda kelola di volume config.

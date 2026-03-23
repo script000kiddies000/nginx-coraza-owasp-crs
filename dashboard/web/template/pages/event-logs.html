@@ -1,8 +1,8 @@
 {{define "content"}}
-<div class="max-w-5xl space-y-4" x-data="eventLogsApp()" x-init="init()">
+<div class="w-full min-h-[calc(100vh-6.5rem)] flex flex-col space-y-4" x-data="eventLogsApp()" x-init="init()">
 
   <div class="flex items-center justify-between gap-4 flex-wrap">
-    <p class="text-gray-400 text-sm max-w-2xl">
+    <p class="text-gray-400 text-sm">
       Stream real-time untuk <span class="font-mono text-gray-500">nginx error.log</span>.
       Cocok untuk melihat pesan seperti <span class="font-mono text-gray-500">coraza dynlib_open</span>, invalid PID, dan lain-lain.
     </p>
@@ -35,12 +35,12 @@
 
   <div x-show="error" x-cloak class="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-200 text-sm px-4 py-3" x-text="error"></div>
 
-  <div class="rounded-xl border border-gray-800 bg-gray-900/40 overflow-hidden" x-show="!loading && !error">
+  <div class="rounded-xl border border-gray-800 bg-gray-900/40 overflow-hidden flex flex-col min-h-0 flex-1" x-show="!loading && !error">
     <div class="px-4 py-2 border-b border-gray-800 text-xs text-gray-500 font-semibold uppercase tracking-wider flex items-center justify-between gap-3">
       <span>Event stream</span>
       <span x-text="levelSummary"></span>
     </div>
-    <div class="overflow-y-auto max-h-[560px]">
+    <div class="flex-1 min-h-0 overflow-y-auto">
       <table class="w-full text-sm">
         <thead class="sticky top-0 bg-gray-900/80 backdrop-blur border-b border-gray-800 z-10">
           <tr class="text-xs font-semibold text-gray-500 uppercase tracking-wider">

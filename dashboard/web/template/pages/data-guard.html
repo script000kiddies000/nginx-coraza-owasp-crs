@@ -1,5 +1,5 @@
 {{define "content"}}
-<div class="max-w-4xl space-y-6" x-data="dlpApp()" x-init="init()">
+<div class="w-full min-h-[calc(100vh-6.5rem)] flex flex-col space-y-6" x-data="dlpApp()" x-init="init()">
   <p class="text-gray-400 text-sm">
     Konfigurasi disimpan di database. Aturan nyata ada di <span class="font-mono text-gray-500">/etc/nginx/coraza/custom/dlp-rules.conf</span> (edit di volume).
     Event DLP diisi otomatis jika pesan audit mengandung <span class="font-mono">DLP</span>.
