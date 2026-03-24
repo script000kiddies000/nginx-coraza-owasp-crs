@@ -121,7 +121,6 @@ func SyncFeeds(dbCfg models.ThreatIntelConfig, configPath, outputPath string) (S
 		return SyncResult{}, fmt.Errorf("write ip_rules: %w", err)
 	}
 
-	cfg.LastSync = nowStr
 	cfg.BlockScore = dbCfg.BlockScore
 	cfg.UpdateInterval = dbCfg.UpdateInterval
 	cfg.Enabled = dbCfg.Enabled
