@@ -1,215 +1,388 @@
 {{define "content"}}
-<div class="space-y-6" x-data="dashboardApp()" x-init="init()">
+<div class="space-y-5 pb-8" x-data="dashboardApp()" x-init="init()">
 
-  <!-- Stat Cards -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-      <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Active Hosts</p>
-      <p class="text-3xl font-bold text-white mt-1">{{if .Data}}{{index .Data "HostCount"}}{{else}}0{{end}}</p>
-      <p class="text-xs text-emerald-400 mt-1">Reverse proxy targets</p>
-    </div>
-
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-      <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">WAF Mode</p>
-      <p class="text-xl font-bold mt-1
-        {{if eq (index .Data "WAFMode") "On"}}text-emerald-400
-        {{else if eq (index .Data "WAFMode") "Off"}}text-rose-400
-        {{else}}text-yellow-400{{end}}">
-        {{if .Data}}{{index .Data "WAFMode"}}{{else}}Unknown{{end}}
-      </p>
-      <p class="text-xs text-gray-500 mt-1">OWASP CRS v4 active</p>
-    </div>
-
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-      <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Requests Today</p>
-      <p class="text-3xl font-bold text-white mt-1" x-text="stats.total_requests ?? '—'">—</p>
-      <p class="text-xs text-gray-500 mt-1">From access log</p>
-    </div>
-
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-      <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Blocked Today</p>
-      <p class="text-3xl font-bold text-rose-400 mt-1" x-text="stats.blocked_count ?? '—'">—</p>
-      <p class="text-xs text-gray-500 mt-1">WAF + Threat Intel</p>
+  <!-- Title + range filter -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <h1 class="text-lg font-semibold text-white tracking-tight">Dashboard</h1>
+    <div class="flex flex-wrap items-center gap-2 shrink-0">
+      <span class="text-[10px] text-gray-500 uppercase tracking-wider hidden sm:inline mr-1">Range</span>
+      <template x-for="opt in [{k:'24h',l:'24 jam'},{k:'7d',l:'7 hari'},{k:'30d',l:'30 hari'}]" :key="opt.k">
+        <button type="button"
+                @click="setRange(opt.k)"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border"
+                :class="range === opt.k
+                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                  : 'bg-gray-900 text-gray-400 border-gray-800 hover:text-white hover:border-gray-700'"
+                x-text="opt.l"></button>
+      </template>
     </div>
   </div>
 
-  <!-- Traffic Chart + WAF Status -->
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <!-- Top metrics + QPS bar -->
+  <div class="grid grid-cols-2 lg:grid-cols-6 gap-3">
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 col-span-1">
+      <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Active hosts</p>
+      <p class="text-2xl font-bold text-white mt-1 tabular-nums" x-text="fmtNum(analytics.summary?.active_hosts)">0</p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 col-span-1">
+      <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Unique IP</p>
+      <p class="text-2xl font-bold text-cyan-400 mt-1 tabular-nums" x-text="fmtNum(analytics.summary?.unique_ips)">0</p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 col-span-1">
+      <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Request count</p>
+      <p class="text-2xl font-bold text-white mt-1 tabular-nums" x-text="fmtNum(analytics.summary?.request_count)">0</p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 col-span-1">
+      <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Blocked</p>
+      <p class="text-2xl font-bold text-rose-400 mt-1 tabular-nums" x-text="fmtNum(analytics.summary?.blocked_count)">0</p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 col-span-2 min-h-[120px]">
+      <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider mb-2">Query per second (avg per bucket)</p>
+      <div class="h-[72px]"><canvas id="chartQps"></canvas></div>
+    </div>
+  </div>
 
-    <!-- Traffic Chart -->
-    <div class="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-xl p-5">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-sm font-semibold text-white">Traffic (last 24h)</h2>
-        <span class="text-xs text-gray-500">Auto-refresh 30s</span>
-      </div>
-      <div class="h-48 flex items-center justify-center">
-        <canvas id="trafficChart" class="w-full h-full"></canvas>
+  <!-- Protection layers -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+    <h2 class="text-xs font-semibold text-white uppercase tracking-wider mb-3">Protection layers</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+      <template x-for="row in protectionRows" :key="row.key">
+        <div class="flex items-center justify-between gap-2 rounded-lg bg-gray-950/60 border border-gray-800/80 px-3 py-2">
+          <span class="text-xs text-gray-400" x-text="row.title"></span>
+          <span class="text-[11px] font-medium shrink-0 px-2 py-0.5 rounded-full border"
+                :class="badgeClass(row.state)"
+                x-text="row.badge"></span>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Error / block rates -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <p class="text-[10px] text-amber-500/90 font-medium uppercase tracking-wider">4xx error</p>
+      <p class="text-2xl font-bold text-white mt-1 tabular-nums" x-text="fmtNum(analytics.summary?.error_4xx)">0</p>
+      <p class="text-xs text-gray-500 mt-1">Error rate <span class="text-amber-400 font-mono" x-text="pct(analytics.summary?.error_4xx_rate)">0%</span></p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <p class="text-[10px] text-orange-400 font-medium uppercase tracking-wider">4xx blocked</p>
+      <p class="text-2xl font-bold text-white mt-1 tabular-nums" x-text="fmtNum(analytics.summary?.blocked_4xx)">0</p>
+      <p class="text-xs text-gray-500 mt-1">Blocked rate <span class="text-orange-300 font-mono" x-text="pct(analytics.summary?.blocked_4xx_rate)">0%</span></p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <p class="text-[10px] text-rose-400 font-medium uppercase tracking-wider">5xx error</p>
+      <p class="text-2xl font-bold text-white mt-1 tabular-nums" x-text="fmtNum(analytics.summary?.error_5xx)">0</p>
+      <p class="text-xs text-gray-500 mt-1">Error rate <span class="text-rose-300 font-mono" x-text="pct(analytics.summary?.error_5xx_rate)">0%</span></p>
+    </div>
+  </div>
+
+  <!-- Line charts -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <h2 class="text-xs font-semibold text-white mb-3">Request status</h2>
+      <div class="h-52"><canvas id="chartRequests"></canvas></div>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <h2 class="text-xs font-semibold text-white mb-3">Blocking status</h2>
+      <div class="h-52"><canvas id="chartBlocked"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Donuts -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <h2 class="text-xs font-semibold text-white mb-1">User client</h2>
+      <p class="text-[10px] text-gray-500 mb-3">Device &amp; browser (parsed from User-Agent)</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+        <div class="h-48 max-w-[220px] mx-auto"><canvas id="chartUA"></canvas></div>
+        <div class="space-y-1.5 max-h-48 overflow-y-auto text-[11px] font-mono pr-1">
+          <template x-for="row in (analytics.user_clients || [])" :key="row.label">
+            <div class="flex justify-between gap-2 text-gray-400">
+              <span class="truncate" x-text="row.label"></span>
+              <span class="text-cyan-500/90 shrink-0 tabular-nums" x-text="row.count"></span>
+            </div>
+          </template>
+          <p x-show="!(analytics.user_clients && analytics.user_clients.length)" class="text-gray-600 py-4">Belum ada data</p>
+        </div>
       </div>
     </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <h2 class="text-xs font-semibold text-white mb-1">Response status</h2>
+      <p class="text-[10px] text-gray-500 mb-3">HTTP status — count &amp; ratio</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+        <div class="h-48 max-w-[220px] mx-auto"><canvas id="chartStatus"></canvas></div>
+        <div class="space-y-1.5 max-h-48 overflow-y-auto text-[11px] font-mono pr-1">
+          <template x-for="row in (analytics.response_status || [])" :key="row.label">
+            <div class="flex justify-between gap-2 text-gray-400">
+              <span class="text-emerald-400/80" x-text="row.label"></span>
+              <span class="text-gray-300 shrink-0 tabular-nums"><span x-text="row.count"></span> <span class="text-gray-600" x-text="'(' + statusRatio(row) + ')'"></span></span>
+            </div>
+          </template>
+          <p x-show="!(analytics.response_status && analytics.response_status.length)" class="text-gray-600 py-4">Belum ada data</p>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    <!-- Protection Layers Status -->
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-      <h2 class="text-sm font-semibold text-white mb-4">Protection Layers</h2>
+  <!-- Progress bars -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <h2 class="text-xs font-semibold text-white mb-1">Referring application / page</h2>
+      <p class="text-[10px] text-gray-500 mb-3">Dari header Referer</p>
       <div class="space-y-3">
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-400">Coraza WAF</span>
-          <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-            <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Active
-          </span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-400">OWASP CRS v4</span>
-          <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-            <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Loaded
-          </span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-400">GeoIP Block</span>
-          <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-            <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Active
-          </span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-400">Threat Intel</span>
-          <span class="inline-flex items-center gap-1 text-xs font-medium text-yellow-400 bg-yellow-500/10 px-2 py-0.5 rounded-full">
-            <span class="w-1.5 h-1.5 bg-yellow-400 rounded-full"></span> Pending
-          </span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-400">TLS Fingerprint</span>
-          <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-            <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> JA3/JA4
-          </span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-400">DLP Rules</span>
-          <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-            <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Active
-          </span>
-        </div>
+        <template x-for="row in (analytics.referers || [])" :key="row.label">
+          <div>
+            <div class="flex justify-between text-[11px] mb-1 gap-2">
+              <span class="text-gray-400 truncate font-mono" x-text="row.label"></span>
+              <span class="text-cyan-500/80 shrink-0 tabular-nums" x-text="row.count"></span>
+            </div>
+            <div class="h-1.5 rounded-full bg-gray-800 overflow-hidden">
+              <div class="h-full rounded-full bg-gradient-to-r from-cyan-600 to-emerald-500 transition-all duration-500"
+                   :style="'width:' + (row.pct || 0) + '%'"></div>
+            </div>
+          </div>
+        </template>
+        <p x-show="!(analytics.referers && analytics.referers.length)" class="text-gray-600 text-sm py-4">Belum ada data</p>
+      </div>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <h2 class="text-xs font-semibold text-white mb-1">vhost / domain</h2>
+      <p class="text-[10px] text-gray-500 mb-3">Dari header Host</p>
+      <div class="space-y-3">
+        <template x-for="row in (analytics.vhosts || [])" :key="row.label">
+          <div>
+            <div class="flex justify-between text-[11px] mb-1 gap-2">
+              <span class="text-gray-300 truncate font-mono" x-text="row.label"></span>
+              <span class="text-emerald-400/80 shrink-0 tabular-nums" x-text="row.count"></span>
+            </div>
+            <div class="h-1.5 rounded-full bg-gray-800 overflow-hidden">
+              <div class="h-full rounded-full bg-gradient-to-r from-emerald-600 to-cyan-500 transition-all duration-500"
+                   :style="'width:' + (row.pct || 0) + '%'"></div>
+            </div>
+          </div>
+        </template>
+        <p x-show="!(analytics.vhosts && analytics.vhosts.length)" class="text-gray-600 text-sm py-4">Belum ada data</p>
       </div>
     </div>
   </div>
 
-  <!-- Recent Security Events -->
-  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-sm font-semibold text-white">Recent Security Events</h2>
-      <a href="/security-logs" class="text-xs text-emerald-400 hover:text-emerald-300 transition-colors">View all →</a>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-xs font-mono">
-        <thead>
-          <tr class="text-gray-600 border-b border-gray-800">
-            <th class="text-left pb-2 pr-4">Time</th>
-            <th class="text-left pb-2 pr-4">Source IP</th>
-            <th class="text-left pb-2 pr-4">Rule</th>
-            <th class="text-left pb-2 pr-4">Country</th>
-            <th class="text-left pb-2">Action</th>
-          </tr>
-        </thead>
-        <tbody class="text-gray-400">
-          <template x-if="events.length === 0">
-            <tr>
-              <td colspan="5" class="py-8 text-center text-gray-600">
-                No security events yet — log tailing starts automatically
-              </td>
-            </tr>
-          </template>
-          <template x-for="e in events" :key="e.time">
-            <tr class="border-b border-gray-800/50">
-              <td class="py-2 pr-4 text-gray-500" x-text="e.time"></td>
-              <td class="py-2 pr-4 text-white" x-text="e.ip"></td>
-              <td class="py-2 pr-4 text-yellow-400" x-text="e.rule"></td>
-              <td class="py-2 pr-4" x-text="e.country"></td>
-              <td class="py-2">
-                <span class="text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded text-xs" x-text="e.action"></span>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
+  <p class="text-center text-[11px] text-gray-600">
+    <a href="/security-logs" class="text-emerald-500/80 hover:text-emerald-400">Security logs</a>
+    <span class="mx-2 text-gray-700">·</span>
+    <a href="/event-logs" class="text-emerald-500/80 hover:text-emerald-400">Event logs</a>
+  </p>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 function dashboardApp() {
+  const chartDefaults = {
+    color: '#6b7280',
+    borderColor: '#1f2937',
+    grid: '#1f2937',
+  };
+  const donutColors = ['#22d3ee','#34d399','#a78bfa','#fb923c','#f472b6','#facc15','#60a5fa','#4ade80','#f87171','#94a3b8'];
+
   return {
-    stats: {},
-    events: [],
-    chart: null,
+    range: '24h',
+    analytics: { summary: {}, time_series: {}, user_clients: [], response_status: [], referers: [], vhosts: [] },
+    protection: {},
+    protectionRows: [],
+    _charts: {},
+
+    fmtNum(n) {
+      if (n == null || n === '') return '0';
+      return Number(n).toLocaleString();
+    },
+    pct(rate) {
+      if (rate == null || Number.isNaN(rate)) return '0%';
+      return (Number(rate) * 100).toFixed(2) + '%';
+    },
+    statusRatio(row) {
+      const t = this.analytics.summary?.request_count || 0;
+      if (!t || !row.count) return '0%';
+      return ((row.count / t) * 100).toFixed(1) + '%';
+    },
+
+    badgeClass(state) {
+      const s = (state || '').toLowerCase();
+      if (s === 'active' || s === 'loaded') return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25';
+      if (s === 'detect') return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/25';
+      if (s === 'pending' || s === 'inactive' || s === 'off') return 'text-yellow-400/90 bg-yellow-500/10 border-yellow-500/20';
+      if (s === 'warn') return 'text-orange-400 bg-orange-500/10 border-orange-500/25';
+      return 'text-gray-400 bg-gray-800 border-gray-700';
+    },
+
+    buildProtectionRows() {
+      const p = this.protection || {};
+      const pick = (k, title, fmt) => {
+        const o = p[k] || {};
+        const st = (o.state || '').toLowerCase();
+        let badge = o.detail || o.state || '—';
+        if (fmt) badge = fmt(o);
+        return { key: k, title, state: st, badge };
+      };
+      this.protectionRows = [
+        pick('coraza_waf', 'Coraza WAF', (o) => o.state === 'active' ? 'Active' : o.state === 'detect' ? 'Detection only' : 'Off'),
+        pick('owasp_crs', 'OWASP CRS v4', (o) => o.state === 'loaded' ? 'Loaded' : 'Off'),
+        pick('geoip', 'GeoIP block', (o) => o.state === 'active' ? 'Active' : 'Inactive'),
+        pick('threat_intel', 'Threat intel', (o) => (o.state === 'active' ? 'Active' : 'Pending')),
+        pick('tls_ja', 'TLS fingerprint', () => 'JA3 / JA4'),
+        pick('dlp', 'DLP rules', () => 'Active'),
+      ];
+    },
+
+    async fetchProtection() {
+      try {
+        const r = await fetch('/api/dashboard/protection');
+        this.protection = await r.json();
+        this.buildProtectionRows();
+      } catch (e) {
+        this.protection = {};
+        this.buildProtectionRows();
+      }
+    },
+
+    async fetchAnalytics() {
+      try {
+        const r = await fetch('/api/dashboard/analytics?range=' + encodeURIComponent(this.range));
+        this.analytics = await r.json();
+      } catch (e) {
+        this.analytics = { summary: {}, time_series: {}, user_clients: [], response_status: [], referers: [], vhosts: [] };
+      }
+      await new Promise((r) => requestAnimationFrame(r));
+      this.updateCharts();
+    },
+
+    destroyChart(id) {
+      if (this._charts[id]) {
+        try { this._charts[id].destroy(); } catch (_) {}
+        delete this._charts[id];
+      }
+    },
+
+    updateCharts() {
+      const ts = this.analytics.time_series || {};
+      const labels = ts.labels || [];
+      const req = ts.requests || [];
+      const blk = ts.blocked || [];
+      const qps = ts.qps_bars || [];
+
+      const commonOpts = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: chartDefaults.color, font: { size: 10 } } } },
+        scales: {
+          x: { grid: { color: chartDefaults.grid }, ticks: { color: '#4b5563', maxRotation: 45, font: { size: 9 } } },
+          y: { grid: { color: chartDefaults.grid }, ticks: { color: '#4b5563', font: { size: 9 } }, beginAtZero: true },
+        },
+      };
+
+      this.destroyChart('qps');
+      const elQ = document.getElementById('chartQps');
+      if (elQ && labels.length) {
+        this._charts.qps = new Chart(elQ, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [{ label: 'QPS', data: qps, backgroundColor: 'rgba(34,211,238,0.45)', borderColor: '#22d3ee', borderWidth: 1 }],
+          },
+          options: { ...commonOpts, scales: { x: commonOpts.scales.x, y: { ...commonOpts.scales.y, title: { display: true, text: 'req/s', color: '#6b7280' } } } },
+        });
+      }
+
+      this.destroyChart('req');
+      const elR = document.getElementById('chartRequests');
+      if (elR && labels.length) {
+        this._charts.req = new Chart(elR, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Requests',
+              data: req,
+              borderColor: '#34d399',
+              backgroundColor: 'rgba(52,211,153,0.08)',
+              fill: true,
+              tension: 0.35,
+              pointRadius: 0,
+              borderWidth: 2,
+            }],
+          },
+          options: commonOpts,
+        });
+      }
+
+      this.destroyChart('blk');
+      const elB = document.getElementById('chartBlocked');
+      if (elB && labels.length) {
+        this._charts.blk = new Chart(elB, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Blocked (4xx+)',
+              data: blk,
+              borderColor: '#fb7185',
+              backgroundColor: 'rgba(251,113,133,0.08)',
+              fill: true,
+              tension: 0.35,
+              pointRadius: 0,
+              borderWidth: 2,
+            }],
+          },
+          options: commonOpts,
+        });
+      }
+
+      const ua = this.analytics.user_clients || [];
+      this.destroyChart('ua');
+      const elUA = document.getElementById('chartUA');
+      if (elUA && ua.length) {
+        this._charts.ua = new Chart(elUA, {
+          type: 'doughnut',
+          data: {
+            labels: ua.map((x) => x.label),
+            datasets: [{ data: ua.map((x) => x.count), backgroundColor: ua.map((_, i) => donutColors[i % donutColors.length]), borderWidth: 0 }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+          },
+        });
+      }
+
+      const st = this.analytics.response_status || [];
+      this.destroyChart('st');
+      const elS = document.getElementById('chartStatus');
+      if (elS && st.length) {
+        this._charts.st = new Chart(elS, {
+          type: 'doughnut',
+          data: {
+            labels: st.map((x) => x.label),
+            datasets: [{ data: st.map((x) => x.count), backgroundColor: st.map((_, i) => donutColors[(i + 3) % donutColors.length]), borderWidth: 0 }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+          },
+        });
+      }
+    },
+
+    async setRange(k) {
+      this.range = k;
+      await this.fetchAnalytics();
+    },
 
     async init() {
-      await this.fetchStats();
-      await this.fetchEvents();
-      this.initChart();
-      setInterval(() => this.fetchStats(), 30000);
+      await this.fetchProtection();
+      await this.fetchAnalytics();
+      setInterval(() => { this.fetchProtection(); this.fetchAnalytics(); }, 30000);
     },
-
-    async fetchStats() {
-      try {
-        const r = await fetch('/api/stats');
-        this.stats = await r.json();
-      } catch(e) {}
-    },
-
-    async fetchEvents() {
-      try {
-        const r = await fetch('/api/security-events');
-        this.events = await r.json();
-      } catch(e) {}
-    },
-
-    initChart() {
-      const ctx = document.getElementById('trafficChart');
-      if (!ctx) return;
-      const labels = Array.from({length: 24}, (_, i) => {
-        const h = (new Date().getHours() - 23 + i + 24) % 24;
-        return h + ':00';
-      });
-      this.chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [
-            {
-              label: 'Requests',
-              data: Array(24).fill(0),
-              borderColor: '#10b981',
-              backgroundColor: 'rgba(16,185,129,0.08)',
-              borderWidth: 1.5,
-              pointRadius: 0,
-              fill: true,
-              tension: 0.4,
-            },
-            {
-              label: 'Blocked',
-              data: Array(24).fill(0),
-              borderColor: '#f43f5e',
-              backgroundColor: 'rgba(244,63,94,0.06)',
-              borderWidth: 1.5,
-              pointRadius: 0,
-              fill: true,
-              tension: 0.4,
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { labels: { color: '#6b7280', font: { size: 11 } } } },
-          scales: {
-            x: { grid: { color: '#1f2937' }, ticks: { color: '#4b5563', font: { size: 10 } } },
-            y: { grid: { color: '#1f2937' }, ticks: { color: '#4b5563', font: { size: 10 } }, beginAtZero: true }
-          }
-        }
-      });
-    }
-  }
+  };
 }
 </script>
 {{end}}

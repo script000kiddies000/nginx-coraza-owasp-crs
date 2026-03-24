@@ -38,6 +38,8 @@
   .flux-digital { font-family: 'Share Tech Mono', ui-monospace, monospace; }
   .flux-feed-scroll::-webkit-scrollbar { width: 6px; }
   .flux-feed-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  /* Flex child so map/globe area can shrink/grow correctly */
+  #flux-map-stage { min-height: 0; }
 </style>
 
 <div class="flux-ct-map -m-6 flex flex-col min-h-[calc(100vh-3.5rem)] bg-[#070a0f] text-slate-200 border-t border-slate-800/80"
@@ -119,10 +121,15 @@
     </aside>
 
     <!-- Map + feed overlay -->
-    <div class="relative flex-1 min-h-[420px] lg:min-h-0 bg-[#0a0d12]">
+    <div id="flux-map-stage" class="relative flex-1 min-h-[420px] lg:min-h-0 bg-[#0a0d12]">
       <div id="flux-leaflet-map" class="absolute inset-0 z-0"></div>
-      <div id="flux-globe-container" class="absolute inset-0 z-0 hidden"></div>
-      <canvas id="flux-globe-canvas" class="absolute inset-0 z-0 hidden"></canvas>
+      <!-- On small screens, stop globe above the feed panel so it stays visually centered -->
+      <div id="flux-globe-container"
+           class="absolute inset-x-0 top-0 bottom-0 z-0 hidden"
+           :class="{ 'max-lg:bottom-[220px]': viewMode === 'globe' }"></div>
+      <canvas id="flux-globe-canvas"
+              class="absolute inset-x-0 top-0 bottom-0 z-0 hidden"
+              :class="{ 'max-lg:bottom-[220px]': viewMode === 'globe' }"></canvas>
 
       <!-- Zoom hint -->
       <div class="absolute bottom-3 left-3 z-[400] pointer-events-none text-[10px] text-slate-600 hidden lg:block">
@@ -243,6 +250,20 @@ function attackMapApp() {
       return palette[idx];
     },
 
+    /** ISO 3166-1 alpha-2 (e.g. US, ID) → English country name; falls back to code. */
+    displayCountryName(code) {
+      const c = String(code || '').trim().toUpperCase();
+      if (!c || c === 'ZZ' || c === '—') return 'Unknown';
+      try {
+        if (typeof Intl !== 'undefined' && Intl.DisplayNames) {
+          const dn = new Intl.DisplayNames(['en'], { type: 'region' });
+          const name = dn.of(c);
+          if (name && name !== c) return name;
+        }
+      } catch (_) { /* invalid region code */ }
+      return c;
+    },
+
     approxDistanceKm(a, b) {
       const toRad = (d) => d * Math.PI / 180;
       const R = 6371;
@@ -284,6 +305,22 @@ function attackMapApp() {
       return pts;
     },
 
+    /** Stop globe.gl rAF / WebGL churn when not visible (plane mode). */
+    stopGlobe3dRender() {
+      if (!this.globe3d) return;
+      try {
+        if (typeof this.globe3d.pauseAnimation === 'function') this.globe3d.pauseAnimation();
+      } catch (_) {}
+    },
+
+    /** Resume globe.gl after returning to globe mode. */
+    resumeGlobe3dRender() {
+      if (!this.globe3d) return;
+      try {
+        if (typeof this.globe3d.resumeAnimation === 'function') this.globe3d.resumeAnimation();
+      } catch (_) {}
+    },
+
     startClock() {
       if (this.clockTimer) clearInterval(this.clockTimer);
       const tick = () => {
@@ -299,6 +336,8 @@ function attackMapApp() {
       if (typeof L === 'undefined') return;
       const el = document.getElementById('flux-leaflet-map');
       if (!el) return;
+
+      this.stopGlobe3dRender();
 
       const canvas = document.getElementById('flux-globe-canvas');
       if (canvas) canvas.classList.add('hidden');
@@ -722,9 +761,20 @@ function attackMapApp() {
       }
 
       const rect = container.getBoundingClientRect();
-      const width = Math.max(320, Math.floor(rect.width || container.clientWidth || 0));
-      const height = Math.max(280, Math.floor(rect.height || container.clientHeight || 0));
+      const width = Math.max(280, Math.floor(rect.width || container.clientWidth || 0));
+      const height = Math.max(240, Math.floor(rect.height || container.clientHeight || 0));
       if (width < 10 || height < 10) return;
+
+      try {
+      const shortSide = Math.min(width, height);
+      // Bigger labels on small viewports (angular degrees on globe)
+      const labelSize = Math.min(1.15, Math.max(0.55, shortSide / 380));
+      const labelDot = Math.min(0.18, Math.max(0.1, labelSize * 0.24));
+      const labelRes = shortSide < 520 ? 5 : 4;
+      const ptRadius = shortSide < 480 ? 0.34 : shortSide < 900 ? 0.28 : 0.24;
+      const arcStroke = shortSide < 480 ? 0.75 : 0.6;
+      // Slightly pull camera back on narrow screens so globe feels centered in the stage
+      const povAlt = width < 400 ? 2.65 : width < 640 ? 2.4 : width < 1024 ? 2.25 : 2.1;
 
       if (!this.globe3d) {
         this.globe3d = Globe()(container)
@@ -733,27 +783,54 @@ function attackMapApp() {
           .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
           .atmosphereColor('#67e8f9')
           .atmosphereAltitude(0.19)
-          .arcStroke(0.6)
+          .arcStroke(arcStroke)
           .arcDashLength(0.42)
           .arcDashGap(0.8)
           .arcDashInitialGap(() => Math.random())
           .arcDashAnimateTime(1400)
+          .arcLabel('tip')
           .pointAltitude(0.03)
-          .pointRadius(0.2)
-          .pointResolution(12);
+          .pointResolution(12)
+          .pointLabel('tip')
+          .labelsData([])
+          .labelLat('lat')
+          .labelLng('lng')
+          .labelText('text')
+          .labelColor('color')
+          .labelAltitude(0.02)
+          .labelIncludeDot(true)
+          .labelDotOrientation('bottom')
+          .labelLabel('text');
       }
 
-      this.globe3d.width(width).height(height);
-      this.globe3d.pointOfView({ lat: this.originLat || -2.5, lng: this.originLon || 118, altitude: 2.15 }, 900);
+      this.globe3d
+        .width(width)
+        .height(height)
+        .labelSize(labelSize)
+        .labelDotRadius(labelDot)
+        .labelResolution(labelRes)
+        .pointRadius(ptRadius)
+        .arcStroke(arcStroke);
 
-      const points = (this.points || []).map((p) => ({
-        lat: Number(p.source_lat),
-        lng: Number(p.source_lon),
-        color: this.colorForCountry(p.source_country),
-      })).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+      // 0ms: safe when layout is corrected immediately after (class change / ResizeObserver)
+      this.globe3d.pointOfView(
+        { lat: this.originLat || -2.5, lng: this.originLon || 118, altitude: povAlt },
+        0
+      );
+
+      const points = (this.points || []).map((p) => {
+        const name = this.displayCountryName(p.source_country);
+        return {
+          lat: Number(p.source_lat),
+          lng: Number(p.source_lon),
+          color: this.colorForCountry(p.source_country),
+          tip: name || 'Unknown',
+        };
+      }).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
 
       const arcs = (this.points || []).slice(0, 120).map((p) => {
         const color = this.colorForCountry(p.source_country);
+        const countryName = this.displayCountryName(p.source_country);
         return {
         startLat: Number(p.source_lat),
         startLng: Number(p.source_lon),
@@ -761,20 +838,71 @@ function attackMapApp() {
         endLng: Number(p.target_lon),
         // Keep line color style close to plane mode: same hue, fading tail.
         color: [color, color + '55'],
+        tip: countryName || 'Unknown',
         };
       }).filter((a) =>
         Number.isFinite(a.startLat) && Number.isFinite(a.startLng) &&
         Number.isFinite(a.endLat) && Number.isFinite(a.endLng)
       );
 
+      const targetCountryCode = (this.points && this.points[0] && this.points[0].target_country)
+        ? String(this.points[0].target_country).trim().toUpperCase() : '';
+      const targetCountryName = targetCountryCode ? this.displayCountryName(targetCountryCode) : '';
+
       const targetPoint = Number.isFinite(this.originLat) && Number.isFinite(this.originLon)
-        ? [{ lat: this.originLat, lng: this.originLon, color: '#22c55e' }]
+        ? [{
+            lat: this.originLat,
+            lng: this.originLon,
+            color: '#22c55e',
+            tip: targetCountryName || '',
+          }]
         : [];
+
+      // One label per source country (centroid of sample points) + target country label.
+      const byCountry = new Map();
+      for (const p of this.points || []) {
+        const code = String(p.source_country || '').trim().toUpperCase();
+        if (!code || code === 'ZZ') continue;
+        const lat = Number(p.source_lat);
+        const lng = Number(p.source_lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+        let agg = byCountry.get(code);
+        if (!agg) {
+          agg = { code, sumLat: 0, sumLng: 0, n: 0 };
+          byCountry.set(code, agg);
+        }
+        agg.sumLat += lat;
+        agg.sumLng += lng;
+        agg.n += 1;
+      }
+      const countryLabels = [];
+      for (const agg of byCountry.values()) {
+        const name = this.displayCountryName(agg.code);
+        const rgb = this.hexToRgb(this.colorForCountry(agg.code));
+        countryLabels.push({
+          lat: agg.sumLat / agg.n,
+          lng: agg.sumLng / agg.n,
+          text: name,
+          color: `rgba(${rgb.r},${rgb.g},${rgb.b},0.92)`,
+        });
+      }
+      if (Number.isFinite(this.originLat) && Number.isFinite(this.originLon) && targetCountryName) {
+        countryLabels.push({
+          lat: this.originLat,
+          lng: this.originLon,
+          text: targetCountryName,
+          color: 'rgba(34, 197, 94, 0.95)',
+        });
+      }
 
       this.globe3d
         .pointsData(points.concat(targetPoint))
         .pointColor('color')
-        .arcsData(arcs);
+        .arcsData(arcs)
+        .labelsData(countryLabels);
+      } finally {
+        this.resumeGlobe3dRender();
+      }
     },
 
     bindGlobeInteractions(canvas) {
@@ -828,15 +956,22 @@ function attackMapApp() {
     setViewMode(mode) {
       this.viewMode = mode === 'globe' ? 'globe' : 'plane';
       this.renderView();
+      // Remeasure after Alpine applies bottom offset above mobile feed panel.
+      if (this.viewMode === 'globe' && typeof Globe !== 'undefined') {
+        requestAnimationFrame(() => requestAnimationFrame(() => this.drawGlobe3dLib()));
+      }
     },
 
     onWindowResize() {
       if (this.viewMode !== 'globe') return;
-      if (typeof Globe !== 'undefined' && this.globe3d) {
-        this.drawGlobe3dLib();
-        return;
-      }
-      this.drawGlobe();
+      requestAnimationFrame(() => {
+        if (this.viewMode !== 'globe') return;
+        if (typeof Globe !== 'undefined' && this.globe3d) {
+          this.drawGlobe3dLib();
+          return;
+        }
+        this.drawGlobe();
+      });
     },
 
     startLoop() {
@@ -854,6 +989,17 @@ function attackMapApp() {
     async init() {
       this.startClock();
       window.addEventListener('resize', () => this.onWindowResize());
+      const mapStage = document.getElementById('flux-map-stage');
+      if (mapStage && typeof ResizeObserver !== 'undefined') {
+        if (this._fluxMapResizeObs) this._fluxMapResizeObs.disconnect();
+        this._fluxMapResizeObs = new ResizeObserver(() => {
+          if (this.viewMode !== 'globe') return;
+          requestAnimationFrame(() => {
+            if (this.viewMode === 'globe') this.drawGlobe3dLib();
+          });
+        });
+        this._fluxMapResizeObs.observe(mapStage);
+      }
       try {
         // Optional world landmass for globe (non-blocking).
         try {
