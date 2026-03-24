@@ -1,70 +1,82 @@
 {{define "content"}}
-<div class="w-full min-h-[calc(100vh-6.5rem)] flex flex-col space-y-4" x-data="eventLogsApp()" x-init="init()">
+<div class="w-full min-h-[calc(100vh-6.5rem)] flex flex-col gap-4" x-data="eventLogsApp()" x-init="init()">
+  <div class="flex items-end justify-between gap-4 flex-wrap">
+    <div>
+      <h2 class="text-xl font-semibold text-white">Logs Event</h2>
+      <p class="text-xs text-gray-500 mt-0.5">Real-time system and nginx event log stream</p>
+    </div>
+  </div>
 
-  <div class="flex items-center justify-between gap-4 flex-wrap">
-    <p class="text-gray-400 text-sm">
-      Stream real-time untuk <span class="font-mono text-gray-500">nginx error.log</span>.
-      Cocok untuk melihat pesan seperti <span class="font-mono text-gray-500">coraza dynlib_open</span>, invalid PID, dan lain-lain.
-    </p>
-    <div class="flex items-center gap-2 flex-wrap">
-      <label class="text-xs text-gray-500">Limit</label>
-      <select x-model.number="limit" @change="load()" class="text-sm bg-gray-900 border border-gray-700 rounded-lg px-2 py-2 text-gray-200">
-        <option value="100">100</option>
-        <option value="200">200</option>
-        <option value="500">500</option>
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+      <p class="text-2xl font-bold text-white tabular-nums" x-text="count">0</p>
+      <p class="text-xs text-gray-500">Lines loaded</p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+      <p class="text-2xl font-bold text-rose-400 tabular-nums" x-text="sev.error + sev.alert + sev.emerg">0</p>
+      <p class="text-xs text-gray-500">Errors</p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+      <p class="text-2xl font-bold text-amber-400 tabular-nums" x-text="sev.warn">0</p>
+      <p class="text-xs text-gray-500">Warnings</p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+      <p class="text-2xl font-bold text-emerald-400 tabular-nums" x-text="sev.notice + sev.info">0</p>
+      <p class="text-xs text-gray-500">Info / OK</p>
+    </div>
+  </div>
+
+  <div class="rounded-xl border border-gray-800 bg-gray-900/40 overflow-hidden flex flex-col min-h-0 flex-1">
+    <div class="px-3 py-2 border-b border-gray-800 flex flex-wrap items-center gap-2">
+      <select x-model="source" @change="load()"
+              class="text-xs bg-gray-900 border border-gray-700 rounded-md px-2 py-1.5 text-gray-200">
+        <option value="nginx-error">Nginx Error Log</option>
       </select>
+      <select x-model.number="limit" @change="load()"
+              class="text-xs bg-gray-900 border border-gray-700 rounded-md px-2 py-1.5 text-gray-200">
+        <option value="100">Last 100</option>
+        <option value="200">Last 200</option>
+        <option value="500">Last 500</option>
+      </select>
+      <select x-model="levelFilter"
+              class="text-xs bg-gray-900 border border-gray-700 rounded-md px-2 py-1.5 text-gray-200">
+        <option value="all">All levels</option>
+        <option value="error">Errors only</option>
+        <option value="warn">Warnings</option>
+        <option value="notice">Notice/Info</option>
+      </select>
+
+      <input type="text" x-model="search" placeholder="Search..."
+             class="min-w-[200px] flex-1 text-xs bg-gray-900 border border-gray-700 rounded-md px-2 py-1.5 text-gray-200 placeholder:text-gray-600" />
+
       <button type="button" @click="load()"
-              class="flex items-center gap-2 text-sm font-medium text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/10 px-3 py-2 rounded-lg transition-colors">
+              class="ml-auto flex items-center gap-1.5 text-xs font-medium text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 hover:bg-emerald-500/20 px-3 py-1.5 rounded-md transition-colors">
         Refresh
       </button>
-      <button type="button" @click="toggleAuto()" :class="auto ? 'bg-emerald-600' : 'bg-gray-700'"
-              class="text-sm font-semibold text-white px-3 py-2 rounded-lg transition-colors">
-        <span x-show="auto">Auto: ON</span>
-        <span x-show="!auto">Auto: OFF</span>
-      </button>
+      <label class="inline-flex items-center gap-1.5 text-xs text-gray-400">
+        <input type="checkbox" x-model="auto" class="accent-emerald-500">
+        Auto-scroll
+      </label>
     </div>
-  </div>
 
-  <div class="text-xs text-gray-500 font-mono" x-show="path">
-    Source: <span x-text="path"></span> · <span x-text="count"></span> lines
-  </div>
+    <div x-show="error" x-cloak class="m-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-200 text-sm px-3 py-2" x-text="error"></div>
 
-  <div x-show="loading" x-cloak class="flex items-center justify-center py-10 text-gray-600 text-sm">
-    Loading…
-  </div>
-
-  <div x-show="error" x-cloak class="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-200 text-sm px-4 py-3" x-text="error"></div>
-
-  <div class="rounded-xl border border-gray-800 bg-gray-900/40 overflow-hidden flex flex-col min-h-0 flex-1" x-show="!loading && !error">
-    <div class="px-4 py-2 border-b border-gray-800 text-xs text-gray-500 font-semibold uppercase tracking-wider flex items-center justify-between gap-3">
-      <span>Event stream</span>
-      <span x-text="levelSummary"></span>
+    <div id="eventLogPane" class="flex-1 min-h-0 overflow-y-auto font-mono text-[12px] leading-5 bg-[#060b16] px-3 py-2">
+      <template x-for="(l, idx) in filteredLines()" :key="idx">
+        <div class="grid grid-cols-[auto_1fr] gap-2 py-0.5 hover:bg-white/[0.02] rounded px-1">
+          <span class="inline-flex items-center px-1.5 h-5 rounded text-[10px] border w-fit"
+                :class="levelClass(l.level)"
+                x-text="(l.level || 'info').toLowerCase()"></span>
+          <span class="text-gray-300 break-all" x-text="l.line || l.raw"></span>
+        </div>
+      </template>
+      <p x-show="!filteredLines().length && !loading" class="text-gray-600 text-sm py-6 text-center">No logs found.</p>
+      <p x-show="loading" class="text-gray-500 text-sm py-6 text-center">Loading...</p>
     </div>
-    <div class="flex-1 min-h-0 overflow-y-auto">
-      <table class="w-full text-sm">
-        <thead class="sticky top-0 bg-gray-900/80 backdrop-blur border-b border-gray-800 z-10">
-          <tr class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            <th class="text-left px-4 py-2 w-28">Level</th>
-            <th class="text-left px-4 py-2">Message</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-800/70 font-mono text-xs">
-          <template x-for="(l, idx) in lines" :key="idx">
-            <tr class="hover:bg-gray-800/30">
-              <td class="px-4 py-2">
-                <span class="px-2 py-0.5 rounded border"
-                      :class="levelClass(l.level)">
-                  <span x-text="l.level || 'info'"></span>
-                </span>
-              </td>
-              <td class="px-4 py-2 text-gray-300 break-words" x-text="l.line || l.raw"></td>
-            </tr>
-          </template>
-          <tr x-show="!lines.length">
-            <td colspan="2" class="px-4 py-12 text-center text-gray-600">Tidak ada log.</td>
-          </tr>
-        </tbody>
-      </table>
+
+    <div class="px-3 py-1.5 border-t border-gray-800 text-[11px] text-gray-600 flex items-center justify-between">
+      <span x-text="(filteredLines().length + ' lines') + (path ? ' · source: ' + path : '')"></span>
+      <span class="text-gray-500">Copy all</span>
     </div>
   </div>
 </div>
@@ -77,30 +89,53 @@ function eventLogsApp() {
     path: '',
     count: 0,
     limit: 200,
+    source: 'nginx-error',
+    levelFilter: 'all',
+    search: '',
     lines: [],
     auto: true,
     timer: null,
-    levelSummary: '',
+    sev: { emerg: 0, alert: 0, error: 0, warn: 0, notice: 0, info: 0 },
 
     levelClass(level) {
       const lv = String(level || '').toLowerCase();
-      if (lv === 'emerg' || lv === 'alert' || lv === 'crit') return 'text-rose-300 border-rose-500/30 bg-rose-500/10';
-      if (lv === 'error') return 'text-amber-300 border-amber-500/30 bg-amber-500/10';
-      if (lv === 'warn' || lv === 'warning') return 'text-amber-300 border-amber-500/30 bg-amber-500/10';
-      if (lv === 'notice') return 'text-cyan-300 border-cyan-500/30 bg-cyan-500/10';
-      return 'text-gray-400 border-gray-700 bg-gray-800';
+      if (lv === 'emerg' || lv === 'alert' || lv === 'crit') return 'text-rose-200 border-rose-500/35 bg-rose-500/14';
+      if (lv === 'error') return 'text-rose-200 border-rose-500/35 bg-rose-500/14';
+      if (lv === 'warn' || lv === 'warning') return 'text-amber-200 border-amber-500/35 bg-amber-500/14';
+      if (lv === 'notice' || lv === 'info') return 'text-emerald-200 border-emerald-500/35 bg-emerald-500/12';
+      return 'text-cyan-200 border-cyan-500/35 bg-cyan-500/12';
     },
-
     summarize() {
-      const c = { emerg: 0, alert: 0, error: 0, warn: 0, notice: 0, info: 0, unknown: 0 };
-      for (const l of (this.lines || [])) {
+      const c = { emerg: 0, alert: 0, error: 0, warn: 0, notice: 0, info: 0 };
+      for (const l of this.lines || []) {
         const lv = String(l.level || '').toLowerCase();
-        if (lv in c) c[lv] += 1;
-        else c.unknown += 1;
+        if (lv === 'emerg') c.emerg++;
+        else if (lv === 'alert' || lv === 'crit') c.alert++;
+        else if (lv === 'error') c.error++;
+        else if (lv === 'warn' || lv === 'warning') c.warn++;
+        else if (lv === 'notice') c.notice++;
+        else c.info++;
       }
-      this.levelSummary = `emerg:${c.emerg} alert:${c.alert} error:${c.error} warn:${c.warn} notice:${c.notice}`;
+      this.sev = c;
     },
-
+    filteredLines() {
+      let rows = this.lines || [];
+      if (this.levelFilter === 'error') {
+        rows = rows.filter((l) => ['error', 'alert', 'emerg', 'crit'].includes(String(l.level || '').toLowerCase()));
+      } else if (this.levelFilter === 'warn') {
+        rows = rows.filter((l) => ['warn', 'warning'].includes(String(l.level || '').toLowerCase()));
+      } else if (this.levelFilter === 'notice') {
+        rows = rows.filter((l) => ['notice', 'info'].includes(String(l.level || '').toLowerCase()));
+      }
+      const q = String(this.search || '').trim().toLowerCase();
+      if (!q) return rows;
+      return rows.filter((l) => String(l.line || l.raw || '').toLowerCase().includes(q));
+    },
+    scrollBottom() {
+      if (!this.auto) return;
+      const pane = document.getElementById('eventLogPane');
+      if (pane) pane.scrollTop = pane.scrollHeight;
+    },
     async load() {
       this.loading = true;
       this.error = '';
@@ -112,6 +147,7 @@ function eventLogsApp() {
         this.count = d.count || 0;
         this.lines = Array.isArray(d.lines) ? d.lines : [];
         this.summarize();
+        requestAnimationFrame(() => this.scrollBottom());
       } catch (e) {
         this.error = e.message || String(e);
         this.lines = [];
@@ -119,31 +155,18 @@ function eventLogsApp() {
         this.loading = false;
       }
     },
-
-    toggleAuto() {
-      this.auto = !this.auto;
-      if (this.auto) {
-        this.startTimer();
-      } else if (this.timer) {
-        clearInterval(this.timer);
-        this.timer = null;
-      }
-    },
-
     startTimer() {
       if (this.timer) clearInterval(this.timer);
-      this.timer = setInterval(() => {
-        if (!this.auto) return;
-        this.load();
-      }, 2500);
+      this.timer = setInterval(() => this.load(), 2000);
     },
-
     init() {
       this.load();
       this.startTimer();
+      window.addEventListener('pagehide', () => {
+        if (this.timer) clearInterval(this.timer);
+      }, { once: true });
     }
   };
 }
 </script>
 {{end}}
-

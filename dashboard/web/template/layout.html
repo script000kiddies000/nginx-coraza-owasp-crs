@@ -7,6 +7,40 @@
   <title>{{.Title}} — Flux WAF</title>
   <!-- x-cloak MUST come before Alpine to avoid flash of unstyled content -->
   <style>[x-cloak]{display:none!important}</style>
+  <style>
+    /* Sidebar icon chips (WafX-style colorful) */
+    aside nav a > svg {
+      width: 18px;
+      height: 18px;
+      padding: 6px;
+      border-radius: 10px;
+      background: rgba(51, 65, 85, 0.28);
+      border: 1px solid rgba(71, 85, 105, 0.42);
+      box-sizing: content-box;
+    }
+    aside nav a[href="/"] > svg { color:#818cf8; background:rgba(79,70,229,.18); border-color:rgba(99,102,241,.35); }
+    aside nav a[href="/attack-map"] > svg { color:#38bdf8; background:rgba(2,132,199,.18); border-color:rgba(14,165,233,.35); }
+    aside nav a[href="/hosts"] > svg,
+    aside nav a[href="/ssl"] > svg { color:#22d3ee; background:rgba(8,145,178,.18); border-color:rgba(34,211,238,.35); }
+    aside nav a[href="/waf/settings"] > svg,
+    aside nav a[href="/rules"] > svg { color:#34d399; background:rgba(5,150,105,.18); border-color:rgba(52,211,153,.35); }
+    aside nav a[href="/virtual-patching"] > svg,
+    aside nav a[href="/bot-management"] > svg,
+    aside nav a[href="/threat-intel"] > svg,
+    aside nav a[href="/ip-reputations"] > svg,
+    aside nav a[href="/geo-blocking"] > svg,
+    aside nav a[href="/data-guard"] > svg,
+    aside nav a[href="/wordpress-security"] > svg { color:#f59e0b; background:rgba(180,83,9,.18); border-color:rgba(251,191,36,.35); }
+    aside nav a[href="/security-report"] > svg,
+    aside nav a[href="/attack-report"] > svg { color:#94a3b8; background:rgba(71,85,105,.18); border-color:rgba(148,163,184,.35); }
+    aside nav a[href="/security-logs"] > svg,
+    aside nav a[href="/logs"] > svg,
+    aside nav a[href="/event-logs"] > svg { color:#fb7185; background:rgba(190,24,93,.18); border-color:rgba(251,113,133,.35); }
+    aside nav a[href="/monitoring/nginx"] > svg,
+    aside nav a[href="/monitoring/server"] > svg { color:#4ade80; background:rgba(22,163,74,.18); border-color:rgba(74,222,128,.35); }
+    aside nav a[href="/settings"] > svg,
+    aside nav a[href="/settings/users"] > svg { color:#a78bfa; background:rgba(124,58,237,.18); border-color:rgba(167,139,250,.35); }
+  </style>
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -73,11 +107,11 @@
     </button>
   </div>
 
-  <nav class="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-0.5">
+  <nav class="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-1">
 
     <a href="/" title="Dashboard"
        :class="navRow(sidebarOpen, false, '')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "dashboard"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -88,7 +122,7 @@
 
     <a href="/attack-map" title="Attack Map"
        :class="navRow(sidebarOpen, false, '')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "attackmap"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -99,7 +133,7 @@
 
     <!-- Edge Network -->
     <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('edge')"
-            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-2">
+            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-3 mb-1">
       <span>Edge Network</span>
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
            class="w-4 h-4 text-gray-600 transition-transform shrink-0" :class="navG.edge ? 'rotate-180' : ''">
@@ -109,7 +143,7 @@
     <a href="/hosts" title="Hosts"
        x-show="!sidebarOpen || navG.edge"
        :class="navRow(sidebarOpen, true, 'edge')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "hosts"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -120,7 +154,7 @@
     <a href="/ssl" title="SSL"
        x-show="!sidebarOpen || navG.edge"
        :class="navRow(sidebarOpen, true, 'edge')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "ssl"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -131,7 +165,7 @@
 
     <!-- WAF -->
     <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('waf')"
-            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-2">
+            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-3 mb-1">
       <span>WAF</span>
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
            class="w-4 h-4 text-gray-600 transition-transform shrink-0" :class="navG.waf ? 'rotate-180' : ''">
@@ -141,7 +175,7 @@
     <a href="/waf/settings" title="WAF Settings"
        x-show="!sidebarOpen || navG.waf"
        :class="navRow(sidebarOpen, true, 'waf')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "wafsettings"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -152,7 +186,7 @@
     <a href="/rules" title="Custom Rules"
        x-show="!sidebarOpen || navG.waf"
        :class="navRow(sidebarOpen, true, 'waf')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "rules"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -163,7 +197,7 @@
 
     <!-- Security engines -->
     <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('engines')"
-            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-2">
+            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-3 mb-1">
       <span>Security Engines</span>
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
            class="w-4 h-4 text-gray-600 transition-transform shrink-0" :class="navG.engines ? 'rotate-180' : ''">
@@ -173,7 +207,7 @@
     <a href="/virtual-patching" title="Virtual Patching"
        x-show="!sidebarOpen || navG.engines"
        :class="navRow(sidebarOpen, true, 'engines')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "vpatch"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -184,7 +218,7 @@
     <a href="/bot-management" title="Bot"
        x-show="!sidebarOpen || navG.engines"
        :class="navRow(sidebarOpen, true, 'engines')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "botmgmt"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -195,7 +229,7 @@
     <a href="/threat-intel" title="Threat Intel"
        x-show="!sidebarOpen || navG.engines"
        :class="navRow(sidebarOpen, true, 'engines')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "threatintel"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -206,7 +240,7 @@
     <a href="/ip-reputations" title="IP Rep"
        x-show="!sidebarOpen || navG.engines"
        :class="navRow(sidebarOpen, true, 'engines')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "iprep"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -217,7 +251,7 @@
     <a href="/geo-blocking" title="Geo IP"
        x-show="!sidebarOpen || navG.engines"
        :class="navRow(sidebarOpen, true, 'engines')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "geoblock"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -228,7 +262,7 @@
     <a href="/data-guard" title="DLP"
        x-show="!sidebarOpen || navG.engines"
        :class="navRow(sidebarOpen, true, 'engines')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "dlp"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -240,7 +274,7 @@
     <a href="/wordpress-security" title="WordPress"
        x-show="!sidebarOpen || navG.engines"
        :class="navRow(sidebarOpen, true, 'engines')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "wpsec"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -251,7 +285,7 @@
 
     <!-- Reports -->
     <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('rep')"
-            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-2">
+            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-3 mb-1">
       <span>Reports</span>
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
            class="w-4 h-4 text-gray-600 transition-transform shrink-0" :class="navG.rep ? 'rotate-180' : ''">
@@ -261,7 +295,7 @@
     <a href="/security-report" title="Security Report"
        x-show="!sidebarOpen || navG.rep"
        :class="navRow(sidebarOpen, true, 'rep')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "secreport"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -272,7 +306,7 @@
     <a href="/attack-report" title="Attack Report"
        x-show="!sidebarOpen || navG.rep"
        :class="navRow(sidebarOpen, true, 'rep')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "atkreport"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -283,7 +317,7 @@
 
     <!-- Logs -->
     <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('logs')"
-            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-2">
+            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-3 mb-1">
       <span>Logs & Analytics</span>
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
            class="w-4 h-4 text-gray-600 transition-transform shrink-0" :class="navG.logs ? 'rotate-180' : ''">
@@ -293,7 +327,7 @@
     <a href="/security-logs" title="Security Events"
        x-show="!sidebarOpen || navG.logs"
        :class="navRow(sidebarOpen, true, 'logs')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "seclogs"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -304,7 +338,7 @@
     <a href="/logs" title="Access Logs"
        x-show="!sidebarOpen || navG.logs"
        :class="navRow(sidebarOpen, true, 'logs')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "logs"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -315,7 +349,7 @@
     <a href="/event-logs" title="Event Logs"
        x-show="!sidebarOpen || navG.logs"
        :class="navRow(sidebarOpen, true, 'logs')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "eventlogs"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -326,7 +360,7 @@
 
     <!-- Monitoring -->
     <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('mon')"
-            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-2">
+            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-3 mb-1">
       <span>Monitoring</span>
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
            class="w-4 h-4 text-gray-600 transition-transform shrink-0" :class="navG.mon ? 'rotate-180' : ''">
@@ -336,7 +370,7 @@
     <a href="/monitoring/nginx" title="Nginx"
        x-show="!sidebarOpen || navG.mon"
        :class="navRow(sidebarOpen, true, 'mon')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "nginx-mon"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -347,7 +381,7 @@
     <a href="/monitoring/server" title="Server"
        x-show="!sidebarOpen || navG.mon"
        :class="navRow(sidebarOpen, true, 'mon')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "srv-mon"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -358,7 +392,7 @@
 
     <!-- System -->
     <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('sys')"
-            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-2">
+            class="w-full flex items-center justify-between h-9 px-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 text-[11px] font-bold uppercase tracking-wider mt-3 mb-1">
       <span>System</span>
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
            class="w-4 h-4 text-gray-600 transition-transform shrink-0" :class="navG.sys ? 'rotate-180' : ''">
@@ -368,7 +402,7 @@
     <a href="/settings" title="Settings"
        x-show="!sidebarOpen || navG.sys"
        :class="navRow(sidebarOpen, true, 'sys')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "settings"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
@@ -379,7 +413,7 @@
     <a href="/settings/users" title="Users"
        x-show="!sidebarOpen || navG.sys"
        :class="navRow(sidebarOpen, true, 'sys')"
-       class="flex items-center h-9 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
               {{if eq .ActiveMenu "users"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">

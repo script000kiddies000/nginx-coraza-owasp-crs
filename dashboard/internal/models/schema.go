@@ -140,10 +140,21 @@ type ServerHealth struct {
 	CPUUsagePercent float64 `json:"cpu_usage_percent"`
 	MemoryTotalGB   float64 `json:"memory_total_gb"`
 	MemoryUsedGB    float64 `json:"memory_used_gb"`
+	SwapTotalGB     float64 `json:"swap_total_gb"`
+	SwapUsedGB      float64 `json:"swap_used_gb"`
 	DiskTotalGB     float64 `json:"disk_total_gb"`
 	DiskUsedGB      float64 `json:"disk_used_gb"`
 	UptimeSeconds   uint64  `json:"uptime_seconds"`
 	NginxDaemonUp   bool    `json:"nginx_daemon_up"`
+	Hostname        string  `json:"hostname"`
+	OSName          string  `json:"os_name"`
+	KernelVersion   string  `json:"kernel_version"`
+	CPUCores        int     `json:"cpu_cores"`
+	PrimaryIP       string  `json:"primary_ip"`
+	NetworkRxBytes  uint64  `json:"network_rx_bytes"`
+	NetworkTxBytes  uint64  `json:"network_tx_bytes"`
+	DiskReadBytes   uint64  `json:"disk_read_bytes"`
+	DiskWriteBytes  uint64  `json:"disk_write_bytes"`
 }
 
 // ── Attack Map (geo-spatial) ──────────────────────────────────────────────────
