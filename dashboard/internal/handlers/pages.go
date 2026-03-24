@@ -33,7 +33,7 @@ func (app *App) PageHosts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) PageSSL(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "ssl", models.PageData{Title: "SSL / TLS", ActiveMenu: "ssl"})
+	app.render(w, r, "ssl", models.PageData{Title: "SSL Certificates", ActiveMenu: "ssl"})
 }
 
 // ── WAF ───────────────────────────────────────────────────────────────────────

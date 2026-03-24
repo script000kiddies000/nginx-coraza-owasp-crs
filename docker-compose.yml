@@ -5,11 +5,10 @@ services:
     build: .
     container_name: nginx-coroza-crs
     ports:
-      - "8080:80"     # Nginx WAF proxy (HTTP)
-      - "8443:443"    # Nginx WAF proxy (HTTPS)
+      - "80:80"       # Nginx WAF proxy (HTTP) — publik / ACME HTTP-01
+      - "443:443"     # Nginx WAF proxy (HTTPS)
       - "8081:81"     # Nginx benchmark endpoint
-      - "9080:8080"   # Flux WAF Dashboard UI (dev)
-      # Production: ganti ke "80:80", "443:443", "8080:8080" untuk deployment proper
+      - "9080:8080"   # Flux WAF Dashboard (management UI)
     volumes:
       # Config files — read-only mount, bisa diedit tanpa rebuild image
       - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
@@ -37,6 +36,8 @@ services:
 
       # SSL certs upload oleh user — dipersist di host, dibaca nginx di default.conf
       - ./ssl_certs:/etc/nginx/ssl_certs:rw
+      # ACME HTTP-01 webroot — persist challenge files across container recreate
+      - ./acme-webroot:/var/www/certbot:rw
 
     # Perf tuning — Go runtime environment untuk Coraza WAF
     # Revert: hapus blok environment ini jika RAM membengkak atau tidak ada perbedaan latency

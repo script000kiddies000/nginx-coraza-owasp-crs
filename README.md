@@ -15,10 +15,10 @@ WAF stack berbasis **Nginx custom build** + **Coraza WAF** + **OWASP CRS v4** da
 
 ## Ports
 
-- `8080` -> Nginx HTTP (`:80`)
-- `8443` -> Nginx HTTPS (`:443`)
+- `80` -> Nginx HTTP (`:80`) — WAF publik / ACME HTTP-01
+- `443` -> Nginx HTTPS (`:443`)
 - `8081` -> Benchmark endpoint (`:81`, no WAF/backend)
-- `9080` -> Flux WAF dashboard (`:8080`)
+- `9080` -> Flux WAF dashboard (`:8080`, management UI)
 
 ## Quick Start
 
@@ -84,19 +84,19 @@ docker compose up -d --build
 Normal request:
 
 ```bash
-curl http://localhost:8080/
+curl http://localhost:80/
 ```
 
 Simple SQLi test (expected `403`):
 
 ```bash
-curl "http://localhost:8080/?id=1'+OR+1=1--"
+curl "http://localhost:80/?id=1'+OR+1=1--"
 ```
 
 HTTPS check:
 
 ```bash
-curl -k -I https://localhost:8443/
+curl -k -I https://localhost:443/
 ```
 
 Benchmark (raw Nginx):

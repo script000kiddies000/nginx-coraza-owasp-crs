@@ -47,6 +47,10 @@ mkdir -p /var/lib/flux-waf
 mkdir -p /etc/nginx/ssl_certs 2>/dev/null || true
 chown www-data:www-data /etc/nginx/ssl_certs 2>/dev/null || true
 
+# ACME webroot (Let's Encrypt HTTP-01)
+mkdir -p /var/www/certbot/.well-known/acme-challenge
+chown -R www-data:www-data /var/www/certbot 2>/dev/null || true
+
 # ── GeoIP2 MMDB bootstrap (auto-download fallback) ───────────────────────────
 GEOIP_DIR="/etc/nginx/geoip"
 COUNTRY_DB="${GEOIP_DIR}/GeoLite2-Country.mmdb"

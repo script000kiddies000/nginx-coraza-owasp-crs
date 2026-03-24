@@ -175,6 +175,11 @@ func (app *App) APISaveHost(w http.ResponseWriter, r *http.Request) {
 		h.LBAlgorithm = "round_robin"
 	}
 
+	if err := resolveHostSSL(app.DB, &h); err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	if err := store.SaveHost(app.DB, h); err != nil {
 		jsonError(w, "db: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -558,6 +563,78 @@ func (app *App) APIGetThreatIntelStatus(w http.ResponseWriter, r *http.Request) 
 			"ip_rules": ipPath,
 			"feeds":    jsonPath,
 		},
+	})
+}
+
+func (app *App) APIGetThreatIntelFeeds(w http.ResponseWriter, r *http.Request) {
+	jsonPath := threatIntelJSONPath()
+	cfg, err := threatintel.ReadFileConfig(jsonPath)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"enabled": cfg.Enabled,
+		"action":  cfg.Action,
+		"feeds":   cfg.Feeds,
+		"path":    jsonPath,
+	})
+}
+
+func (app *App) APIPostThreatIntelFeeds(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Enabled bool               `json:"enabled"`
+		Action  string             `json:"action"`
+		Feeds   []threatintel.Feed `json:"feeds"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if body.Action == "" {
+		body.Action = "block"
+	}
+	if body.Action != "block" && body.Action != "allow" {
+		jsonError(w, "action must be block or allow", http.StatusBadRequest)
+		return
+	}
+	for i := range body.Feeds {
+		f := &body.Feeds[i]
+		f.Name = strings.TrimSpace(f.Name)
+		f.Type = strings.TrimSpace(strings.ToLower(f.Type))
+		f.URL = strings.TrimSpace(f.URL)
+		f.APIKey = strings.TrimSpace(f.APIKey)
+		if f.Name == "" || f.Type == "" || f.URL == "" {
+			jsonError(w, "feed name/type/url is required", http.StatusBadRequest)
+			return
+		}
+		switch f.Type {
+		case "spamhaus_drop", "emerging_threats", "abuseipdb":
+		default:
+			jsonError(w, "unsupported feed type: "+f.Type, http.StatusBadRequest)
+			return
+		}
+	}
+
+	jsonPath := threatIntelJSONPath()
+	cfg, err := threatintel.ReadFileConfig(jsonPath)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	cfg.Enabled = body.Enabled
+	cfg.Action = body.Action
+	cfg.Feeds = body.Feeds
+	if err := threatintel.WriteFileConfig(jsonPath, cfg); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]any{
+		"ok":      true,
+		"enabled": cfg.Enabled,
+		"action":  cfg.Action,
+		"feeds":   cfg.Feeds,
 	})
 }
 

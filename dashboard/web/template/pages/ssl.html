@@ -1,150 +1,415 @@
 {{define "content"}}
-<div class="w-full min-h-[calc(100vh-6.5rem)] flex flex-col space-y-6" x-data="sslApp()" x-init="init()">
+<div class="w-full min-h-[calc(100vh-6.5rem)] flex flex-col space-y-6" x-data="tlsCertsApp()" x-init="init()"
+     @keydown.escape.window="showModalLE = false; showModalCustom = false">
 
-  <div class="flex items-center justify-between gap-4 flex-wrap">
-    <p class="text-gray-400 text-sm">
-      Upload sertifikat TLS ke folder mount
-      <span class="font-mono text-gray-500">/etc/nginx/ssl_certs</span>.
-      Default server akan memakai <span class="font-mono text-gray-500">localhost.crt</span> &amp;
-      <span class="font-mono text-gray-500">localhost.key</span>.
-    </p>
-    <button type="button" @click="load()" class="text-sm text-gray-500 hover:text-gray-300">
-      Refresh
-    </button>
+  <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+    <div>
+      <h1 class="text-lg font-semibold text-white tracking-tight">SSL Certificates</h1>
+      <p class="text-gray-400 text-sm mt-1 max-w-2xl">
+        Kelola TLS: <span class="text-gray-300">Let&apos;s Encrypt</span> (HTTP-01) atau unggah / tempel PEM untuk domain tertentu.
+        Di menu <a href="/hosts" class="text-emerald-400 hover:text-emerald-300">Hosts</a>, pilih sertifikat lewat dropdown.
+      </p>
+      <p class="text-xs text-gray-600 mt-2 font-mono" x-show="meta.ssl_dir">
+        <span x-text="'PEM disimpan di ' + (meta.ssl_dir || '')"></span>
+        <span class="text-gray-500" x-show="meta.acme_webroot" x-text="' · ACME webroot ' + (meta.acme_webroot || '')"></span>
+      </p>
+    </div>
+    <button type="button" @click="load()" class="text-sm text-gray-500 hover:text-gray-300 self-start shrink-0">Refresh</button>
   </div>
 
   <div x-show="msgOk" x-cloak class="text-sm text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-lg px-4 py-2" x-text="msgOk"></div>
   <div x-show="msgErr" x-cloak class="text-sm text-rose-400 border border-rose-500/30 bg-rose-500/10 rounded-lg px-4 py-2" x-text="msgErr"></div>
 
-  <div class="flex-1 min-h-0 overflow-y-auto">
-    <div class="grid lg:grid-cols-2 gap-6">
-      <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-4">
-        <h2 class="text-sm font-semibold text-white">Upload</h2>
-        <div>
-          <label class="block text-xs text-gray-500 mb-1">Nama sertifikat (basename)</label>
-          <input type="text" x-model="form.name" placeholder="localhost"
-                 class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200 font-mono">
-          <p class="text-xs text-gray-600 mt-1">
-            Output akan jadi <span class="font-mono">NAME.crt</span> dan <span class="font-mono">NAME.key</span>.
-          </p>
-        </div>
+  <!-- Summary -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+      <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total</p>
+      <p class="text-2xl font-semibold text-white mt-1" x-text="summary.total ?? 0"></p>
+    </div>
+    <div class="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+      <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Let&apos;s Encrypt</p>
+      <p class="text-2xl font-semibold text-emerald-400 mt-1" x-text="summary.lets_encrypt ?? 0"></p>
+    </div>
+    <div class="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+      <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Custom</p>
+      <p class="text-2xl font-semibold text-amber-400 mt-1" x-text="summary.custom ?? 0"></p>
+    </div>
+    <div class="rounded-xl border border-amber-500/25 bg-amber-500/5 p-4">
+      <p class="text-xs font-medium text-amber-200/70 uppercase tracking-wider">Expiring ≤30d</p>
+      <p class="text-2xl font-semibold text-amber-300 mt-1" x-text="summary.expiring_30d ?? 0"></p>
+    </div>
+  </div>
 
-        <div>
-          <label class="block text-xs text-gray-500 mb-1">File .crt</label>
-          <input type="file" @change="setFile('crt', $event)" accept=".crt,.pem,.cer" class="w-full text-sm text-gray-300">
-        </div>
+  <!-- Let's Encrypt -->
+  <div class="rounded-xl border border-gray-800 bg-gray-900/40 overflow-hidden">
+    <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-800">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="text-emerald-400 flex-shrink-0" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z" clip-rule="evenodd"/></svg>
+        </span>
+        <h2 class="text-sm font-semibold text-white truncate">Let&apos;s Encrypt</h2>
+      </div>
+      <button type="button" @click="openModalLE()"
+              class="shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors">
+        + Add certificate
+      </button>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="border-b border-gray-800 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <tr>
+            <th class="text-left px-5 py-3">Domain</th>
+            <th class="text-left px-5 py-3">Expires</th>
+            <th class="text-left px-5 py-3">Days left</th>
+            <th class="text-left px-5 py-3">Status</th>
+            <th class="text-left px-5 py-3">Used by</th>
+            <th class="text-right px-5 py-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-800/80">
+          <template x-for="c in leList" :key="c.id">
+            <tr class="hover:bg-gray-800/30">
+              <td class="px-5 py-3 font-mono text-xs text-cyan-300" x-text="c.domain"></td>
+              <td class="px-5 py-3 text-gray-400 text-xs" x-text="fmtDate(c.not_after)"></td>
+              <td class="px-5 py-3 text-xs" x-text="fmtDays(c.days_left)"></td>
+              <td class="px-5 py-3">
+                <span class="inline-flex text-xs font-medium border px-2 py-0.5 rounded-full"
+                      :class="statusClass(c.status)"
+                      :title="c.error_msg || ''"
+                      x-text="c.status || '—'"></span>
+              </td>
+              <td class="px-5 py-3 text-xs text-gray-500 max-w-[10rem] truncate" :title="(c.used_by||[]).join(', ')" x-text="(c.used_by && c.used_by.length) ? c.used_by.join(', ') : '—'"></td>
+              <td class="px-5 py-3 text-right">
+                <button type="button" @click="removeCert(c)" class="text-rose-400 hover:text-rose-300 text-xs px-2 py-1 rounded border border-rose-500/25 hover:bg-rose-500/10">Delete</button>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="leList.length === 0">
+            <td colspan="6" class="px-5 py-10 text-center text-gray-600 text-sm">
+              Belum ada sertifikat Let&apos;s Encrypt. Klik <span class="text-gray-400">Add certificate</span> untuk menerbitkan.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-        <div>
-          <label class="block text-xs text-gray-500 mb-1">File .key</label>
-          <input type="file" @change="setFile('key', $event)" accept=".key,.pem" class="w-full text-sm text-gray-300">
-        </div>
+  <!-- Custom -->
+  <div class="rounded-xl border border-gray-800 bg-gray-900/40 overflow-hidden">
+    <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-800">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="text-amber-400 flex-shrink-0" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.872l-3.236 4.53L7.53 10.53a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clip-rule="evenodd"/></svg>
+        </span>
+        <h2 class="text-sm font-semibold text-white truncate">Custom / upload</h2>
+      </div>
+      <button type="button" @click="openModalCustom()"
+              class="shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors">
+        + Upload certificate
+      </button>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="border-b border-gray-800 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <tr>
+            <th class="text-left px-5 py-3">Domain</th>
+            <th class="text-left px-5 py-3">Issuer</th>
+            <th class="text-left px-5 py-3">Expires</th>
+            <th class="text-left px-5 py-3">Days left</th>
+            <th class="text-left px-5 py-3">Status</th>
+            <th class="text-left px-5 py-3">Used by</th>
+            <th class="text-right px-5 py-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-800/80">
+          <template x-for="c in customList" :key="c.id">
+            <tr class="hover:bg-gray-800/30">
+              <td class="px-5 py-3 font-mono text-xs text-cyan-300" x-text="c.domain"></td>
+              <td class="px-5 py-3 text-gray-400 text-xs max-w-[8rem] truncate" :title="c.issuer || ''" x-text="c.issuer || '—'"></td>
+              <td class="px-5 py-3 text-gray-400 text-xs" x-text="fmtDate(c.not_after)"></td>
+              <td class="px-5 py-3 text-xs" x-text="fmtDays(c.days_left)"></td>
+              <td class="px-5 py-3">
+                <span class="inline-flex text-xs font-medium border px-2 py-0.5 rounded-full"
+                      :class="statusClass(c.status)"
+                      :title="c.error_msg || ''"
+                      x-text="c.status || '—'"></span>
+              </td>
+              <td class="px-5 py-3 text-xs text-gray-500 max-w-[10rem] truncate" :title="(c.used_by||[]).join(', ')" x-text="(c.used_by && c.used_by.length) ? c.used_by.join(', ') : '—'"></td>
+              <td class="px-5 py-3 text-right">
+                <button type="button" @click="removeCert(c)" class="text-rose-400 hover:text-rose-300 text-xs px-2 py-1 rounded border border-rose-500/25 hover:bg-rose-500/10">Delete</button>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="customList.length === 0">
+            <td colspan="7" class="px-5 py-10 text-center text-gray-600 text-sm">
+              Belum ada sertifikat custom. Tempel PEM atau pilih file, lalu simpan — atau tautkan dari host dengan HTTPS + sertifikat terkelola.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-        <button type="button" @click="upload()" :disabled="uploading || !form.crt || !form.key"
-                class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold px-5 py-2 rounded-lg">
-          <span x-show="!uploading">Upload &amp; reload nginx</span>
-          <span x-show="uploading">Mengupload…</span>
+  <!-- Modal: Let&apos;s Encrypt -->
+  <div x-show="showModalLE" x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 py-8">
+    <div class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col"
+         @click.outside="showModalLE = false">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-800 shrink-0">
+        <div>
+          <h3 class="text-white font-semibold">Let&apos;s Encrypt</h3>
+          <p class="text-xs text-gray-500 mt-0.5">Terbitkan sertifikat via HTTP-01</p>
+        </div>
+        <button type="button" @click="showModalLE = false" class="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-gray-800">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
         </button>
       </div>
 
-      <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-3">
-        <h2 class="text-sm font-semibold text-white">Daftar pasangan sertifikat</h2>
-        <div class="text-xs text-gray-500 font-mono" x-show="dir">
-          Dir: <span x-text="dir"></span>
+      <div class="px-5 py-4 overflow-y-auto flex-1 space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-400 mb-1">Domain <span class="text-rose-400">*</span></label>
+          <input type="text" x-model="leForm.domain" placeholder="example.com"
+                 class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 font-mono focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 outline-none">
         </div>
-
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="border-b border-gray-800">
-              <tr class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                <th class="text-left px-3 py-2">Name</th>
-                <th class="text-left px-3 py-2">CRT</th>
-                <th class="text-left px-3 py-2">KEY</th>
-                <th class="text-left px-3 py-2">Mod</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-800/70 font-mono text-xs">
-              <template x-for="p in pairs" :key="p.name">
-                <tr class="hover:bg-gray-800/30">
-                  <td class="px-3 py-2">
-                    <span class="text-cyan-400" x-text="p.name"></span>
-                  </td>
-                  <td class="px-3 py-2">
-                    <span :class="p.has_crt ? 'text-emerald-400' : 'text-rose-400'" x-text="p.has_crt ? 'OK' : 'missing'"></span>
-                  </td>
-                  <td class="px-3 py-2">
-                    <span :class="p.has_key ? 'text-emerald-400' : 'text-rose-400'" x-text="p.has_key ? 'OK' : 'missing'"></span>
-                  </td>
-                  <td class="px-3 py-2 text-gray-500" x-text="p.mod_time || '—'"></td>
-                </tr>
-              </template>
-              <tr x-show="pairs.length === 0">
-                <td colspan="4" class="px-3 py-8 text-center text-gray-600">Belum ada sertifikat.</td>
-              </tr>
-            </tbody>
-          </table>
+        <div>
+          <label class="block text-xs font-medium text-gray-400 mb-1">Email (renewal / ACME account)</label>
+          <input type="email" x-model="leForm.email" placeholder="admin@example.com"
+                 class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 outline-none">
         </div>
-
-        <p class="text-xs text-gray-600">
-          Catatan: jika host mengaktifkan SSL, pastikan config host memakai paths cert/key yang valid.
-          Worker default saat ini akan diarahkan ke <span class="font-mono">localhost</span>.
+        <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
+          <input type="checkbox" x-model="leForm.staging" class="rounded border-gray-600 bg-gray-800 text-emerald-600 focus:ring-emerald-500/40">
+          Use Let&apos;s Encrypt staging (testing)
+        </label>
+        <p class="text-xs text-gray-600 leading-relaxed">
+          Butuh port <span class="font-mono text-gray-500">80</span> terbuka dari internet ke host ini agar HTTP-01 valid.
+          File challenge dilayani dari webroot <span class="font-mono text-gray-500" x-text="meta.acme_webroot || '/var/www/certbot'"></span>.
         </p>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 px-5 py-4 border-t border-gray-800 shrink-0">
+        <button type="button" @click="showModalLE = false" class="text-gray-400 hover:text-white text-sm px-4 py-2 rounded-lg hover:bg-gray-800">Cancel</button>
+        <button type="button" @click="submitLE()" :disabled="busy"
+                class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+          <span x-text="busy ? 'Issuing…' : 'Issue certificate'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Custom / upload -->
+  <div x-show="showModalCustom" x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 py-8">
+    <div class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-xl shadow-2xl max-h-[90vh] flex flex-col"
+         @click.outside="showModalCustom = false">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-800 shrink-0">
+        <div>
+          <h3 class="text-white font-semibold">Upload certificate</h3>
+          <p class="text-xs text-gray-500 mt-0.5">Tempel PEM atau pilih file</p>
+        </div>
+        <button type="button" @click="showModalCustom = false" class="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-gray-800">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
+        </button>
+      </div>
+
+      <div class="px-5 py-4 overflow-y-auto flex-1 space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-400 mb-1">Domain <span class="text-rose-400">*</span></label>
+          <input type="text" x-model="custForm.domain" placeholder="example.com"
+                 class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 font-mono focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 outline-none">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-medium text-gray-400 mb-1">Cert file</label>
+            <input type="file" accept=".pem,.crt,.cer,.txt" @change="readFileTo($event, 'cert_pem')"
+                   class="w-full text-xs text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gray-800 file:text-gray-300">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-400 mb-1">Key file</label>
+            <input type="file" accept=".pem,.key,.txt" @change="readFileTo($event, 'key_pem')"
+                   class="w-full text-xs text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gray-800 file:text-gray-300">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-400 mb-1">Certificate PEM <span class="text-rose-400">*</span></label>
+          <textarea x-model="custForm.cert_pem" rows="4" placeholder="-----BEGIN CERTIFICATE-----"
+                    class="w-full bg-gray-950 border border-gray-800 text-gray-300 text-xs font-mono rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500/40 outline-none resize-y"></textarea>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-400 mb-1">Private key PEM <span class="text-rose-400">*</span></label>
+          <textarea x-model="custForm.key_pem" rows="4" placeholder="-----BEGIN PRIVATE KEY-----"
+                    class="w-full bg-gray-950 border border-gray-800 text-gray-300 text-xs font-mono rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500/40 outline-none resize-y"></textarea>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-400 mb-1">Chain (optional)</label>
+          <textarea x-model="custForm.chain_pem" rows="3" placeholder="-----BEGIN CERTIFICATE----- (intermediate chain)"
+                    class="w-full bg-gray-950 border border-gray-800 text-gray-300 text-xs font-mono rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500/40 outline-none resize-y"></textarea>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 px-5 py-4 border-t border-gray-800 shrink-0">
+        <button type="button" @click="showModalCustom = false" class="text-gray-400 hover:text-white text-sm px-4 py-2 rounded-lg hover:bg-gray-800">Cancel</button>
+        <button type="button" @click="submitCustom()" :disabled="busy"
+                class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+          <span x-text="busy ? 'Saving…' : 'Save certificate'"></span>
+        </button>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-function sslApp() {
+function tlsCertsApp() {
   return {
-    dir: '',
-    pairs: [],
+    certificates: [],
+    summary: {},
+    meta: { ssl_dir: '', acme_webroot: '' },
     msgOk: '',
     msgErr: '',
-    uploading: false,
-    form: { name: 'localhost', crt: null, key: null },
+    showModalLE: false,
+    showModalCustom: false,
+    busy: false,
+    leForm: { domain: '', email: '', staging: false },
+    custForm: { domain: '', cert_pem: '', key_pem: '', chain_pem: '' },
 
-    setFile(kind, e) {
+    get leList() {
+      return (this.certificates || []).filter(c => c.source === 'letsencrypt');
+    },
+    get customList() {
+      return (this.certificates || []).filter(c => c.source !== 'letsencrypt');
+    },
+
+    fmtDate(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '—';
+      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    },
+    fmtDays(d) {
+      if (d === null || d === undefined) return '—';
+      const n = Number(d);
+      if (Number.isNaN(n)) return '—';
+      if (n < 0) return 'expired';
+      return 'in ' + n + ' d';
+    },
+    statusClass(status) {
+      const s = String(status || '').toLowerCase();
+      if (s === 'active') return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25';
+      if (s === 'error') return 'text-rose-400 bg-rose-500/10 border-rose-500/25';
+      return 'text-gray-400 bg-gray-500/10 border-gray-500/25';
+    },
+
+    openModalLE() {
+      this.msgErr = '';
+      this.leForm = { domain: '', email: '', staging: false };
+      this.showModalCustom = false;
+      this.showModalLE = true;
+    },
+
+    openModalCustom() {
+      this.msgErr = '';
+      this.custForm = { domain: '', cert_pem: '', key_pem: '', chain_pem: '' };
+      this.showModalLE = false;
+      this.showModalCustom = true;
+    },
+
+    readFileTo(e, field) {
       const f = e.target.files && e.target.files[0];
-      this.form[kind] = f || null;
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = () => { this.custForm[field] = (r.result || '').toString(); };
+      r.readAsText(f);
     },
 
     async load() {
       this.msgErr = '';
-      this.msgOk = '';
-      const d = await fetch('/api/ssl').then(r => r.json());
-      this.dir = d.dir || '';
-      this.pairs = Array.isArray(d.pairs) ? d.pairs : [];
+      const r = await fetch('/api/tls/certificates');
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'load failed');
+      this.certificates = Array.isArray(d.certificates) ? d.certificates : [];
+      this.summary = d.summary || {};
+      this.meta = { ssl_dir: d.ssl_dir || '', acme_webroot: d.acme_webroot || '' };
     },
 
     async init() {
       try { await this.load(); } catch (e) { this.msgErr = e.message || String(e); }
     },
 
-    async upload() {
-      this.uploading = true;
+    async submitLE() {
+      this.busy = true;
       this.msgOk = '';
       this.msgErr = '';
       try {
-        const fd = new FormData();
-        fd.append('name', this.form.name);
-        fd.append('crt', this.form.crt);
-        fd.append('key', this.form.key);
-
-        const r = await fetch('/api/ssl/upload', { method: 'POST', body: fd });
+        const r = await fetch('/api/tls/certificates/letsencrypt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            domain: (this.leForm.domain || '').trim(),
+            email: (this.leForm.email || '').trim(),
+            staging: !!this.leForm.staging
+          })
+        });
         const t = await r.text();
         let j = {}; try { j = JSON.parse(t); } catch (_) {}
         if (!r.ok) throw new Error(j.error || t);
-        this.msgOk = 'Upload OK: ' + (j.name || this.form.name);
-        if (j.reload_err) this.msgErr = 'Upload berhasil tapi reload gagal: ' + j.reload_err;
+        this.msgOk = 'Certificate issued for ' + (j.domain || this.leForm.domain);
+        this.showModalLE = false;
         await this.load();
       } catch (e) {
         this.msgErr = e.message || String(e);
       } finally {
-        this.uploading = false;
+        this.busy = false;
+      }
+    },
+
+    async submitCustom() {
+      this.busy = true;
+      this.msgOk = '';
+      this.msgErr = '';
+      try {
+        const r = await fetch('/api/tls/certificates/custom', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            domain: (this.custForm.domain || '').trim(),
+            cert_pem: this.custForm.cert_pem || '',
+            key_pem: this.custForm.key_pem || '',
+            chain_pem: this.custForm.chain_pem || ''
+          })
+        });
+        const t = await r.text();
+        let j = {}; try { j = JSON.parse(t); } catch (_) {}
+        if (!r.ok) throw new Error(j.error || t);
+        this.msgOk = 'Custom certificate saved' + (j.domain ? (' for ' + j.domain) : '');
+        this.showModalCustom = false;
+        await this.load();
+      } catch (e) {
+        this.msgErr = e.message || String(e);
+      } finally {
+        this.busy = false;
+      }
+    },
+
+    async removeCert(c) {
+      if (!c || !c.id) return;
+      const used = (c.used_by && c.used_by.length) ? ('\n\nUsed by: ' + c.used_by.join(', ')) : '';
+      if (!confirm('Delete certificate for "' + c.domain + '"?' + used)) return;
+      this.msgErr = '';
+      try {
+        const r = await fetch('/api/tls/certificates/' + encodeURIComponent(c.id), { method: 'DELETE' });
+        const t = await r.text();
+        let j = {}; try { j = JSON.parse(t); } catch (_) {}
+        if (r.status === 409) {
+          this.msgErr = j.error || 'Certificate is in use by a host. Unassign it in Hosts first.';
+          return;
+        }
+        if (!r.ok) throw new Error(j.error || t);
+        this.msgOk = 'Certificate removed';
+        await this.load();
+      } catch (e) {
+        this.msgErr = e.message || String(e);
       }
     }
   };
 }
 </script>
 {{end}}
-

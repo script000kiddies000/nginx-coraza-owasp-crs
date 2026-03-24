@@ -132,7 +132,7 @@ func SyncFeeds(dbCfg models.ThreatIntelConfig, configPath, outputPath string) (S
 	return SyncResult{LastSync: nowStr, IPCount: len(ips)}, nil
 }
 
-func loadAndMergeConfig(dbCfg models.ThreatIntelConfig, path string) (FileConfig, error) {
+func ReadFileConfig(path string) (FileConfig, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return FileConfig{}, fmt.Errorf("read threat_intel.json: %w", err)
@@ -140,6 +140,32 @@ func loadAndMergeConfig(dbCfg models.ThreatIntelConfig, path string) (FileConfig
 	var cfg FileConfig
 	if err := json.Unmarshal(raw, &cfg); err != nil {
 		return FileConfig{}, fmt.Errorf("parse threat_intel.json: %w", err)
+	}
+	if cfg.Action == "" {
+		cfg.Action = "block"
+	}
+	return cfg, nil
+}
+
+func WriteFileConfig(path string, cfg FileConfig) error {
+	if cfg.Action == "" {
+		cfg.Action = "block"
+	}
+	out, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode threat_intel.json: %w", err)
+	}
+	out = append(out, '\n')
+	if err := os.WriteFile(path, out, 0o644); err != nil {
+		return fmt.Errorf("write threat_intel.json: %w", err)
+	}
+	return nil
+}
+
+func loadAndMergeConfig(dbCfg models.ThreatIntelConfig, path string) (FileConfig, error) {
+	cfg, err := ReadFileConfig(path)
+	if err != nil {
+		return FileConfig{}, err
 	}
 	cfg.Enabled = dbCfg.Enabled
 	cfg.UpdateInterval = dbCfg.UpdateInterval
@@ -152,15 +178,7 @@ func loadAndMergeConfig(dbCfg models.ThreatIntelConfig, path string) (FileConfig
 }
 
 func saveConfig(path string, cfg FileConfig) error {
-	out, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return fmt.Errorf("encode threat_intel.json: %w", err)
-	}
-	out = append(out, '\n')
-	if err := os.WriteFile(path, out, 0o644); err != nil {
-		return fmt.Errorf("write threat_intel.json: %w", err)
-	}
-	return nil
+	return WriteFileConfig(path, cfg)
 }
 
 func fetchFeed(feed *Feed) (string, error) {

@@ -113,28 +113,54 @@
   <!-- Feeds table -->
   <div class="mt-8 rounded-xl border border-gray-800 bg-gray-900/40 overflow-hidden" x-show="formReady">
     <div class="px-5 py-3 border-b border-gray-800 flex justify-between items-center flex-wrap gap-2">
-      <h2 class="text-sm font-semibold text-gray-200 uppercase tracking-wider">Feed (threat_intel.json)</h2>
-      <span class="text-xs text-gray-600 font-mono" x-show="feedsFile.enabled !== undefined" x-text="'enabled (file): ' + feedsFile.enabled"></span>
+      <div class="flex items-center gap-3 flex-wrap">
+        <h2 class="text-sm font-semibold text-gray-200 uppercase tracking-wider">Feed (threat_intel.json)</h2>
+        <label class="inline-flex items-center gap-2 text-xs text-gray-400">
+          <input type="checkbox" x-model="feedsEnabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500 focus:ring-emerald-500/40">
+          enabled (file)
+        </label>
+        <label class="inline-flex items-center gap-2 text-xs text-gray-400">
+          action
+          <select x-model="feedsAction" class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200">
+            <option value="block">block</option>
+            <option value="allow">allow</option>
+          </select>
+        </label>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" @click="openAddFeed()"
+                class="text-xs font-medium text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/10 px-3 py-1.5 rounded-lg transition-colors">
+          + Tambah feed
+        </button>
+        <button type="button" @click="saveFeedsConfig()" :disabled="feedsSaving"
+                class="text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+          <span x-show="!feedsSaving">Simpan feed</span>
+          <span x-show="feedsSaving">Menyimpan…</span>
+        </button>
+      </div>
     </div>
     <div class="overflow-x-auto">
-      <table class="w-full text-sm min-w-[640px]">
+      <table class="w-full text-sm min-w-[940px]">
         <thead class="border-b border-gray-800 text-xs text-gray-500 uppercase">
           <tr>
             <th class="text-left px-4 py-3">Nama</th>
             <th class="text-left px-4 py-3">Tipe</th>
+            <th class="text-left px-4 py-3">URL</th>
             <th class="text-left px-4 py-3">Aktif</th>
             <th class="text-left px-4 py-3">Last sync</th>
             <th class="text-left px-4 py-3">IP count</th>
+            <th class="text-left px-4 py-3">Aksi</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-800">
           <template x-if="!feedsList.length">
-            <tr><td colspan="5" class="px-4 py-8 text-center text-gray-600 text-sm">Tidak ada data feed (file tidak ada atau format berbeda).</td></tr>
+            <tr><td colspan="7" class="px-4 py-8 text-center text-gray-600 text-sm">Tidak ada data feed (file tidak ada atau format berbeda).</td></tr>
           </template>
           <template x-for="(f, idx) in feedsList" :key="idx">
             <tr class="hover:bg-gray-800/30">
               <td class="px-4 py-3 text-gray-200" x-text="f.name || '—'"></td>
               <td class="px-4 py-3 font-mono text-xs text-gray-500" x-text="f.type || '—'"></td>
+              <td class="px-4 py-3 font-mono text-xs text-gray-500 max-w-[280px] truncate" :title="f.url || ''" x-text="f.url || '—'"></td>
               <td class="px-4 py-3">
                 <span class="text-xs px-2 py-0.5 rounded border"
                       :class="f.enabled ? 'text-emerald-300 border-emerald-500/30' : 'text-gray-500 border-gray-700'"
@@ -142,10 +168,60 @@
               </td>
               <td class="px-4 py-3 font-mono text-xs text-gray-500" x-text="f.last_sync || '—'"></td>
               <td class="px-4 py-3 font-mono text-xs text-gray-400" x-text="f.ip_count ?? '—'"></td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-2">
+                  <button type="button" @click="toggleFeed(idx)"
+                          class="text-[11px] px-2 py-1 rounded border border-gray-700 text-gray-300 hover:bg-gray-800"
+                          x-text="f.enabled ? 'Off' : 'On'"></button>
+                  <button type="button" @click="openEditFeed(idx)"
+                          class="text-[11px] px-2 py-1 rounded border border-sky-500/30 text-sky-300 hover:bg-sky-500/10">Edit</button>
+                  <button type="button" @click="deleteFeed(idx)"
+                          class="text-[11px] px-2 py-1 rounded border border-rose-500/30 text-rose-300 hover:bg-rose-500/10">Hapus</button>
+                </div>
+              </td>
             </tr>
           </template>
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <div x-show="feedModalOpen" x-cloak class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+    <div class="w-full max-w-xl rounded-xl border border-gray-800 bg-gray-900 p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-gray-100" x-text="feedEditingIdx === -1 ? 'Tambah Feed' : 'Edit Feed'"></h3>
+        <button type="button" @click="closeFeedModal()" class="text-gray-500 hover:text-white">✕</button>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Nama</label>
+          <input x-model="feedForm.name" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Type</label>
+          <select x-model="feedForm.type" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200">
+            <option value="spamhaus_drop">spamhaus_drop</option>
+            <option value="emerging_threats">emerging_threats</option>
+            <option value="abuseipdb">abuseipdb</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">URL</label>
+        <input x-model="feedForm.url" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 font-mono">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">API Key (optional, khusus abuseipdb)</label>
+        <input x-model="feedForm.api_key" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 font-mono">
+      </div>
+      <label class="flex items-center gap-2 text-sm text-gray-300">
+        <input type="checkbox" x-model="feedForm.enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500 focus:ring-emerald-500/40">
+        Feed aktif
+      </label>
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" @click="closeFeedModal()" class="text-sm text-gray-300 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg">Batal</button>
+        <button type="button" @click="applyFeedForm()" class="text-sm text-white bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded-lg">Simpan feed</button>
+      </div>
     </div>
   </div>
 </div>
@@ -157,13 +233,19 @@ function threatIntelApp() {
     formReady: false,
     saving: false,
     syncing: false,
+    feedsSaving: false,
     errorBanner: '',
     okBanner: '',
     paths: { ip_rules: '', feeds: '' },
     ipRules: {},
     feedsFile: {},
     feedsList: [],
+    feedsEnabled: true,
+    feedsAction: 'block',
     feedsError: '',
+    feedModalOpen: false,
+    feedEditingIdx: -1,
+    feedForm: { name: '', type: 'spamhaus_drop', url: '', enabled: true, api_key: '' },
     whitelistText: '',
     form: {
       enabled: true,
@@ -200,7 +282,9 @@ function threatIntelApp() {
         this.paths = data.paths || {};
         this.feedsError = data.feeds_error || '';
         this.feedsFile = (data.feeds_file && typeof data.feeds_file === 'object') ? data.feeds_file : {};
-        this.feedsList = Array.isArray(this.feedsFile.feeds) ? this.feedsFile.feeds : [];
+        this.feedsList = Array.isArray(this.feedsFile.feeds) ? this.feedsFile.feeds.map(f => ({ ...f })) : [];
+        this.feedsEnabled = this.feedsFile.enabled !== undefined ? !!this.feedsFile.enabled : true;
+        this.feedsAction = this.feedsFile.action || 'block';
         this.formReady = true;
       } catch (e) {
         this.errorBanner = e.message || String(e);
@@ -254,6 +338,77 @@ function threatIntelApp() {
         this.errorBanner = e.message || String(e);
       } finally {
         this.syncing = false;
+      }
+    },
+    resetFeedForm() {
+      this.feedForm = { name: '', type: 'spamhaus_drop', url: '', enabled: true, api_key: '' };
+    },
+    openAddFeed() {
+      this.feedEditingIdx = -1;
+      this.resetFeedForm();
+      this.feedModalOpen = true;
+    },
+    openEditFeed(idx) {
+      const f = this.feedsList[idx];
+      if (!f) return;
+      this.feedEditingIdx = idx;
+      this.feedForm = {
+        name: f.name || '',
+        type: f.type || 'spamhaus_drop',
+        url: f.url || '',
+        enabled: !!f.enabled,
+        api_key: f.api_key || ''
+      };
+      this.feedModalOpen = true;
+    },
+    closeFeedModal() {
+      this.feedModalOpen = false;
+    },
+    applyFeedForm() {
+      const item = {
+        name: String(this.feedForm.name || '').trim(),
+        type: String(this.feedForm.type || '').trim(),
+        url: String(this.feedForm.url || '').trim(),
+        enabled: !!this.feedForm.enabled,
+        api_key: String(this.feedForm.api_key || '').trim()
+      };
+      if (!item.name || !item.type || !item.url) {
+        this.errorBanner = 'Nama, tipe, dan URL feed wajib diisi.';
+        return;
+      }
+      if (this.feedEditingIdx === -1) this.feedsList.push(item);
+      else this.feedsList.splice(this.feedEditingIdx, 1, item);
+      this.closeFeedModal();
+    },
+    toggleFeed(idx) {
+      if (!this.feedsList[idx]) return;
+      this.feedsList[idx].enabled = !this.feedsList[idx].enabled;
+    },
+    deleteFeed(idx) {
+      if (!this.feedsList[idx]) return;
+      this.feedsList.splice(idx, 1);
+    },
+    async saveFeedsConfig() {
+      this.feedsSaving = true;
+      this.errorBanner = '';
+      this.okBanner = '';
+      try {
+        const r = await fetch('/api/threat-intel/feeds', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            enabled: !!this.feedsEnabled,
+            action: this.feedsAction || 'block',
+            feeds: this.feedsList
+          })
+        });
+        if (!r.ok) throw new Error(await r.text() || r.statusText);
+        this.okBanner = 'Feed configuration berhasil disimpan.';
+        await this.load();
+      } catch (e) {
+        this.errorBanner = e.message || String(e);
+      } finally {
+        this.feedsSaving = false;
       }
     }
   };

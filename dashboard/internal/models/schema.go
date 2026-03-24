@@ -24,11 +24,35 @@ type HostConfig struct {
 	LBAlgorithm     string   `json:"lb_algorithm"` // "round_robin" | "least_conn" | "ip_hash"
 	WAFMode         string   `json:"waf_mode"`     // "On" | "Off" | "DetectionOnly"
 	SSLEnabled      bool     `json:"ssl_enabled"`
-	SSLCert         string   `json:"ssl_cert"` // path to .crt file
-	SSLKey          string   `json:"ssl_key"`  // path to .key file
+	SSLCertID       string   `json:"ssl_cert_id,omitempty"` // TLS certificate record (dashboard); resolves to paths
+	SSLCert         string   `json:"ssl_cert"`                // path to .crt file (optional if ssl_cert_id set)
+	SSLKey          string   `json:"ssl_key"`                 // path to .key file
 	HTTP2Enabled    bool     `json:"http2_enabled"`
 	HTTP3Enabled    bool     `json:"http3_enabled"`
 	ExcludePaths    []string `json:"waf_exclude_paths"`
+}
+
+// TLSCertificate — managed TLS cert (Let's Encrypt or custom PEM), stored in BoltDB; files under ssl_certs.
+type TLSCertificate struct {
+	ID        string `json:"id"`
+	Domain    string `json:"domain"`
+	Source    string `json:"source"` // "letsencrypt" | "custom"
+	Email     string `json:"email,omitempty"`
+	CertPath  string `json:"cert_path"`
+	KeyPath   string `json:"key_path"`
+	Issuer    string `json:"issuer,omitempty"`
+	NotAfter  string `json:"not_after,omitempty"` // RFC3339
+	Status    string `json:"status"`              // "active" | "error"
+	ErrorMsg  string `json:"error_msg,omitempty"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+// ACMEAccountData persists Let's Encrypt account key for renewals / repeat issuance.
+type ACMEAccountData struct {
+	Email             string `json:"email"`
+	PrivateKeyPEM     string `json:"private_key_pem"`
+	RegistrationJSON  string `json:"registration_json,omitempty"`
 }
 
 // ── WAF Settings ──────────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ const (
 	keyAdvBot   = "advbot"
 	keyDLP      = "dlp"
 	keyThreatIntel = "threat_intel"
+	keyACME        = "acme_account"
 )
 
 // ── WAF Settings ──────────────────────────────────────────────────────────────
@@ -74,6 +75,18 @@ func GetThreatIntelConfig(db *bolt.DB) models.ThreatIntelConfig {
 
 func SaveThreatIntelConfig(db *bolt.DB, c models.ThreatIntelConfig) error {
 	return put(db, BucketSettings, keyThreatIntel, c)
+}
+
+// ── ACME (Let's Encrypt account key) ─────────────────────────────────────────
+
+func GetACMEAccount(db *bolt.DB) models.ACMEAccountData {
+	var a models.ACMEAccountData
+	_ = get(db, BucketSettings, keyACME, &a)
+	return a
+}
+
+func SaveACMEAccount(db *bolt.DB, a models.ACMEAccountData) error {
+	return put(db, BucketSettings, keyACME, a)
 }
 
 // ── Hourly Stats ──────────────────────────────────────────────────────────────

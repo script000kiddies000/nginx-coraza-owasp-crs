@@ -72,6 +72,13 @@ server {
 {{- end}}
     server_name {{.Domain}};
 
+    location ^~ /.well-known/acme-challenge/ {
+        coraza off;
+        root /var/www/certbot;
+        default_type text/plain;
+        allow all;
+    }
+
     coraza {{if eq .WAFMode "Off"}}off{{else}}on{{end}};
     coraza_rules_file /etc/nginx/coraza/coraza.conf;
 

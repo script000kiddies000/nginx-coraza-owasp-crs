@@ -24,6 +24,7 @@ const (
 	BucketSecurityEvents = "security_events"
 	BucketBotBlocked     = "bot_blocked"
 	BucketDLPEvents      = "dlp_events"
+	BucketTLSCerts       = "tls_certs"
 )
 
 // Open opens the BoltDB file. Creates the file if it does not exist.
@@ -41,6 +42,7 @@ func InitBuckets(db *bolt.DB) error {
 		BucketUsers, BucketSessions, BucketHosts,
 		BucketSettings, BucketStatsHourly, BucketAttackMap, BucketThreatIntel,
 		BucketSecurityEvents, BucketBotBlocked, BucketDLPEvents,
+		BucketTLSCerts,
 	}
 	return db.Update(func(tx *bolt.Tx) error {
 		for _, name := range buckets {
