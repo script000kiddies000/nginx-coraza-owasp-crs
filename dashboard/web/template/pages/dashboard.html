@@ -189,6 +189,8 @@ function dashboardApp() {
     protection: {},
     protectionRows: [],
     _charts: {},
+    _refreshTimer: null,
+    _alive: true,
 
     fmtNum(n) {
       if (n == null || n === '') return '0';
@@ -246,12 +248,18 @@ function dashboardApp() {
     async fetchAnalytics() {
       try {
         const r = await fetch('/api/dashboard/analytics?range=' + encodeURIComponent(this.range));
-        this.analytics = await r.json();
+        if (!r.ok) throw new Error('analytics api status ' + r.status);
+        const payload = await r.json();
+        if (!payload || typeof payload !== 'object' || !payload.time_series) {
+          throw new Error('analytics payload invalid');
+        }
+        this.analytics = payload;
+        await new Promise((r) => requestAnimationFrame(r));
+        this.updateCharts();
       } catch (e) {
-        this.analytics = { summary: {}, time_series: {}, user_clients: [], response_status: [], referers: [], vhosts: [] };
+        // Keep previous charts/data if refresh fails, avoid "flash then disappear".
+        console.warn('[dashboard] fetchAnalytics failed:', e);
       }
-      await new Promise((r) => requestAnimationFrame(r));
-      this.updateCharts();
     },
 
     destroyChart(id) {
@@ -260,8 +268,31 @@ function dashboardApp() {
         delete this._charts[id];
       }
     },
+    canvasReady(id) {
+      const el = document.getElementById(id);
+      return !!(el && el.isConnected && el.ownerDocument === document);
+    },
+    createChartSafe(id, cfg) {
+      const el = document.getElementById(id);
+      if (!el || !el.isConnected) return null;
+      try {
+        return new Chart(el, cfg);
+      } catch (e) {
+        console.warn('[dashboard] chart create failed:', id, e);
+        return null;
+      }
+    },
+    teardown() {
+      this._alive = false;
+      if (this._refreshTimer) {
+        clearInterval(this._refreshTimer);
+        this._refreshTimer = null;
+      }
+      for (const k of Object.keys(this._charts)) this.destroyChart(k);
+    },
 
     updateCharts() {
+      if (!this._alive) return;
       const ts = this.analytics.time_series || {};
       const labels = ts.labels || [];
       const req = ts.requests || [];
@@ -279,9 +310,8 @@ function dashboardApp() {
       };
 
       this.destroyChart('qps');
-      const elQ = document.getElementById('chartQps');
-      if (elQ && labels.length) {
-        this._charts.qps = new Chart(elQ, {
+      if (this.canvasReady('chartQps') && labels.length) {
+        this._charts.qps = this.createChartSafe('chartQps', {
           type: 'bar',
           data: {
             labels,
@@ -292,9 +322,8 @@ function dashboardApp() {
       }
 
       this.destroyChart('req');
-      const elR = document.getElementById('chartRequests');
-      if (elR && labels.length) {
-        this._charts.req = new Chart(elR, {
+      if (this.canvasReady('chartRequests') && labels.length) {
+        this._charts.req = this.createChartSafe('chartRequests', {
           type: 'line',
           data: {
             labels,
@@ -314,9 +343,8 @@ function dashboardApp() {
       }
 
       this.destroyChart('blk');
-      const elB = document.getElementById('chartBlocked');
-      if (elB && labels.length) {
-        this._charts.blk = new Chart(elB, {
+      if (this.canvasReady('chartBlocked') && labels.length) {
+        this._charts.blk = this.createChartSafe('chartBlocked', {
           type: 'line',
           data: {
             labels,
@@ -337,9 +365,8 @@ function dashboardApp() {
 
       const ua = this.analytics.user_clients || [];
       this.destroyChart('ua');
-      const elUA = document.getElementById('chartUA');
-      if (elUA && ua.length) {
-        this._charts.ua = new Chart(elUA, {
+      if (this.canvasReady('chartUA') && ua.length) {
+        this._charts.ua = this.createChartSafe('chartUA', {
           type: 'doughnut',
           data: {
             labels: ua.map((x) => x.label),
@@ -355,9 +382,8 @@ function dashboardApp() {
 
       const st = this.analytics.response_status || [];
       this.destroyChart('st');
-      const elS = document.getElementById('chartStatus');
-      if (elS && st.length) {
-        this._charts.st = new Chart(elS, {
+      if (this.canvasReady('chartStatus') && st.length) {
+        this._charts.st = this.createChartSafe('chartStatus', {
           type: 'doughnut',
           data: {
             labels: st.map((x) => x.label),
@@ -378,9 +404,16 @@ function dashboardApp() {
     },
 
     async init() {
+      this._alive = true;
+      window.addEventListener('pagehide', () => this.teardown(), { once: true });
+      window.addEventListener('beforeunload', () => this.teardown(), { once: true });
       await this.fetchProtection();
       await this.fetchAnalytics();
-      setInterval(() => { this.fetchProtection(); this.fetchAnalytics(); }, 30000);
+      this._refreshTimer = setInterval(() => {
+        if (!this._alive) return;
+        this.fetchProtection();
+        this.fetchAnalytics();
+      }, 30000);
     },
   };
 }
