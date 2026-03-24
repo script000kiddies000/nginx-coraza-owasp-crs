@@ -1,48 +1,34 @@
 {{define "content"}}
 <div class="space-y-5 pb-8" x-data="dashboardApp()" x-init="init()">
-
-  <!-- Title + range filter -->
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
     <h1 class="text-lg font-semibold text-white tracking-tight">Dashboard</h1>
     <div class="flex flex-wrap items-center gap-2 shrink-0">
-      <span class="text-[10px] text-gray-500 uppercase tracking-wider hidden sm:inline mr-1">Range</span>
       <template x-for="opt in [{k:'24h',l:'24 jam'},{k:'7d',l:'7 hari'},{k:'30d',l:'30 hari'}]" :key="opt.k">
-        <button type="button"
-                @click="setRange(opt.k)"
+        <button type="button" @click="setRange(opt.k)"
                 class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border"
-                :class="range === opt.k
-                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                  : 'bg-gray-900 text-gray-400 border-gray-800 hover:text-white hover:border-gray-700'"
+                :class="range === opt.k ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-gray-900 text-gray-400 border-gray-800 hover:text-white hover:border-gray-700'"
                 x-text="opt.l"></button>
       </template>
     </div>
   </div>
 
-  <!-- Top metrics + QPS bar -->
   <div class="grid grid-cols-2 lg:grid-cols-6 gap-3">
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 col-span-1">
-      <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Active hosts</p>
-      <p class="text-2xl font-bold text-white mt-1 tabular-nums" x-text="fmtNum(analytics.summary?.active_hosts)">0</p>
-    </div>
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 col-span-1">
-      <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Unique IP</p>
-      <p class="text-2xl font-bold text-cyan-400 mt-1 tabular-nums" x-text="fmtNum(analytics.summary?.unique_ips)">0</p>
-    </div>
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 col-span-1">
-      <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Request count</p>
-      <p class="text-2xl font-bold text-white mt-1 tabular-nums" x-text="fmtNum(analytics.summary?.request_count)">0</p>
-    </div>
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 col-span-1">
-      <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Blocked</p>
-      <p class="text-2xl font-bold text-rose-400 mt-1 tabular-nums" x-text="fmtNum(analytics.summary?.blocked_count)">0</p>
-    </div>
+    <template x-for="c in topCards" :key="c.k">
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 col-span-1">
+        <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider" x-text="c.l"></p>
+        <p class="text-2xl font-bold mt-1 tabular-nums" :class="c.cls" x-text="fmtNum(c.v())">0</p>
+      </div>
+    </template>
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 col-span-2 min-h-[120px]">
       <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider mb-2">Query per second (avg per bucket)</p>
-      <div class="h-[72px]"><canvas id="chartQps"></canvas></div>
+      <div class="h-[72px] flex items-end gap-[2px]">
+        <template x-for="(v, i) in qpsBars()" :key="'qps-'+i">
+          <div class="flex-1 bg-cyan-500/40 rounded-sm" :style="'height:'+v+'%'"></div>
+        </template>
+      </div>
     </div>
   </div>
 
-  <!-- Protection layers -->
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
     <h2 class="text-xs font-semibold text-white uppercase tracking-wider mb-3">Protection layers</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -50,14 +36,12 @@
         <div class="flex items-center justify-between gap-2 rounded-lg bg-gray-950/60 border border-gray-800/80 px-3 py-2">
           <span class="text-xs text-gray-400" x-text="row.title"></span>
           <span class="text-[11px] font-medium shrink-0 px-2 py-0.5 rounded-full border"
-                :class="badgeClass(row.state)"
-                x-text="row.badge"></span>
+                :class="badgeClass(row.state)" x-text="row.badge"></span>
         </div>
       </template>
     </div>
   </div>
 
-  <!-- Error / block rates -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
       <p class="text-[10px] text-amber-500/90 font-medium uppercase tracking-wider">4xx error</p>
@@ -76,25 +60,35 @@
     </div>
   </div>
 
-  <!-- Line charts -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
       <h2 class="text-xs font-semibold text-white mb-3">Request status</h2>
-      <div class="h-52"><canvas id="chartRequests"></canvas></div>
+      <div class="h-52">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="w-full h-full">
+          <polyline :points="linePoints(analytics.time_series?.requests || [])" fill="none" stroke="#34d399" stroke-width="2" />
+        </svg>
+      </div>
     </div>
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
       <h2 class="text-xs font-semibold text-white mb-3">Blocking status</h2>
-      <div class="h-52"><canvas id="chartBlocked"></canvas></div>
+      <div class="h-52">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="w-full h-full">
+          <polyline :points="linePoints(analytics.time_series?.blocked || [])" fill="none" stroke="#fb7185" stroke-width="2" />
+        </svg>
+      </div>
     </div>
   </div>
 
-  <!-- Donuts -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
       <h2 class="text-xs font-semibold text-white mb-1">User client</h2>
       <p class="text-[10px] text-gray-500 mb-3">Device &amp; browser (parsed from User-Agent)</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-        <div class="h-48 max-w-[220px] mx-auto"><canvas id="chartUA"></canvas></div>
+        <div class="h-48 max-w-[220px] mx-auto flex items-center justify-center">
+          <div class="relative w-36 h-36 rounded-full" :style="'background: conic-gradient('+donutSlices(analytics.user_clients || []).join(',')+')'">
+            <div class="absolute inset-5 rounded-full bg-gray-900 border border-gray-800"></div>
+          </div>
+        </div>
         <div class="space-y-1.5 max-h-48 overflow-y-auto text-[11px] font-mono pr-1">
           <template x-for="row in (analytics.user_clients || [])" :key="row.label">
             <div class="flex justify-between gap-2 text-gray-400">
@@ -102,7 +96,6 @@
               <span class="text-cyan-500/90 shrink-0 tabular-nums" x-text="row.count"></span>
             </div>
           </template>
-          <p x-show="!(analytics.user_clients && analytics.user_clients.length)" class="text-gray-600 py-4">Belum ada data</p>
         </div>
       </div>
     </div>
@@ -110,7 +103,11 @@
       <h2 class="text-xs font-semibold text-white mb-1">Response status</h2>
       <p class="text-[10px] text-gray-500 mb-3">HTTP status — count &amp; ratio</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-        <div class="h-48 max-w-[220px] mx-auto"><canvas id="chartStatus"></canvas></div>
+        <div class="h-48 max-w-[220px] mx-auto flex items-center justify-center">
+          <div class="relative w-36 h-36 rounded-full" :style="'background: conic-gradient('+donutSlices(analytics.response_status || []).join(',')+')'">
+            <div class="absolute inset-5 rounded-full bg-gray-900 border border-gray-800"></div>
+          </div>
+        </div>
         <div class="space-y-1.5 max-h-48 overflow-y-auto text-[11px] font-mono pr-1">
           <template x-for="row in (analytics.response_status || [])" :key="row.label">
             <div class="flex justify-between gap-2 text-gray-400">
@@ -118,13 +115,11 @@
               <span class="text-gray-300 shrink-0 tabular-nums"><span x-text="row.count"></span> <span class="text-gray-600" x-text="'(' + statusRatio(row) + ')'"></span></span>
             </div>
           </template>
-          <p x-show="!(analytics.response_status && analytics.response_status.length)" class="text-gray-600 py-4">Belum ada data</p>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Progress bars -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
       <h2 class="text-xs font-semibold text-white mb-1">Referring application / page</h2>
@@ -137,12 +132,10 @@
               <span class="text-cyan-500/80 shrink-0 tabular-nums" x-text="row.count"></span>
             </div>
             <div class="h-1.5 rounded-full bg-gray-800 overflow-hidden">
-              <div class="h-full rounded-full bg-gradient-to-r from-cyan-600 to-emerald-500 transition-all duration-500"
-                   :style="'width:' + (row.pct || 0) + '%'"></div>
+              <div class="h-full rounded-full bg-gradient-to-r from-cyan-600 to-emerald-500" :style="'width:' + (row.pct || 0) + '%'"></div>
             </div>
           </div>
         </template>
-        <p x-show="!(analytics.referers && analytics.referers.length)" class="text-gray-600 text-sm py-4">Belum ada data</p>
       </div>
     </div>
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
@@ -156,56 +149,33 @@
               <span class="text-emerald-400/80 shrink-0 tabular-nums" x-text="row.count"></span>
             </div>
             <div class="h-1.5 rounded-full bg-gray-800 overflow-hidden">
-              <div class="h-full rounded-full bg-gradient-to-r from-emerald-600 to-cyan-500 transition-all duration-500"
-                   :style="'width:' + (row.pct || 0) + '%'"></div>
+              <div class="h-full rounded-full bg-gradient-to-r from-emerald-600 to-cyan-500" :style="'width:' + (row.pct || 0) + '%'"></div>
             </div>
           </div>
         </template>
-        <p x-show="!(analytics.vhosts && analytics.vhosts.length)" class="text-gray-600 text-sm py-4">Belum ada data</p>
       </div>
     </div>
   </div>
-
-  <p class="text-center text-[11px] text-gray-600">
-    <a href="/security-logs" class="text-emerald-500/80 hover:text-emerald-400">Security logs</a>
-    <span class="mx-2 text-gray-700">·</span>
-    <a href="/event-logs" class="text-emerald-500/80 hover:text-emerald-400">Event logs</a>
-  </p>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 function dashboardApp() {
-  const chartDefaults = {
-    color: '#6b7280',
-    borderColor: '#1f2937',
-    grid: '#1f2937',
-  };
   const donutColors = ['#22d3ee','#34d399','#a78bfa','#fb923c','#f472b6','#facc15','#60a5fa','#4ade80','#f87171','#94a3b8'];
-
   return {
     range: '24h',
     analytics: { summary: {}, time_series: {}, user_clients: [], response_status: [], referers: [], vhosts: [] },
     protection: {},
     protectionRows: [],
-    _charts: {},
     _refreshTimer: null,
-    _alive: true,
+    topCards: [],
 
-    fmtNum(n) {
-      if (n == null || n === '') return '0';
-      return Number(n).toLocaleString();
-    },
-    pct(rate) {
-      if (rate == null || Number.isNaN(rate)) return '0%';
-      return (Number(rate) * 100).toFixed(2) + '%';
-    },
+    fmtNum(n) { return Number(n || 0).toLocaleString(); },
+    pct(rate) { return ((Number(rate || 0) * 100).toFixed(2)) + '%'; },
     statusRatio(row) {
       const t = this.analytics.summary?.request_count || 0;
       if (!t || !row.count) return '0%';
       return ((row.count / t) * 100).toFixed(1) + '%';
     },
-
     badgeClass(state) {
       const s = (state || '').toLowerCase();
       if (s === 'active' || s === 'loaded') return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25';
@@ -214,206 +184,105 @@ function dashboardApp() {
       if (s === 'warn') return 'text-orange-400 bg-orange-500/10 border-orange-500/25';
       return 'text-gray-400 bg-gray-800 border-gray-700';
     },
+    qpsBars() {
+      const arr = this.ensureSeries(this.analytics.time_series?.qps_bars || []);
+      const max = Math.max(1, ...arr);
+      return arr.map((x) => Math.max(3, (x / max) * 100));
+    },
+    linePoints(arr) {
+      const series = this.ensureSeries(arr || []);
+      const max = Math.max(1, ...series);
+      const n = series.length;
+      if (n <= 1) return '0,98 100,98';
+      return series.map((v, i) => {
+        const x = n === 1 ? 0 : (i / (n - 1)) * 100;
+        const y = 100 - ((v / max) * 96 + 2);
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+      }).join(' ');
+    },
+    ensureSeries(arr) {
+      const src = Array.isArray(arr) ? arr.map((v) => Number(v) || 0) : [];
+      if (src.length) return src;
+      // Keep chart shape visible even when API data is empty.
+      const len = this.range === '30d' ? 30 : this.range === '7d' ? 7 : 24;
+      return Array(len).fill(0);
+    },
+    donutSlices(rows) {
+      const list = rows || [];
+      const total = list.reduce((s, r) => s + (Number(r.count) || 0), 0);
+      if (!total) return ['#1f2937 0deg 360deg'];
+      let start = 0;
+      const out = [];
+      list.forEach((r, i) => {
+        const pct = (Number(r.count) || 0) / total;
+        const end = start + pct * 360;
+        out.push(`${donutColors[i % donutColors.length]} ${start.toFixed(2)}deg ${end.toFixed(2)}deg`);
+        start = end;
+      });
+      if (start < 360) out.push(`#1f2937 ${start.toFixed(2)}deg 360deg`);
+      return out;
+    },
 
+    rebuildTopCards() {
+      this.topCards = [
+        { k: 'ah', l: 'Active hosts', cls: 'text-white', v: () => this.analytics.summary?.active_hosts || 0 },
+        { k: 'ui', l: 'Unique IP', cls: 'text-cyan-400', v: () => this.analytics.summary?.unique_ips || 0 },
+        { k: 'rc', l: 'Request count', cls: 'text-white', v: () => this.analytics.summary?.request_count || 0 },
+        { k: 'bc', l: 'Blocked', cls: 'text-rose-400', v: () => this.analytics.summary?.blocked_count || 0 },
+      ];
+    },
     buildProtectionRows() {
       const p = this.protection || {};
       const pick = (k, title, fmt) => {
         const o = p[k] || {};
-        const st = (o.state || '').toLowerCase();
-        let badge = o.detail || o.state || '—';
-        if (fmt) badge = fmt(o);
-        return { key: k, title, state: st, badge };
+        return { key: k, title, state: (o.state || '').toLowerCase(), badge: fmt ? fmt(o) : (o.detail || o.state || '—') };
       };
       this.protectionRows = [
         pick('coraza_waf', 'Coraza WAF', (o) => o.state === 'active' ? 'Active' : o.state === 'detect' ? 'Detection only' : 'Off'),
         pick('owasp_crs', 'OWASP CRS v4', (o) => o.state === 'loaded' ? 'Loaded' : 'Off'),
         pick('geoip', 'GeoIP block', (o) => o.state === 'active' ? 'Active' : 'Inactive'),
-        pick('threat_intel', 'Threat intel', (o) => (o.state === 'active' ? 'Active' : 'Pending')),
+        pick('threat_intel', 'Threat intel', (o) => o.state === 'active' ? 'Active' : 'Pending'),
         pick('tls_ja', 'TLS fingerprint', () => 'JA3 / JA4'),
         pick('dlp', 'DLP rules', () => 'Active'),
       ];
     },
-
     async fetchProtection() {
       try {
         const r = await fetch('/api/dashboard/protection');
+        if (!r.ok) throw new Error('status ' + r.status);
         this.protection = await r.json();
-        this.buildProtectionRows();
-      } catch (e) {
+      } catch (_) {
         this.protection = {};
-        this.buildProtectionRows();
       }
+      this.buildProtectionRows();
     },
-
     async fetchAnalytics() {
       try {
         const r = await fetch('/api/dashboard/analytics?range=' + encodeURIComponent(this.range));
-        if (!r.ok) throw new Error('analytics api status ' + r.status);
+        if (!r.ok) throw new Error('status ' + r.status);
         const payload = await r.json();
-        if (!payload || typeof payload !== 'object' || !payload.time_series) {
-          throw new Error('analytics payload invalid');
-        }
+        if (!payload || typeof payload !== 'object' || !payload.time_series) throw new Error('invalid payload');
         this.analytics = payload;
-        await new Promise((r) => requestAnimationFrame(r));
-        this.updateCharts();
       } catch (e) {
-        // Keep previous charts/data if refresh fails, avoid "flash then disappear".
         console.warn('[dashboard] fetchAnalytics failed:', e);
       }
+      this.rebuildTopCards();
     },
-
-    destroyChart(id) {
-      if (this._charts[id]) {
-        try { this._charts[id].destroy(); } catch (_) {}
-        delete this._charts[id];
-      }
-    },
-    canvasReady(id) {
-      const el = document.getElementById(id);
-      return !!(el && el.isConnected && el.ownerDocument === document);
-    },
-    createChartSafe(id, cfg) {
-      const el = document.getElementById(id);
-      if (!el || !el.isConnected) return null;
-      try {
-        return new Chart(el, cfg);
-      } catch (e) {
-        console.warn('[dashboard] chart create failed:', id, e);
-        return null;
-      }
-    },
-    teardown() {
-      this._alive = false;
-      if (this._refreshTimer) {
-        clearInterval(this._refreshTimer);
-        this._refreshTimer = null;
-      }
-      for (const k of Object.keys(this._charts)) this.destroyChart(k);
-    },
-
-    updateCharts() {
-      if (!this._alive) return;
-      const ts = this.analytics.time_series || {};
-      const labels = ts.labels || [];
-      const req = ts.requests || [];
-      const blk = ts.blocked || [];
-      const qps = ts.qps_bars || [];
-
-      const commonOpts = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: chartDefaults.color, font: { size: 10 } } } },
-        scales: {
-          x: { grid: { color: chartDefaults.grid }, ticks: { color: '#4b5563', maxRotation: 45, font: { size: 9 } } },
-          y: { grid: { color: chartDefaults.grid }, ticks: { color: '#4b5563', font: { size: 9 } }, beginAtZero: true },
-        },
-      };
-
-      this.destroyChart('qps');
-      if (this.canvasReady('chartQps') && labels.length) {
-        this._charts.qps = this.createChartSafe('chartQps', {
-          type: 'bar',
-          data: {
-            labels,
-            datasets: [{ label: 'QPS', data: qps, backgroundColor: 'rgba(34,211,238,0.45)', borderColor: '#22d3ee', borderWidth: 1 }],
-          },
-          options: { ...commonOpts, scales: { x: commonOpts.scales.x, y: { ...commonOpts.scales.y, title: { display: true, text: 'req/s', color: '#6b7280' } } } },
-        });
-      }
-
-      this.destroyChart('req');
-      if (this.canvasReady('chartRequests') && labels.length) {
-        this._charts.req = this.createChartSafe('chartRequests', {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [{
-              label: 'Requests',
-              data: req,
-              borderColor: '#34d399',
-              backgroundColor: 'rgba(52,211,153,0.08)',
-              fill: true,
-              tension: 0.35,
-              pointRadius: 0,
-              borderWidth: 2,
-            }],
-          },
-          options: commonOpts,
-        });
-      }
-
-      this.destroyChart('blk');
-      if (this.canvasReady('chartBlocked') && labels.length) {
-        this._charts.blk = this.createChartSafe('chartBlocked', {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [{
-              label: 'Blocked (4xx+)',
-              data: blk,
-              borderColor: '#fb7185',
-              backgroundColor: 'rgba(251,113,133,0.08)',
-              fill: true,
-              tension: 0.35,
-              pointRadius: 0,
-              borderWidth: 2,
-            }],
-          },
-          options: commonOpts,
-        });
-      }
-
-      const ua = this.analytics.user_clients || [];
-      this.destroyChart('ua');
-      if (this.canvasReady('chartUA') && ua.length) {
-        this._charts.ua = this.createChartSafe('chartUA', {
-          type: 'doughnut',
-          data: {
-            labels: ua.map((x) => x.label),
-            datasets: [{ data: ua.map((x) => x.count), backgroundColor: ua.map((_, i) => donutColors[i % donutColors.length]), borderWidth: 0 }],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-          },
-        });
-      }
-
-      const st = this.analytics.response_status || [];
-      this.destroyChart('st');
-      if (this.canvasReady('chartStatus') && st.length) {
-        this._charts.st = this.createChartSafe('chartStatus', {
-          type: 'doughnut',
-          data: {
-            labels: st.map((x) => x.label),
-            datasets: [{ data: st.map((x) => x.count), backgroundColor: st.map((_, i) => donutColors[(i + 3) % donutColors.length]), borderWidth: 0 }],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-          },
-        });
-      }
-    },
-
     async setRange(k) {
       this.range = k;
       await this.fetchAnalytics();
     },
-
     async init() {
-      this._alive = true;
-      window.addEventListener('pagehide', () => this.teardown(), { once: true });
-      window.addEventListener('beforeunload', () => this.teardown(), { once: true });
+      this.rebuildTopCards();
       await this.fetchProtection();
       await this.fetchAnalytics();
       this._refreshTimer = setInterval(() => {
-        if (!this._alive) return;
         this.fetchProtection();
         this.fetchAnalytics();
       }, 30000);
+      window.addEventListener('pagehide', () => {
+        if (this._refreshTimer) clearInterval(this._refreshTimer);
+      }, { once: true });
     },
   };
 }
