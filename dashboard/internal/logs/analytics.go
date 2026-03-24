@@ -20,6 +20,8 @@ type DashboardAnalytics struct {
 	RespStatus   []LabelCount `json:"response_status"`
 	Referers     []BarRow `json:"referers"`
 	VHosts       []BarRow `json:"vhosts"`
+	GeoRequests  []BarRow `json:"geo_requests"`
+	GeoBlocked   []BarRow `json:"geo_blocked"`
 }
 
 type DashboardSummary struct {
@@ -89,6 +91,8 @@ func BuildDashboardAnalytics(entries []map[string]any, windowStart, windowEnd ti
 	statusCounts := make(map[string]int)
 	refCounts := make(map[string]int)
 	vhostCounts := make(map[string]int)
+	geoReqCounts := make(map[string]int)
+	geoBlkCounts := make(map[string]int)
 
 	var err4xx, blocked4xx, err5xx, blockedTotal int
 	for _, e := range filtered {
@@ -100,6 +104,13 @@ func BuildDashboardAnalytics(entries []map[string]any, windowStart, windowEnd ti
 		st := statusCode(e["status"])
 		if st >= 400 {
 			blockedTotal++
+		}
+		cc := normalizeCountryCode(str(e["country"]))
+		if cc != "" {
+			geoReqCounts[cc]++
+			if st >= 400 {
+				geoBlkCounts[cc]++
+			}
 		}
 		if st >= 400 && st < 500 {
 			err4xx++
@@ -151,6 +162,8 @@ func BuildDashboardAnalytics(entries []map[string]any, windowStart, windowEnd ti
 	out.RespStatus = topLabelCounts(statusCounts, 12)
 	out.Referers = topBarRows(refCounts, 10)
 	out.VHosts = topBarRows(vhostCounts, 10)
+	out.GeoRequests = topBarRowsWithTotal(geoReqCounts, n, 240)
+	out.GeoBlocked = topBarRowsWithTotal(geoBlkCounts, blockedTotal, 240)
 
 	return out
 }
@@ -319,6 +332,41 @@ func topBarRows(m map[string]int, limit int) []BarRow {
 		out = append(out, BarRow{Label: x.Label, Count: x.Count, Pct: pct})
 	}
 	return out
+}
+
+func topBarRowsWithTotal(m map[string]int, total int, limit int) []BarRow {
+	type kv struct{ k string; v int }
+	var list []kv
+	for k, v := range m {
+		list = append(list, kv{k, v})
+	}
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].v != list[j].v {
+			return list[i].v > list[j].v
+		}
+		return list[i].k < list[j].k
+	})
+	if limit > 0 && len(list) > limit {
+		list = list[:limit]
+	}
+	out := make([]BarRow, 0, len(list))
+	base := float64(total)
+	if base <= 0 {
+		base = 1
+	}
+	for _, x := range list {
+		pct := math.Round((float64(x.v)/base)*1000) / 10
+		out = append(out, BarRow{Label: x.k, Count: x.v, Pct: pct})
+	}
+	return out
+}
+
+func normalizeCountryCode(s string) string {
+	s = strings.TrimSpace(strings.ToUpper(s))
+	if len(s) != 2 || s == "--" || s == "ZZ" {
+		return ""
+	}
+	return s
 }
 
 func parseEntryTime(e map[string]any) time.Time {
