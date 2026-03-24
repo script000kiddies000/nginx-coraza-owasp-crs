@@ -21,11 +21,7 @@
     </template>
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 col-span-2 min-h-[120px]">
       <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider mb-2">Query per second (avg per bucket)</p>
-      <div class="h-[72px] flex items-end gap-[2px]">
-        <template x-for="(v, i) in qpsBars()" :key="'qps-'+i">
-          <div class="flex-1 bg-cyan-500/40 rounded-sm" :style="'height:'+v+'%'"></div>
-        </template>
-      </div>
+      <div id="chartQps" class="h-[72px]"></div>
     </div>
   </div>
 
@@ -63,19 +59,11 @@
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
       <h2 class="text-xs font-semibold text-white mb-3">Request status</h2>
-      <div class="h-52">
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="w-full h-full">
-          <polyline :points="linePoints(analytics.time_series?.requests || [])" fill="none" stroke="#34d399" stroke-width="2" />
-        </svg>
-      </div>
+      <div id="chartRequests" class="h-52"></div>
     </div>
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
       <h2 class="text-xs font-semibold text-white mb-3">Blocking status</h2>
-      <div class="h-52">
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="w-full h-full">
-          <polyline :points="linePoints(analytics.time_series?.blocked || [])" fill="none" stroke="#fb7185" stroke-width="2" />
-        </svg>
-      </div>
+      <div id="chartBlocked" class="h-52"></div>
     </div>
   </div>
 
@@ -84,11 +72,7 @@
       <h2 class="text-xs font-semibold text-white mb-1">User client</h2>
       <p class="text-[10px] text-gray-500 mb-3">Device &amp; browser (parsed from User-Agent)</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-        <div class="h-48 max-w-[220px] mx-auto flex items-center justify-center">
-          <div class="relative w-36 h-36 rounded-full" :style="'background: conic-gradient('+donutSlices(analytics.user_clients || []).join(',')+')'">
-            <div class="absolute inset-5 rounded-full bg-gray-900 border border-gray-800"></div>
-          </div>
-        </div>
+        <div id="chartUA" class="h-48 max-w-[220px] mx-auto w-full"></div>
         <div class="space-y-1.5 max-h-48 overflow-y-auto text-[11px] font-mono pr-1">
           <template x-for="row in (analytics.user_clients || [])" :key="row.label">
             <div class="flex justify-between gap-2 text-gray-400">
@@ -103,11 +87,7 @@
       <h2 class="text-xs font-semibold text-white mb-1">Response status</h2>
       <p class="text-[10px] text-gray-500 mb-3">HTTP status — count &amp; ratio</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-        <div class="h-48 max-w-[220px] mx-auto flex items-center justify-center">
-          <div class="relative w-36 h-36 rounded-full" :style="'background: conic-gradient('+donutSlices(analytics.response_status || []).join(',')+')'">
-            <div class="absolute inset-5 rounded-full bg-gray-900 border border-gray-800"></div>
-          </div>
-        </div>
+        <div id="chartStatus" class="h-48 max-w-[220px] mx-auto w-full"></div>
         <div class="space-y-1.5 max-h-48 overflow-y-auto text-[11px] font-mono pr-1">
           <template x-for="row in (analytics.response_status || [])" :key="row.label">
             <div class="flex justify-between gap-2 text-gray-400">
@@ -158,15 +138,24 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 <script>
 function dashboardApp() {
   const donutColors = ['#22d3ee','#34d399','#a78bfa','#fb923c','#f472b6','#facc15','#60a5fa','#4ade80','#f87171','#94a3b8'];
+  const chartBase = {
+    chart: { toolbar: { show: false }, animations: { enabled: false }, foreColor: '#6b7280' },
+    grid: { borderColor: '#1f2937' },
+    tooltip: { theme: 'dark' },
+    legend: { labels: { colors: '#6b7280' } },
+    dataLabels: { enabled: false },
+  };
   return {
     range: '24h',
     analytics: { summary: {}, time_series: {}, user_clients: [], response_status: [], referers: [], vhosts: [] },
     protection: {},
     protectionRows: [],
     _refreshTimer: null,
+    _charts: {},
     topCards: [],
 
     fmtNum(n) { return Number(n || 0).toLocaleString(); },
@@ -184,22 +173,6 @@ function dashboardApp() {
       if (s === 'warn') return 'text-orange-400 bg-orange-500/10 border-orange-500/25';
       return 'text-gray-400 bg-gray-800 border-gray-700';
     },
-    qpsBars() {
-      const arr = this.ensureSeries(this.analytics.time_series?.qps_bars || []);
-      const max = Math.max(1, ...arr);
-      return arr.map((x) => Math.max(3, (x / max) * 100));
-    },
-    linePoints(arr) {
-      const series = this.ensureSeries(arr || []);
-      const max = Math.max(1, ...series);
-      const n = series.length;
-      if (n <= 1) return '0,98 100,98';
-      return series.map((v, i) => {
-        const x = n === 1 ? 0 : (i / (n - 1)) * 100;
-        const y = 100 - ((v / max) * 96 + 2);
-        return `${x.toFixed(2)},${y.toFixed(2)}`;
-      }).join(' ');
-    },
     ensureSeries(arr) {
       const src = Array.isArray(arr) ? arr.map((v) => Number(v) || 0) : [];
       if (src.length) return src;
@@ -207,20 +180,92 @@ function dashboardApp() {
       const len = this.range === '30d' ? 30 : this.range === '7d' ? 7 : 24;
       return Array(len).fill(0);
     },
-    donutSlices(rows) {
-      const list = rows || [];
-      const total = list.reduce((s, r) => s + (Number(r.count) || 0), 0);
-      if (!total) return ['#1f2937 0deg 360deg'];
-      let start = 0;
-      const out = [];
-      list.forEach((r, i) => {
-        const pct = (Number(r.count) || 0) / total;
-        const end = start + pct * 360;
-        out.push(`${donutColors[i % donutColors.length]} ${start.toFixed(2)}deg ${end.toFixed(2)}deg`);
-        start = end;
-      });
-      if (start < 360) out.push(`#1f2937 ${start.toFixed(2)}deg 360deg`);
-      return out;
+    teardownCharts() {
+      for (const k of Object.keys(this._charts)) {
+        try { this._charts[k].destroy(); } catch (_) {}
+      }
+      this._charts = {};
+    },
+    drawCharts() {
+      if (typeof ApexCharts === 'undefined') return;
+      const ts = this.analytics.time_series || {};
+      const labels = (ts.labels && ts.labels.length) ? ts.labels : this.ensureSeries([]).map((_, i) => String(i + 1));
+      const req = this.ensureSeries(ts.requests || []);
+      const blk = this.ensureSeries(ts.blocked || []);
+      const qps = this.ensureSeries(ts.qps_bars || []);
+
+      this.teardownCharts();
+
+      const qpsEl = document.querySelector('#chartQps');
+      if (qpsEl) {
+        this._charts.qps = new ApexCharts(qpsEl, {
+          ...chartBase,
+          chart: { ...chartBase.chart, type: 'bar', height: 72 },
+          series: [{ name: 'QPS', data: qps }],
+          colors: ['#22d3ee'],
+          xaxis: { categories: labels, labels: { show: false }, axisTicks: { show: false }, axisBorder: { show: false } },
+          yaxis: { labels: { show: false } },
+        });
+        this._charts.qps.render();
+      }
+
+      const reqEl = document.querySelector('#chartRequests');
+      if (reqEl) {
+        this._charts.req = new ApexCharts(reqEl, {
+          ...chartBase,
+          chart: { ...chartBase.chart, type: 'line', height: 208 },
+          stroke: { curve: 'smooth', width: 2 },
+          colors: ['#34d399'],
+          series: [{ name: 'Requests', data: req }],
+          xaxis: { categories: labels, labels: { style: { colors: '#6b7280' } } },
+          yaxis: { labels: { style: { colors: '#6b7280' } } },
+        });
+        this._charts.req.render();
+      }
+
+      const blkEl = document.querySelector('#chartBlocked');
+      if (blkEl) {
+        this._charts.blk = new ApexCharts(blkEl, {
+          ...chartBase,
+          chart: { ...chartBase.chart, type: 'line', height: 208 },
+          stroke: { curve: 'smooth', width: 2 },
+          colors: ['#fb7185'],
+          series: [{ name: 'Blocked', data: blk }],
+          xaxis: { categories: labels, labels: { style: { colors: '#6b7280' } } },
+          yaxis: { labels: { style: { colors: '#6b7280' } } },
+        });
+        this._charts.blk.render();
+      }
+
+      const uaRows = (this.analytics.user_clients || []);
+      const uaEl = document.querySelector('#chartUA');
+      if (uaEl) {
+        this._charts.ua = new ApexCharts(uaEl, {
+          ...chartBase,
+          chart: { ...chartBase.chart, type: 'donut', height: 192 },
+          labels: (uaRows.length ? uaRows : [{ label: 'No data', count: 1 }]).map((x) => x.label),
+          series: (uaRows.length ? uaRows : [{ label: 'No data', count: 1 }]).map((x) => Number(x.count) || 0),
+          colors: donutColors,
+          legend: { show: false },
+          stroke: { width: 0 },
+        });
+        this._charts.ua.render();
+      }
+
+      const stRows = (this.analytics.response_status || []);
+      const stEl = document.querySelector('#chartStatus');
+      if (stEl) {
+        this._charts.st = new ApexCharts(stEl, {
+          ...chartBase,
+          chart: { ...chartBase.chart, type: 'donut', height: 192 },
+          labels: (stRows.length ? stRows : [{ label: 'No data', count: 1 }]).map((x) => x.label),
+          series: (stRows.length ? stRows : [{ label: 'No data', count: 1 }]).map((x) => Number(x.count) || 0),
+          colors: donutColors,
+          legend: { show: false },
+          stroke: { width: 0 },
+        });
+        this._charts.st.render();
+      }
     },
 
     rebuildTopCards() {
@@ -267,6 +312,7 @@ function dashboardApp() {
         console.warn('[dashboard] fetchAnalytics failed:', e);
       }
       this.rebuildTopCards();
+      this.$nextTick(() => this.drawCharts());
     },
     async setRange(k) {
       this.range = k;
@@ -282,6 +328,7 @@ function dashboardApp() {
       }, 30000);
       window.addEventListener('pagehide', () => {
         if (this._refreshTimer) clearInterval(this._refreshTimer);
+        this.teardownCharts();
       }, { once: true });
     },
   };
