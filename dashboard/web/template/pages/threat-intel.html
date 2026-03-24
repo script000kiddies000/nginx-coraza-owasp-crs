@@ -12,9 +12,9 @@
               class="text-sm font-medium text-gray-300 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg transition-colors">
         Refresh
       </button>
-      <button type="button" @click="refreshFromDisk()" :disabled="syncing"
+      <button type="button" @click="syncNow()" :disabled="syncing"
               class="text-sm font-medium text-sky-400 border border-sky-500/30 hover:bg-sky-500/10 px-3 py-2 rounded-lg transition-colors disabled:opacity-50">
-        <span x-show="!syncing">Muat ulang dari ip_rules</span>
+        <span x-show="!syncing">Sync sekarang</span>
         <span x-show="syncing">…</span>
       </button>
     </div>
@@ -239,7 +239,7 @@ function threatIntelApp() {
         this.saving = false;
       }
     },
-    async refreshFromDisk() {
+    async syncNow() {
       this.syncing = true;
       this.errorBanner = '';
       this.okBanner = '';

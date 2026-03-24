@@ -13,7 +13,9 @@ import (
 	bolt "go.etcd.io/bbolt"
 
 	"flux-waf/internal/models"
+	"flux-waf/internal/nginx"
 	"flux-waf/internal/store"
+	"flux-waf/internal/threatintel"
 )
 
 const (
@@ -260,17 +262,37 @@ func processLogEntry(db *bolt.DB, entry map[string]any) {
 // threatIntelSync syncs threat intelligence feeds every 24 hours.
 // Full implementation: Fase 5.
 func threatIntelSync(db *bolt.DB) {
-	// Initial delay: wait 1 minute before first sync (let nginx warm up).
-	time.Sleep(time.Minute)
 	for {
+		now := time.Now()
+		next := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
+		time.Sleep(time.Until(next))
+
 		cfg := store.GetThreatIntelConfig(db)
 		if cfg.Enabled {
-			log.Println("[workers] threat intel sync — not yet implemented (Fase 5)")
+			ipPath := threatintel.DefaultIPRulesPath
+			if p := os.Getenv("FLUX_THREAT_INTEL_IP_RULES"); p != "" {
+				ipPath = p
+			}
+			jsonPath := threatintel.DefaultJSONPath
+			if p := os.Getenv("FLUX_THREAT_INTEL_JSON"); p != "" {
+				jsonPath = p
+			}
+			res, err := threatintel.SyncFeeds(cfg, jsonPath, ipPath)
+			if err != nil {
+				log.Printf("[workers] threat intel sync failed: %v", err)
+				continue
+			}
+			if err := nginx.ReloadNginx(); err != nil {
+				log.Printf("[workers] threat intel nginx reload failed: %v", err)
+				continue
+			}
+			cfg.LastSync = res.LastSync
+			cfg.IPCount = res.IPCount
+			if err := store.SaveThreatIntelConfig(db, cfg); err != nil {
+				log.Printf("[workers] save threat intel config failed: %v", err)
+				continue
+			}
+			log.Printf("[workers] threat intel synced at midnight, total deny: %d", res.IPCount)
 		}
-		interval := time.Duration(cfg.UpdateInterval) * time.Hour
-		if interval == 0 {
-			interval = 24 * time.Hour
-		}
-		time.Sleep(interval)
 	}
 }

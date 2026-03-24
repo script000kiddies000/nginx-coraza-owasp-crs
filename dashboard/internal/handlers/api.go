@@ -563,23 +563,28 @@ func (app *App) APIGetThreatIntelStatus(w http.ResponseWriter, r *http.Request) 
 
 func (app *App) APIForceSyncIntel(w http.ResponseWriter, r *http.Request) {
 	ipPath := threatIntelIPRulesPath()
-	info := threatintel.ReadIPRulesInfo(ipPath, 1)
+	jsonPath := threatIntelJSONPath()
 	cfg := store.GetThreatIntelConfig(app.DB)
-	if info.LastSyncLine != "" && info.LastSyncLine != "Never" {
-		cfg.LastSync = info.LastSyncLine
-	} else {
-		cfg.LastSync = time.Now().Format(time.RFC3339) + " (refresh — feed sync belum dijalankan)"
+	res, err := threatintel.SyncFeeds(cfg, jsonPath, ipPath)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	cfg.IPCount = info.DenyCount
+	if err := nginx.ReloadNginx(); err != nil {
+		jsonError(w, "sync done but nginx reload failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	cfg.LastSync = res.LastSync
+	cfg.IPCount = res.IPCount
 	if err := store.SaveThreatIntelConfig(app.DB, cfg); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	jsonOK(w, map[string]any{
 		"ok":         true,
-		"message":    "Status dimuat ulang dari ip_rules.conf. Untuk sync penuh jalankan: python3 scripts/sync_threat_intel.py (di host).",
+		"message":    "Threat intel sync sukses (feeds fetched, ip_rules.conf updated, nginx reloaded).",
 		"last_sync":  cfg.LastSync,
-		"deny_count": info.DenyCount,
+		"deny_count": cfg.IPCount,
 	})
 }
 
