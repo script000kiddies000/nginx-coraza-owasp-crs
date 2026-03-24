@@ -12,16 +12,20 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-2 lg:grid-cols-6 gap-3">
+  <div class="grid grid-cols-2 xl:grid-cols-12 gap-3">
     <template x-for="c in topCards" :key="c.k">
-      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 col-span-1">
+      <div class="bg-gradient-to-b from-gray-900 to-gray-900/70 border border-gray-800 rounded-xl p-4 col-span-1 xl:col-span-2 min-h-[130px] flex flex-col justify-between shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
         <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider" x-text="c.l"></p>
-        <p class="text-2xl font-bold mt-1 tabular-nums" :class="c.cls" x-text="fmtNum(c.v())">0</p>
+        <p class="text-3xl font-bold mt-1 tabular-nums leading-none" :class="c.cls" x-text="fmtNum(c.v())">0</p>
+        <p class="text-[10px] text-gray-600 mt-1" x-text="c.sub || 'Live'"></p>
       </div>
     </template>
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 col-span-2 min-h-[120px]">
-      <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider mb-2">Query per second (avg per bucket)</p>
-      <div id="chartQps" class="h-[72px]"></div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 col-span-2 xl:col-span-4 min-h-[130px] flex flex-col">
+      <div class="flex items-center justify-between mb-1.5">
+        <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Query per second (avg per bucket)</p>
+        <span class="text-xs font-mono text-cyan-400/90" x-text="(analytics.summary?.qps_avg ?? 0).toFixed(3) + ' req/s'"></span>
+      </div>
+      <div id="chartQps" class="h-[96px] mt-auto"></div>
     </div>
   </div>
 
@@ -39,17 +43,17 @@
   </div>
 
   <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 min-h-[118px] flex flex-col justify-between">
       <p class="text-[10px] text-amber-500/90 font-medium uppercase tracking-wider">4xx error</p>
       <p class="text-2xl font-bold text-white mt-1 tabular-nums" x-text="fmtNum(analytics.summary?.error_4xx)">0</p>
       <p class="text-xs text-gray-500 mt-1">Error rate <span class="text-amber-400 font-mono" x-text="pct(analytics.summary?.error_4xx_rate)">0%</span></p>
     </div>
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 min-h-[118px] flex flex-col justify-between">
       <p class="text-[10px] text-orange-400 font-medium uppercase tracking-wider">4xx blocked</p>
       <p class="text-2xl font-bold text-white mt-1 tabular-nums" x-text="fmtNum(analytics.summary?.blocked_4xx)">0</p>
       <p class="text-xs text-gray-500 mt-1">Blocked rate <span class="text-orange-300 font-mono" x-text="pct(analytics.summary?.blocked_4xx_rate)">0%</span></p>
     </div>
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 min-h-[118px] flex flex-col justify-between">
       <p class="text-[10px] text-rose-400 font-medium uppercase tracking-wider">5xx error</p>
       <p class="text-2xl font-bold text-white mt-1 tabular-nums" x-text="fmtNum(analytics.summary?.error_5xx)">0</p>
       <p class="text-xs text-gray-500 mt-1">Error rate <span class="text-rose-300 font-mono" x-text="pct(analytics.summary?.error_5xx_rate)">0%</span></p>
@@ -193,6 +197,7 @@ function dashboardApp() {
       const req = this.ensureSeries(ts.requests || []);
       const blk = this.ensureSeries(ts.blocked || []);
       const qps = this.ensureSeries(ts.qps_bars || []);
+      const qpsViz = qps.map((v) => v > 0 ? Math.max(v, 0.03) : 0);
 
       this.teardownCharts();
 
@@ -200,11 +205,17 @@ function dashboardApp() {
       if (qpsEl) {
         this._charts.qps = new ApexCharts(qpsEl, {
           ...chartBase,
-          chart: { ...chartBase.chart, type: 'bar', height: 72 },
-          series: [{ name: 'QPS', data: qps }],
+          chart: { ...chartBase.chart, type: 'bar', height: 104 },
+          series: [{ name: 'QPS', data: qpsViz }],
           colors: ['#22d3ee'],
+          plotOptions: {
+            bar: {
+              columnWidth: '58%',
+              borderRadius: 2,
+            },
+          },
           xaxis: { categories: labels, labels: { show: false }, axisTicks: { show: false }, axisBorder: { show: false } },
-          yaxis: { labels: { show: false } },
+          yaxis: { min: 0, forceNiceScale: true, labels: { show: false } },
         });
         this._charts.qps.render();
       }
@@ -270,10 +281,10 @@ function dashboardApp() {
 
     rebuildTopCards() {
       this.topCards = [
-        { k: 'ah', l: 'Active hosts', cls: 'text-white', v: () => this.analytics.summary?.active_hosts || 0 },
-        { k: 'ui', l: 'Unique IP', cls: 'text-cyan-400', v: () => this.analytics.summary?.unique_ips || 0 },
-        { k: 'rc', l: 'Request count', cls: 'text-white', v: () => this.analytics.summary?.request_count || 0 },
-        { k: 'bc', l: 'Blocked', cls: 'text-rose-400', v: () => this.analytics.summary?.blocked_count || 0 },
+        { k: 'ah', l: 'Active hosts', cls: 'text-white', sub: 'Configured vhost', v: () => this.analytics.summary?.active_hosts || 0 },
+        { k: 'ui', l: 'Unique IP', cls: 'text-cyan-400', sub: 'Distinct clients', v: () => this.analytics.summary?.unique_ips || 0 },
+        { k: 'rc', l: 'Request count', cls: 'text-white', sub: 'Within selected range', v: () => this.analytics.summary?.request_count || 0 },
+        { k: 'bc', l: 'Blocked', cls: 'text-rose-400', sub: '4xx security responses', v: () => this.analytics.summary?.blocked_count || 0 },
       ];
     },
     buildProtectionRows() {
