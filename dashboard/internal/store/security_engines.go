@@ -31,6 +31,10 @@ func GetWPSecurityConfig(db *bolt.DB) models.WPSecurityConfig {
 			BlockUploadsPHP:     true,
 			BlockAuthorEnum:     true,
 			BlockScannerUA:      true,
+			StripAssetVersion:   true,
+			HidePoweredBy:       true,
+			RateLimitLogin:      true,
+			RemindFileEdit:      true,
 		}
 	}
 	return c

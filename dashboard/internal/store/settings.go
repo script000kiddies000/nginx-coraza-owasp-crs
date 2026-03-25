@@ -50,9 +50,68 @@ func SaveAdvBotConfig(db *bolt.DB, c models.AdvBotConfig) error {
 
 // ── DLP Config ────────────────────────────────────────────────────────────────
 
+func defaultDLPPatterns() []string {
+	return []string{
+		"DLP: Credit Card Number",
+		"DLP: Social Security Number",
+		"DLP: API Key / Bearer Token",
+		"DLP: AWS Access Key",
+		"DLP: Private Key (PEM)",
+		"DLP: Password field (audit only)",
+		"DLP: JWT Token (audit only)",
+	}
+}
+
+func defaultDLPConfig() models.DLPConfig {
+	return models.DLPConfig{
+		DLPEnabled:           true,
+		DLPActive:            true,
+		InspectRequestBody:   true,
+		InspectResponseBody:  true,
+		MaxBodySizeKB:        12800,
+		AlertOnBlock:         true,
+		ConfigVersion:        1,
+		DLPPatterns:          defaultDLPPatterns(),
+	}
+}
+
+func normalizeDLPConfig(c *models.DLPConfig) {
+	if c.ConfigVersion < 1 {
+		if c.MaxBodySizeKB <= 0 {
+			c.MaxBodySizeKB = 12800
+		}
+		c.InspectRequestBody = true
+		c.InspectResponseBody = true
+		c.AlertOnBlock = true
+		c.ConfigVersion = 1
+	}
+	if c.MaxBodySizeKB <= 0 {
+		c.MaxBodySizeKB = 12800
+	}
+	if c.MaxBodySizeKB < 64 {
+		c.MaxBodySizeKB = 64
+	}
+	if c.MaxBodySizeKB > 524288 {
+		c.MaxBodySizeKB = 524288
+	}
+	if len(c.DLPPatterns) == 0 {
+		c.DLPPatterns = defaultDLPPatterns()
+	}
+}
+
 func GetDLPConfig(db *bolt.DB) models.DLPConfig {
 	var c models.DLPConfig
-	_ = get(db, BucketSettings, keyDLP, &c)
+	err := get(db, BucketSettings, keyDLP, &c)
+	if err == ErrNotFound {
+		def := defaultDLPConfig()
+		_ = put(db, BucketSettings, keyDLP, def)
+		return def
+	}
+	if err != nil {
+		return defaultDLPConfig()
+	}
+	normalizeDLPConfig(&c)
+	_ = put(db, BucketSettings, keyDLP, c)
 	return c
 }
 

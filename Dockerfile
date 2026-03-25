@@ -169,6 +169,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /flux-waf ./cmd/flux-w
 # ==============================================================================
 FROM debian:bookworm-slim
 
+# Waktu container: WIB (Jakarta) — nginx log, Go dashboard, dll.
+ENV TZ=Asia/Jakarta
+
 ARG S6_OVERLAY_VERSION=3.2.0.0
 
 # Runtime dependencies saja (tidak ada -dev packages)
@@ -180,9 +183,10 @@ ARG S6_OVERLAY_VERSION=3.2.0.0
 #   libgd3     → ngx_http_image_filter_module.so
 #   libxslt1.1 → ngx_http_xslt_filter_module.so
 #   libxml2    → dependency libxslt1.1
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libpcre3 zlib1g libssl3 ca-certificates openssl libmaxminddb0 \
-    curl xz-utils \
+    curl xz-utils tzdata \
+    && ln -snf /usr/share/zoneinfo/Asia/Jakarta /etc/localtime \
     && ARCH=$(uname -m) \
     && curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" \
        | tar xJf - -C / \

@@ -1,41 +1,135 @@
 {{define "content"}}
 <div class="w-full min-h-[calc(100vh-6.5rem)] flex flex-col space-y-6" x-data="dlpApp()" x-init="init()">
-  <p class="text-gray-400 text-sm">
-    Konfigurasi disimpan di database. Aturan nyata ada di <span class="font-mono text-gray-500">/etc/nginx/coraza/custom/dlp-rules.conf</span> (edit di volume).
-    Event DLP diisi otomatis jika pesan audit mengandung <span class="font-mono">DLP</span>.
-  </p>
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+    <div class="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+      <div class="text-xs uppercase tracking-wide text-gray-500">Plugin Status</div>
+      <div class="mt-1 text-lg font-semibold" :class="form.dlp_enabled ? 'text-emerald-400' : 'text-rose-400'" x-text="form.dlp_enabled ? 'Enabled' : 'Disabled'"></div>
+    </div>
+    <div class="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+      <div class="text-xs uppercase tracking-wide text-gray-500">Rules Active</div>
+      <div class="mt-1 text-lg font-semibold" :class="form.dlp_active ? 'text-emerald-400' : 'text-amber-400'" x-text="form.dlp_active ? 'Active' : 'Inactive'"></div>
+    </div>
+    <div class="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+      <div class="text-xs uppercase tracking-wide text-gray-500">Total Patterns</div>
+      <div class="mt-1 text-lg font-semibold text-cyan-400" x-text="catalogRows().length"></div>
+    </div>
+    <div class="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+      <div class="text-xs uppercase tracking-wide text-gray-500">Detection Events</div>
+      <div class="mt-1 text-lg font-semibold text-violet-400" x-text="events.length"></div>
+    </div>
+  </div>
 
   <div x-show="msgOk" x-cloak class="text-sm text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-lg px-4 py-2" x-text="msgOk"></div>
   <div x-show="msgErr" x-cloak class="text-sm text-rose-400 border border-rose-500/30 bg-rose-500/10 rounded-lg px-4 py-2" x-text="msgErr"></div>
 
-  <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-4">
-    <h2 class="text-sm font-semibold text-white">Kebijakan</h2>
-    <label class="flex items-center gap-3 cursor-pointer">
-      <input type="checkbox" x-model="form.dlp_enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
-      <span class="text-sm text-gray-300">DLP enabled (flag operasional)</span>
-    </label>
-    <label class="flex items-center gap-3 cursor-pointer">
-      <input type="checkbox" x-model="form.dlp_active" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
-      <span class="text-sm text-gray-300">DLP active</span>
-    </label>
-    <label class="flex items-center gap-3 cursor-pointer">
-      <input type="checkbox" x-model="form.auto_quarantine" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
-      <span class="text-sm text-gray-300">Auto quarantine (ekspansi nanti)</span>
-    </label>
-    <div>
-      <label class="text-xs text-gray-500 uppercase">Pola / label (satu per baris, untuk dokumentasi)</label>
-      <textarea x-model="patternsText" rows="4" class="w-full mt-1 font-mono text-sm bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-gray-200"></textarea>
+  <div class="grid grid-cols-1 xl:grid-cols-5 gap-5">
+    <div class="xl:col-span-3 rounded-xl border border-gray-800 bg-gray-900/40 p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-white">Pattern Catalog</h2>
+        <span class="text-xs text-gray-500">Default pattern akan otomatis diinisialisasi jika config belum ada.</span>
+      </div>
+      <div class="overflow-x-auto rounded-lg border border-gray-800">
+        <table class="w-full text-xs min-w-[980px]">
+          <thead class="bg-gray-950/80 text-gray-400 uppercase">
+            <tr>
+              <th class="text-left px-3 py-2">Type</th>
+              <th class="text-left px-3 py-2">Name</th>
+              <th class="text-left px-3 py-2">Raw Pattern</th>
+              <th class="text-left px-3 py-2">Severity</th>
+              <th class="text-left px-3 py-2">Action</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-800">
+            <template x-for="(row, i) in catalogRows()" :key="row.name + i">
+              <tr class="bg-gray-900/20">
+                <td class="px-3 py-2 whitespace-nowrap">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border whitespace-nowrap leading-none"
+                        :class="row.builtin ? 'text-emerald-300 border-emerald-400/40 bg-emerald-500/10' : 'text-cyan-300 border-cyan-400/40 bg-cyan-500/10'"
+                        x-text="row.builtin ? 'BUILT-IN' : 'CUSTOM'"></span>
+                </td>
+                <td class="px-3 py-2 text-gray-200" x-text="row.name"></td>
+                <td class="px-3 py-2 font-mono text-gray-300 break-all" x-text="row.rawPattern"></td>
+                <td class="px-3 py-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold border"
+                        :class="severityClass(row.severity)" x-text="row.severity"></span>
+                </td>
+                <td class="px-3 py-2 text-gray-300" x-text="row.action"></td>
+              </tr>
+            </template>
+            <tr x-show="!catalogRows().length">
+              <td colspan="5" class="px-3 py-6 text-center text-gray-500">Belum ada pattern.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-4 space-y-2">
+        <label class="text-xs text-gray-500 uppercase">Tambah custom pattern (label/regex)</label>
+        <div class="flex gap-2">
+          <input type="text" x-model.trim="newPattern" placeholder="contoh: (?i)internal_token_[A-Za-z0-9]{24,}"
+                 class="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200 font-mono">
+          <button type="button" @click="addPattern()"
+                  class="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold">Add</button>
+        </div>
+        <div class="flex flex-wrap gap-2" x-show="customPatterns.length">
+          <template x-for="(p, i) in customPatterns" :key="p + i">
+            <button type="button" @click="removePattern(i)"
+                    class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs bg-gray-800 hover:bg-gray-700 text-cyan-200">
+              <span class="font-mono" x-text="p"></span><span class="text-rose-300">x</span>
+            </button>
+          </template>
+        </div>
+      </div>
     </div>
-    <div class="text-xs text-gray-600 font-mono" x-show="meta.path">
-      <span x-text="meta.path"></span> · <span x-text="meta.mod_time || '—'"></span>
+
+    <div class="xl:col-span-2 rounded-xl border border-gray-800 bg-gray-900/40 p-4 space-y-3.5">
+      <h2 class="text-sm font-semibold text-white">Inspection Settings</h2>
+      <label class="flex items-center justify-between gap-4 cursor-pointer">
+        <div>
+          <div class="text-sm text-gray-300">Inspect Request Body</div>
+          <div class="text-xs text-gray-500">Scan data sent to backend</div>
+        </div>
+        <input type="checkbox" x-model="form.inspect_request_body" class="rounded border-gray-600 bg-gray-800 text-emerald-500 shrink-0">
+      </label>
+      <label class="flex items-center justify-between gap-4 cursor-pointer">
+        <div>
+          <div class="text-sm text-gray-300">Inspect Response Body</div>
+          <div class="text-xs text-gray-500">May impact performance</div>
+        </div>
+        <input type="checkbox" x-model="form.inspect_response_body" class="rounded border-gray-600 bg-gray-800 text-emerald-500 shrink-0">
+      </label>
+      <div>
+        <label class="text-xs text-gray-500 uppercase">Max Body Size (KB)</label>
+        <input type="number" min="64" max="524288" step="1" x-model.number="form.max_body_size_kb"
+               class="w-full mt-1 font-mono text-sm bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-gray-200">
+      </div>
+      <label class="flex items-center justify-between gap-4 cursor-pointer">
+        <div>
+          <div class="text-sm text-gray-300">Alert on Block</div>
+          <div class="text-xs text-gray-500">Deny rule pakai log / nolog</div>
+        </div>
+        <input type="checkbox" x-model="form.alert_on_block" class="rounded border-gray-600 bg-gray-800 text-emerald-500 shrink-0">
+      </label>
+      <label class="flex items-center gap-3 cursor-pointer pt-1 border-t border-gray-800">
+        <input type="checkbox" x-model="form.dlp_enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+        <span class="text-sm text-gray-300">DLP Enabled</span>
+      </label>
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" x-model="form.dlp_active" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+        <span class="text-sm text-gray-300">Rules Active</span>
+      </label>
+      <button type="button" @click="apply()" :disabled="saving"
+              class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold px-5 py-2 rounded-lg">Save Config &amp; Apply to nginx</button>
+      <div class="text-xs text-gray-600 font-mono space-y-1">
+        <div x-show="metaInspection.path"><span class="text-gray-500">inspection</span> <span x-text="metaInspection.path"></span> · <span x-text="metaInspection.mod_time || '—'"></span></div>
+        <div x-show="metaRules.path"><span class="text-gray-500">rules</span> <span x-text="metaRules.path"></span> · <span x-text="metaRules.mod_time || '—'"></span></div>
+      </div>
     </div>
-    <button type="button" @click="apply()" :disabled="saving"
-            class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold px-5 py-2 rounded-lg">Simpan &amp; reload nginx</button>
   </div>
 
   <div class="flex justify-between items-center">
-    <h2 class="text-sm font-semibold text-white">Event DLP</h2>
-    <button type="button" @click="clearEvents()" class="text-xs text-rose-400 hover:underline">Hapus log event</button>
+    <h2 class="text-sm font-semibold text-white">Detection Events</h2>
+    <button type="button" @click="clearEvents()" class="text-xs text-rose-400 hover:underline">Clear All</button>
   </div>
   <div class="rounded-xl border border-gray-800 bg-gray-900/40 overflow-x-auto">
     <table class="w-full text-xs min-w-[640px]">
@@ -66,36 +160,83 @@
 <script>
 function dlpApp() {
   return {
+    builtinPatterns: [
+      { name: 'DLP: Credit Card Number', rawPattern: '\\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12})\\b', severity: 'CRITICAL', auditOnly: false },
+      { name: 'DLP: Social Security Number', rawPattern: '\\b(?:[1-8][0-9]{2}|9(?:[0-8][0-9]|9[0-9]))-(?:[1-9][0-9]|0[1-9])-(?:[1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])\\b', severity: 'CRITICAL', auditOnly: false },
+      { name: 'DLP: API Key / Bearer Token', rawPattern: '(?i)(?:api[_\\-]?key|bearer|access[_\\-]?token|secret)[^\\S\\n]*[:=][^\\S\\n]*[A-Za-z0-9\\-_.~+/]{16,64}', severity: 'CRITICAL', auditOnly: false },
+      { name: 'DLP: AWS Access Key', rawPattern: 'AKIA[0-9A-Z]{16}', severity: 'CRITICAL', auditOnly: false },
+      { name: 'DLP: Private Key (PEM)', rawPattern: '-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----', severity: 'CRITICAL', auditOnly: false },
+      { name: 'DLP: Password field (audit only)', rawPattern: '(?i)\\x22(?:password|passwd|pwd|secret)\\x22\\s*:\\s*\\x22[^\\x22]{4,}\\x22', severity: 'ERROR', auditOnly: true },
+      { name: 'DLP: JWT Token (audit only)', rawPattern: 'eyJ[A-Za-z0-9\\-_]{10,}\\.eyJ[A-Za-z0-9\\-_]{10,}\\.[A-Za-z0-9\\-_.+/]{10,}', severity: 'ERROR', auditOnly: true }
+    ],
     saving: false,
     msgOk: '',
     msgErr: '',
     form: {},
-    patternsText: '',
-    meta: {},
+    customPatterns: [],
+    newPattern: '',
+    metaInspection: {},
+    metaRules: {},
     events: [],
-    parsePat(s) {
-      return String(s || '').split(/[\n]+/).map(x => x.trim()).filter(Boolean);
+    severityClass(sev) {
+      if (sev === 'CRITICAL') return 'text-rose-300 border-rose-400/40 bg-rose-500/10';
+      if (sev === 'ERROR') return 'text-amber-300 border-amber-400/40 bg-amber-500/10';
+      return 'text-gray-300 border-gray-500/40 bg-gray-500/10';
+    },
+    parseCustomPatterns(list) {
+      const builtins = new Set(this.builtinPatterns.map(x => x.name));
+      return (list || []).map(x => String(x || '').trim()).filter(Boolean).filter(x => !builtins.has(x));
+    },
+    catalogRows() {
+      const rows = this.builtinPatterns.map(p => {
+        return {
+          builtin: true,
+          name: p.name,
+          rawPattern: p.rawPattern,
+          severity: p.severity,
+          action: p.auditOnly ? 'PASS + LOG' : (this.form.alert_on_block ? 'BLOCK + LOG' : 'BLOCK + NOLOG')
+        };
+      });
+      return rows.concat(this.customPatterns.map(p => ({
+        builtin: false,
+        name: `Custom: ${p}`,
+        rawPattern: p,
+        severity: 'CRITICAL',
+        action: this.form.alert_on_block ? 'BLOCK + LOG' : 'BLOCK + NOLOG'
+      })));
     },
     async init() {
       await Promise.all([this.loadCfg(), this.loadEvents(), this.loadStatus()]);
     },
     async loadCfg() {
       const c = await fetch('/api/dlp/config').then(r => r.json());
-      this.form = c;
-      this.patternsText = (c.dlp_patterns || []).join('\n');
+      this.form = c || {};
+      if (!Array.isArray(this.form.dlp_patterns)) this.form.dlp_patterns = [];
+      this.customPatterns = this.parseCustomPatterns(this.form.dlp_patterns);
     },
     async loadStatus() {
       const s = await fetch('/api/dlp/status').then(r => r.json());
-      this.meta = s.rules_file || {};
+      this.metaInspection = s.inspection_file || {};
+      this.metaRules = s.rules_file || {};
     },
     async loadEvents() {
       this.events = await fetch('/api/dlp/events?limit=100').then(r => r.json());
+    },
+    addPattern() {
+      const p = String(this.newPattern || '').trim();
+      if (!p) return;
+      if (this.customPatterns.includes(p)) return;
+      this.customPatterns.push(p);
+      this.newPattern = '';
+    },
+    removePattern(i) {
+      this.customPatterns.splice(i, 1);
     },
     async apply() {
       this.saving = true; this.msgOk = ''; this.msgErr = '';
       const body = {
         ...this.form,
-        dlp_patterns: this.parsePat(this.patternsText)
+        dlp_patterns: [...this.builtinPatterns.map(x => x.name), ...this.customPatterns]
       };
       try {
         const r = await fetch('/api/dlp/apply', {
@@ -106,10 +247,13 @@ function dlpApp() {
         const t = await r.text();
         let j = {}; try { j = JSON.parse(t); } catch (_) {}
         if (!r.ok) throw new Error(j.error || t);
-        this.msgOk = 'Disimpan.';
+        this.msgOk = 'Data Guard config berhasil disimpan dan diterapkan.';
         await this.init();
-      } catch (e) { this.msgErr = e.message || String(e); }
-      finally { this.saving = false; }
+      } catch (e) {
+        this.msgErr = e.message || String(e);
+      } finally {
+        this.saving = false;
+      }
     },
     async clearEvents() {
       if (!confirm('Hapus semua event DLP di dashboard?')) return;
@@ -117,7 +261,9 @@ function dlpApp() {
         await fetch('/api/dlp/clear-events', { method: 'POST' });
         this.msgOk = 'Event dikosongkan.';
         await this.loadEvents();
-      } catch (e) { this.msgErr = e.message || String(e); }
+      } catch (e) {
+        this.msgErr = e.message || String(e);
+      }
     }
   };
 }

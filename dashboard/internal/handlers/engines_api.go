@@ -103,13 +103,6 @@ func vpatchRulesPath() string {
 	return "/etc/nginx/coraza/custom/vpatch.rules"
 }
 
-func dlpRulesPath() string {
-	if p := os.Getenv("FLUX_DLP_RULES_PATH"); p != "" {
-		return p
-	}
-	return "/etc/nginx/coraza/custom/dlp-rules.conf"
-}
-
 func (app *App) APIGetVPatchConfig(w http.ResponseWriter, r *http.Request) {
 	cfg := store.GetVirtualPatchConfig(app.DB)
 	w.Header().Set("Content-Type", "application/json")
@@ -163,6 +156,17 @@ func (app *App) APIApplyDLPConfig(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
+	if body.MaxBodySizeKB < 64 {
+		body.MaxBodySizeKB = 64
+	}
+	if body.MaxBodySizeKB > 524288 {
+		body.MaxBodySizeKB = 524288
+	}
+	body.ConfigVersion = 1
+	if err := nginx.WriteDLPConfigFiles(body); err != nil {
+		jsonError(w, "write dlp files: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if err := store.SaveDLPConfig(app.DB, body); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -178,8 +182,9 @@ func (app *App) APIApplyDLPConfig(w http.ResponseWriter, r *http.Request) {
 func (app *App) APIGetDLPStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"config":     store.GetDLPConfig(app.DB),
-		"rules_file": nginx.StatConfigFile(dlpRulesPath()),
+		"config":           store.GetDLPConfig(app.DB),
+		"rules_file":       nginx.StatConfigFile(nginx.FLUXDLPRulesPath()),
+		"inspection_file":  nginx.StatConfigFile(nginx.FLUXDLPInspectionPath()),
 	})
 }
 

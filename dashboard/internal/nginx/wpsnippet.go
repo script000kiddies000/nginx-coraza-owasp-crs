@@ -29,9 +29,13 @@ func WriteWPSecuritySnippet(cfg models.WPSecurityConfig) (path string, err error
 	b.WriteString(path)
 	b.WriteString(";\n\n")
 
-	if !cfg.Enabled {
-		b.WriteString("# Module disabled — no extra rules applied.\n")
-		return path, os.WriteFile(path, []byte(b.String()), 0644)
+	if cfg.HidePoweredBy {
+		b.WriteString("proxy_hide_header X-Powered-By;\n\n")
+	}
+
+	if cfg.RateLimitLogin {
+		b.WriteString("# /wp-login.php only — zone key empty for other URIs (see http{} map $flux_wp_login_key)\n")
+		b.WriteString("limit_req zone=flux_wp_login burst=5 nodelay;\n\n")
 	}
 
 	if cfg.BlockXMLRPC {
@@ -51,6 +55,11 @@ func WriteWPSecuritySnippet(cfg models.WPSecurityConfig) (path string, err error
 	}
 	if cfg.StripAssetVersion {
 		b.WriteString("location ~* \\.(css|js)$ {\n    if ($arg_ver ~* \"[0-9]+\\.[0-9]+\") {\n        rewrite ^(.*)$ $1? permanent;\n    }\n}\n\n")
+	}
+
+	if cfg.RemindFileEdit {
+		b.WriteString("# Reminder — not enforced by nginx: set in wp-config.php:\n")
+		b.WriteString("#   define('DISALLOW_FILE_EDIT', true);\n\n")
 	}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {

@@ -100,10 +100,15 @@ type ThreatIntelConfig struct {
 // ── DLP / Data Guard ──────────────────────────────────────────────────────────
 
 type DLPConfig struct {
-	DLPEnabled     bool     `json:"dlp_enabled"`
-	DLPActive      bool     `json:"dlp_active"`
-	AutoQuarantine bool     `json:"auto_quarantine"`
-	DLPPatterns    []string `json:"dlp_patterns"`
+	DLPEnabled          bool     `json:"dlp_enabled"`
+	DLPActive           bool     `json:"dlp_active"`
+	AutoQuarantine      bool     `json:"auto_quarantine"`
+	InspectRequestBody  bool     `json:"inspect_request_body"`
+	InspectResponseBody bool     `json:"inspect_response_body"`
+	MaxBodySizeKB       int      `json:"max_body_size_kb"`
+	AlertOnBlock        bool     `json:"alert_on_block"`
+	ConfigVersion       int      `json:"config_version"`
+	DLPPatterns         []string `json:"dlp_patterns"`
 }
 
 // ── Virtual Patching (CRS companion / CVE-style rules file) ───────────────────
@@ -118,14 +123,15 @@ type VirtualPatchConfig struct {
 // ── WordPress Security (nginx snippet generation) ───────────────────────────
 
 type WPSecurityConfig struct {
-	Enabled             bool   `json:"enabled"`
 	BlockXMLRPC         bool   `json:"block_xmlrpc"`
 	BlockSensitiveFiles bool   `json:"block_sensitive_files"`
 	BlockUploadsPHP     bool   `json:"block_uploads_php"`
 	BlockAuthorEnum     bool   `json:"block_author_enum"`
 	BlockScannerUA      bool   `json:"block_scanner_ua"`
 	StripAssetVersion   bool   `json:"strip_asset_version"`
-	Notes               string `json:"notes"`
+	HidePoweredBy       bool   `json:"hide_powered_by"`
+	RateLimitLogin      bool   `json:"rate_limit_login"`
+	RemindFileEdit      bool   `json:"remind_file_edit"`
 	LastWritten         string `json:"last_written"`
 }
 
