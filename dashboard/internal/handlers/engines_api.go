@@ -141,10 +141,19 @@ func (app *App) APIReloadVPatch(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) APIVPatchStatus(w http.ResponseWriter, r *http.Request) {
 	cfg := store.GetVirtualPatchConfig(app.DB)
+
+	entries, err := nginx.ReadVPatchEntries(vpatchRulesPath(), 200)
+	if err != nil {
+		// Keep dashboard responsive even if parsing fails.
+		log.Printf("[vpatch] parse entries: %v", err)
+		entries = []models.VirtualPatchEntry{}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"config":     cfg,
 		"rules_file": nginx.StatConfigFile(vpatchRulesPath()),
+		"entries":    entries,
 	})
 }
 

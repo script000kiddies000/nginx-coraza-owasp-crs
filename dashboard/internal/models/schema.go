@@ -120,6 +120,17 @@ type VirtualPatchConfig struct {
 	Notes      string `json:"notes"`
 }
 
+// VirtualPatchEntry is a single CVE block extracted from /etc/nginx/coraza/custom/vpatch.rules.
+// It's read-only for dashboard purposes (catalog / preview).
+type VirtualPatchEntry struct {
+	CVE       string `json:"cve"`
+	Title     string `json:"title"`
+	Severity  string `json:"severity"`
+	RuleID    string `json:"rule_id,omitempty"`
+	RawRx     string `json:"raw_rx,omitempty"`
+	RawRuleID string `json:"raw_rule_id,omitempty"`
+}
+
 // ── WordPress Security (nginx snippet generation) ───────────────────────────
 
 type WPSecurityConfig struct {

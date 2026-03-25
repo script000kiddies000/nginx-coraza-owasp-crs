@@ -125,11 +125,11 @@
       <div id="flux-leaflet-map" class="absolute inset-0 z-0"></div>
       <!-- On small screens, stop globe above the feed panel so it stays visually centered -->
       <div id="flux-globe-container"
-           class="absolute inset-x-0 top-0 bottom-0 z-0 hidden"
-           :class="{ 'max-lg:bottom-[220px]': viewMode === 'globe' }"></div>
+           class="absolute left-0 right-0 top-0 bottom-0 z-0 hidden"
+           :class="{ 'max-lg:bottom-[220px]': viewMode === 'globe', 'lg:right-[380px]': viewMode === 'globe' }"></div>
       <canvas id="flux-globe-canvas"
-              class="absolute inset-x-0 top-0 bottom-0 z-0 hidden"
-              :class="{ 'max-lg:bottom-[220px]': viewMode === 'globe' }"></canvas>
+              class="absolute left-0 right-0 top-0 bottom-0 z-0 hidden"
+              :class="{ 'max-lg:bottom-[220px]': viewMode === 'globe', 'lg:right-[380px]': viewMode === 'globe' }"></canvas>
 
       <!-- Zoom hint -->
       <div class="absolute bottom-3 left-3 z-[400] pointer-events-none text-[10px] text-slate-600 hidden lg:block">
@@ -346,7 +346,8 @@ function attackMapApp() {
       if (el) el.classList.remove('hidden');
 
       if (this.rocketTimer) {
-        clearInterval(this.rocketTimer);
+        // rocketTimer stores requestAnimationFrame id in plane mode.
+        cancelAnimationFrame(this.rocketTimer);
         this.rocketTimer = null;
       }
       this.rocketAnims = [];
@@ -408,15 +409,35 @@ function attackMapApp() {
           weight: 1,
           opacity: 0.95,
         }).addTo(this.layerGroup);
-        const tailLen = 12 + (idx % 5);
-        const trail = L.polyline([], { color, weight: 3, opacity: 0.95, lineCap: 'round' }).addTo(this.layerGroup);
+        // WafX-like: outer glow + inner dashed core.
+        const tailCoreLen = 10 + (idx % 5);
+        const tailGlowLen = tailCoreLen + 10;
+        const trailGlow = L.polyline([], {
+          color,
+          weight: 7,
+          opacity: 0.12,
+          lineCap: 'round',
+        }).addTo(this.layerGroup);
+        const trailCore = L.polyline([], {
+          color,
+          weight: 3,
+          opacity: 0.60,
+          lineCap: 'round',
+          dashArray: '7,7',
+        }).addTo(this.layerGroup);
         this.rocketAnims.push({
           arc,
           dot,
-          trail,
+          trailCore,
+          trailGlow,
           t: idx % arc.length,
           step: speed + (idx % 2),
-          tailLen,
+          tailCoreLen,
+          tailGlowLen,
+          baseRadius: 3.3,
+          pulseAmp: 0.18 + (idx % 4) * 0.05,
+          pulseSpeed: 1.1 + (idx % 5) * 0.18,
+          pulsePhase: (idx % 360) * Math.PI / 180,
         });
 
         L.marker(from, {
@@ -433,24 +454,51 @@ function attackMapApp() {
       });
 
       // Single animation loop for all rocket dots.
-      this.rocketTimer = setInterval(() => {
-        if (this.viewMode !== 'plane') return;
+      const tick = () => {
+        if (this.viewMode !== 'plane') {
+          this.rocketTimer = null;
+          return;
+        }
+        const now = performance.now();
+        const nowSec = now / 1000;
         for (const a of this.rocketAnims) {
           a.t += a.step;
           if (a.t >= a.arc.length) a.t = 0;
           a.dot.setLatLng(a.arc[a.t]);
 
-          // Update rocket tail polyline.
+          // Pulse "head" dot.
+          const pulse = 1 + (a.pulseAmp || 0.2) * Math.sin(nowSec * (a.pulseSpeed || 1) + (a.pulsePhase || 0));
+          const r = Math.max(2.0, (a.baseRadius || 3.3) * pulse);
+          if (a.dot && typeof a.dot.setRadius === 'function') a.dot.setRadius(r);
+
+          // Update tails.
           const len = a.arc.length;
-          const tailLen = Math.min(a.tailLen || 12, len - 1);
-          const tail = [];
-          const start = Math.max(0, a.t - tailLen + 1);
-          for (let idx = start; idx <= a.t; idx++) {
-            tail.push(a.arc[idx]);
+          const tailCoreLen = Math.min(a.tailCoreLen || 12, len - 1);
+          const tailGlowLen = Math.min(a.tailGlowLen || 22, len - 1);
+
+          const tailGlow = [];
+          const startGlow = Math.max(0, a.t - tailGlowLen + 1);
+          for (let idx = startGlow; idx <= a.t; idx++) {
+            tailGlow.push(a.arc[idx]);
           }
-          if (a.trail) a.trail.setLatLngs(tail);
+          if (a.trailGlow) a.trailGlow.setLatLngs(tailGlow);
+
+          const tailCore = [];
+          const startCore = Math.max(0, a.t - tailCoreLen + 1);
+          for (let idx = startCore; idx <= a.t; idx++) {
+            tailCore.push(a.arc[idx]);
+          }
+          if (a.trailCore) {
+            a.trailCore.setLatLngs(tailCore);
+            // DashOffset makes the dashed core feel more "alive".
+            if (typeof a.trailCore.setStyle === 'function') {
+              a.trailCore.setStyle({ dashOffset: -a.t * 0.8 });
+            }
+          }
         }
-      }, 55);
+        this.rocketTimer = requestAnimationFrame(tick);
+      };
+      this.rocketTimer = requestAnimationFrame(tick);
 
       setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 200);
       setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 600);
@@ -770,9 +818,10 @@ function attackMapApp() {
       // Bigger labels on small viewports (angular degrees on globe)
       const labelSize = Math.min(1.15, Math.max(0.55, shortSide / 380));
       const labelDot = Math.min(0.18, Math.max(0.1, labelSize * 0.24));
-      const labelRes = shortSide < 520 ? 5 : 4;
-      const ptRadius = shortSide < 480 ? 0.34 : shortSide < 900 ? 0.28 : 0.24;
-      const arcStroke = shortSide < 480 ? 0.75 : 0.6;
+      // Lower resolutions for performance (heavier point/label tessellation).
+      const labelRes = shortSide < 520 ? 3 : 2;
+      const ptRadius = shortSide < 480 ? 0.30 : shortSide < 900 ? 0.25 : 0.22;
+      const arcStroke = shortSide < 480 ? 0.70 : 0.55;
       // Slightly pull camera back on narrow screens so globe feels centered in the stage
       const povAlt = width < 400 ? 2.65 : width < 640 ? 2.4 : width < 1024 ? 2.25 : 2.1;
 
@@ -780,25 +829,25 @@ function attackMapApp() {
         this.globe3d = Globe()(container)
           .backgroundColor('rgba(0,0,0,0)')
           .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
-          .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
+          // Skip bump map for lighter GPU work; reference "safelIne-like" globe still looks good.
           .atmosphereColor('#67e8f9')
-          .atmosphereAltitude(0.19)
+          .atmosphereAltitude(0.12)
           .arcStroke(arcStroke)
           .arcDashLength(0.42)
           .arcDashGap(0.8)
           .arcDashInitialGap(() => Math.random())
-          .arcDashAnimateTime(1400)
+          .arcDashAnimateTime(1800)
           .arcLabel('tip')
-          .pointAltitude(0.03)
-          .pointResolution(12)
+          .pointAltitude(0.02)
+          .pointResolution(7)
           .pointLabel('tip')
           .labelsData([])
           .labelLat('lat')
           .labelLng('lng')
           .labelText('text')
           .labelColor('color')
-          .labelAltitude(0.02)
-          .labelIncludeDot(true)
+          .labelAltitude(0.015)
+          .labelIncludeDot(false)
           .labelDotOrientation('bottom')
           .labelLabel('text');
       }
@@ -818,7 +867,11 @@ function attackMapApp() {
         0
       );
 
-      const points = (this.points || []).map((p) => {
+      // Reduce point count + arcs count for lighter globe (keeps the "stream" look).
+      const pointCandidates = (this.points || []).slice(0, 80);
+      const arcCandidates = (this.points || []).slice(0, 70);
+
+      const points = pointCandidates.map((p) => {
         const name = this.displayCountryName(p.source_country);
         return {
           lat: Number(p.source_lat),
@@ -828,22 +881,31 @@ function attackMapApp() {
         };
       }).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
 
-      const arcs = (this.points || []).slice(0, 120).map((p) => {
+      const seenArcKeys = new Set();
+      const arcs = [];
+      for (const p of arcCandidates) {
+        const startLat = Number(p.source_lat);
+        const startLng = Number(p.source_lon);
+        const endLat = Number(p.target_lat);
+        const endLng = Number(p.target_lon);
+        if (!Number.isFinite(startLat) || !Number.isFinite(startLng) || !Number.isFinite(endLat) || !Number.isFinite(endLng)) continue;
+        const d = p.domain || 'unknown';
+        const key = `${startLat.toFixed(1)},${startLng.toFixed(1)}->${endLat.toFixed(1)},${endLng.toFixed(1)}|${d}`;
+        if (seenArcKeys.has(key)) continue;
+        seenArcKeys.add(key);
         const color = this.colorForCountry(p.source_country);
         const countryName = this.displayCountryName(p.source_country);
-        return {
-        startLat: Number(p.source_lat),
-        startLng: Number(p.source_lon),
-        endLat: Number(p.target_lat),
-        endLng: Number(p.target_lon),
-        // Keep line color style close to plane mode: same hue, fading tail.
-        color: [color, color + '55'],
-        tip: countryName || 'Unknown',
-        };
-      }).filter((a) =>
-        Number.isFinite(a.startLat) && Number.isFinite(a.startLng) &&
-        Number.isFinite(a.endLat) && Number.isFinite(a.endLng)
-      );
+        arcs.push({
+          startLat,
+          startLng,
+          endLat,
+          endLng,
+          // Keep line color style close to plane mode: same hue, fading tail.
+          color: [color, color + '55'],
+          tip: countryName || 'Unknown',
+        });
+        if (arcs.length >= 55) break;
+      }
 
       const targetCountryCode = (this.points && this.points[0] && this.points[0].target_country)
         ? String(this.points[0].target_country).trim().toUpperCase() : '';
@@ -860,7 +922,7 @@ function attackMapApp() {
 
       // One label per source country (centroid of sample points) + target country label.
       const byCountry = new Map();
-      for (const p of this.points || []) {
+      for (const p of (this.points || []).slice(0, 120)) {
         const code = String(p.source_country || '').trim().toUpperCase();
         if (!code || code === 'ZZ') continue;
         const lat = Number(p.source_lat);
@@ -875,8 +937,10 @@ function attackMapApp() {
         agg.sumLng += lng;
         agg.n += 1;
       }
+      // Keep only top N source country labels (performance + visual cleanliness).
+      const sortedAggs = Array.from(byCountry.values()).sort((a, b) => b.n - a.n).slice(0, 8);
       const countryLabels = [];
-      for (const agg of byCountry.values()) {
+      for (const agg of sortedAggs) {
         const name = this.displayCountryName(agg.code);
         const rgb = this.hexToRgb(this.colorForCountry(agg.code));
         countryLabels.push({

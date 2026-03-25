@@ -1,40 +1,127 @@
 {{define "content"}}
 <div class="w-full min-h-[calc(100vh-6.5rem)] flex flex-col space-y-6" x-data="vpatchApp()" x-init="load()">
+  <div class="grid grid-cols-1 xl:grid-cols-4 gap-3">
+    <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
+      <div class="text-xs uppercase tracking-wide text-gray-500">Rules File</div>
+      <div class="mt-1 font-semibold text-sm text-emerald-400" x-text="meta.path ? 'Ready' : 'Missing'"></div>
+    </div>
+    <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
+      <div class="text-xs uppercase tracking-wide text-gray-500">Total CVE</div>
+      <div class="mt-1 font-semibold text-sm text-cyan-400" x-text="entries.length"></div>
+    </div>
+    <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
+      <div class="text-xs uppercase tracking-wide text-gray-500">Enabled Flag</div>
+      <div class="mt-1 font-semibold text-sm" :class="form.enabled ? 'text-emerald-400' : 'text-rose-400'" x-text="form.enabled ? 'Enabled' : 'Disabled'"></div>
+    </div>
+    <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
+      <div class="text-xs uppercase tracking-wide text-gray-500">Aggressive Flag</div>
+      <div class="mt-1 font-semibold text-sm" :class="form.aggressive ? 'text-emerald-400' : 'text-amber-400'" x-text="form.aggressive ? 'Aggressive' : 'Normal'"></div>
+    </div>
+  </div>
+
   <p class="text-gray-400 text-sm">
-    Aturan virtual patch di-load dari <span class="font-mono text-gray-500">/etc/nginx/coraza/custom/vpatch.rules</span> (lihat <span class="font-mono">coraza.conf</span>).
-    Panel ini menyimpan preferensi di database dan memicu <strong>nginx reload</strong> — isi file CVE tetap Anda kelola di volume config.
+    Virtual patch rules diambil dari <span class="font-mono text-gray-500">/etc/nginx/coraza/custom/vpatch.rules</span>.
+    Dashboard ini menampilkan <strong>preview catalog CVE</strong> (read-only) + menyimpan flag operasional di DB.
   </p>
 
   <div x-show="msgOk" x-cloak class="text-sm text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-lg px-4 py-2" x-text="msgOk"></div>
   <div x-show="msgErr" x-cloak class="text-sm text-rose-400 border border-rose-500/30 bg-rose-500/10 rounded-lg px-4 py-2" x-text="msgErr"></div>
 
-  <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-4" x-show="loaded">
-    <label class="flex items-center gap-3 cursor-pointer">
-      <input type="checkbox" x-model="form.enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
-      <span class="text-sm text-gray-300">Virtual patching dianggap aktif (operasional / monitoring)</span>
-    </label>
-    <label class="flex items-center gap-3 cursor-pointer">
-      <input type="checkbox" x-model="form.aggressive" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
-      <span class="text-sm text-gray-300">Mode agresif (catatan kebijakan — untuk ekspansi rule otomatis nanti)</span>
-    </label>
-    <div>
-      <label class="block text-xs text-gray-500 uppercase mb-1">Catatan internal</label>
-      <textarea x-model="form.notes" rows="3" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200"></textarea>
+  <div class="grid grid-cols-1 xl:grid-cols-5 gap-5" x-show="loaded">
+    <!-- Left: pattern catalog -->
+    <div class="xl:col-span-3 rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-3">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-sm font-semibold text-white">Virtual Patch Catalog</h2>
+        <div class="text-xs text-gray-500 font-mono" x-text="filteredEntries.length + ' / ' + entries.length"></div>
+      </div>
+
+      <div class="flex gap-2">
+        <input
+          type="text"
+          x-model.trim="search"
+          placeholder="Cari CVE atau keyword (mis. MOVEit / 2021-41773 / critical)…"
+          class="flex-1 text-sm bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-gray-200 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+        >
+        <button type="button" @click="search = ''" :disabled="!search" class="px-3 py-2 rounded-lg border border-gray-800 text-sm text-gray-400 hover:bg-gray-800/40 disabled:opacity-40">Clear</button>
+      </div>
+
+      <div class="rounded-lg border border-gray-800 overflow-hidden">
+        <div class="max-h-[520px] overflow-y-auto">
+          <table class="w-full text-xs min-w-[980px]">
+            <thead class="bg-gray-950/80 text-gray-400 uppercase">
+              <tr>
+                <th class="text-left px-3 py-2 whitespace-nowrap">Severity</th>
+                <th class="text-left px-3 py-2 whitespace-nowrap">CVE</th>
+                <th class="text-left px-3 py-2">Title</th>
+                <th class="text-left px-3 py-2">Raw @rx</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800/80">
+              <template x-for="(e, i) in filteredEntries" :key="e.cve + '-' + i">
+                <tr class="bg-gray-900/20 hover:bg-gray-900/40">
+                  <td class="px-3 py-2 whitespace-nowrap">
+                    <span class="px-2 py-0.5 rounded text-[10px] font-semibold border" :class="sevBadgeClass(e.severity)" x-text="e.severity || '—'"></span>
+                  </td>
+                  <td class="px-3 py-2 whitespace-nowrap font-mono text-cyan-400/90" x-text="e.cve"></td>
+                  <td class="px-3 py-2 text-gray-200" x-text="e.title"></td>
+                  <td class="px-3 py-2 text-gray-300 font-mono text-[11px] break-all">
+                    <div class="max-h-16 overflow-auto whitespace-pre-wrap" x-text="e.raw_rx || ''"></div>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="!filteredEntries.length">
+                <td colspan="4" class="px-3 py-10 text-center text-gray-600">Tidak ada hasil.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
-    <div class="text-xs text-gray-600 font-mono space-y-1" x-show="meta.path">
-      <p>File: <span x-text="meta.path"></span></p>
-      <p x-show="meta.mod_time">Diubah: <span x-text="meta.mod_time"></span> · <span x-text="meta.size_bytes"></span> bytes</p>
-      <p x-show="form.last_reload">Reload terakhir (DB): <span x-text="form.last_reload"></span></p>
-    </div>
-    <div class="flex flex-wrap gap-3">
-      <button type="button" @click="apply()" :disabled="saving"
-              class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold px-5 py-2 rounded-lg">Simpan &amp; reload nginx</button>
-      <button type="button" @click="reloadOnly()" :disabled="saving"
-              class="text-sm text-gray-400 border border-gray-700 hover:bg-gray-800 px-4 py-2 rounded-lg">Reload nginx saja</button>
-      <button type="button" @click="load()" class="text-sm text-gray-500 hover:text-gray-300">Refresh status</button>
+
+    <!-- Right: settings -->
+    <div class="xl:col-span-2 rounded-xl border border-gray-800 bg-gray-900/40 p-4 space-y-4">
+      <h2 class="text-sm font-semibold text-white">Virtual Patching Settings</h2>
+
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" x-model="form.enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+        <span class="text-sm text-gray-300">Virtual patching flag operasional</span>
+      </label>
+
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" x-model="form.aggressive" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+        <span class="text-sm text-gray-300">Mode agresif (catatan kebijakan)</span>
+      </label>
+
+      <div>
+        <label class="block text-xs text-gray-500 uppercase mb-1">Catatan internal</label>
+        <textarea x-model="form.notes" rows="4" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200"></textarea>
+      </div>
+
+      <div class="text-xs text-gray-600 font-mono space-y-1">
+        <div x-show="meta.path"><span class="text-gray-500">File</span>: <span x-text="meta.path"></span></div>
+        <div x-show="meta.mod_time"><span class="text-gray-500">Mod</span>: <span x-text="meta.mod_time"></span></div>
+        <div x-show="meta.size !== undefined"><span class="text-gray-500">Size</span>: <span x-text="meta.size"></span> bytes</div>
+        <div x-show="form.last_reload"><span class="text-gray-500">Last DB reload</span>: <span x-text="form.last_reload"></span></div>
+      </div>
+
+      <div class="flex flex-wrap gap-3 pt-1">
+        <button type="button" @click="apply()" :disabled="saving"
+                class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold px-5 py-2 rounded-lg">
+          Save &amp; reload nginx
+        </button>
+        <button type="button" @click="reloadOnly()" :disabled="saving"
+                class="text-sm text-gray-400 border border-gray-700 hover:bg-gray-800 px-4 py-2 rounded-lg">
+          Reload only
+        </button>
+      </div>
+
+      <button type="button" @click="load()" :disabled="saving" class="w-full text-sm text-gray-500 hover:text-gray-300 disabled:opacity-40">
+        Refresh status
+      </button>
     </div>
   </div>
 </div>
+
 <script>
 function vpatchApp() {
   return {
@@ -42,6 +129,8 @@ function vpatchApp() {
     saving: false,
     msgOk: '',
     msgErr: '',
+    entries: [],
+    search: '',
     form: { enabled: false, aggressive: false, notes: '', last_reload: '' },
     meta: {},
     async load() {
@@ -53,10 +142,29 @@ function vpatchApp() {
         ]);
         this.form = { ...this.form, ...cfg };
         this.meta = st.rules_file || {};
+        this.entries = Array.isArray(st.entries) ? st.entries : [];
         this.loaded = true;
       } catch (e) {
         this.msgErr = e.message || String(e);
       }
+    },
+    get filteredEntries() {
+      const q = String(this.search || '').toLowerCase().trim();
+      if (!q) return this.entries;
+      return this.entries.filter(e => {
+        const fields = [
+          e.cve, e.title, e.severity, e.raw_rx
+        ].map(x => String(x || '').toLowerCase()).join(' | ');
+        return fields.includes(q);
+      });
+    },
+    sevBadgeClass(sev) {
+      const s = String(sev || '').toUpperCase();
+      if (s === 'CRITICAL') return 'text-rose-300 border-rose-400/30 bg-rose-500/10';
+      if (s === 'HIGH') return 'text-amber-300 border-amber-400/30 bg-amber-500/10';
+      if (s === 'MEDIUM') return 'text-yellow-300 border-yellow-400/30 bg-yellow-500/10';
+      if (s === 'LOW') return 'text-emerald-300 border-emerald-400/30 bg-emerald-500/10';
+      return 'text-gray-300 border-gray-500/30 bg-gray-500/10';
     },
     async apply() {
       this.saving = true; this.msgOk = ''; this.msgErr = '';
