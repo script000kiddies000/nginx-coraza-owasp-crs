@@ -19,6 +19,12 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	// Static assets — served directly from embedded FS
 	mux.Handle("GET /public/", http.FileServer(http.FS(publicFS())))
 
+	// Browsers request /favicon.ico implicitly; avoid 404 noise in dev (dashboard :9080).
+	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=604800")
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	// ── Auth (no middleware) ───────────────────────────────────────────────
 	mux.HandleFunc("GET /login", app.PageLogin)
 	mux.HandleFunc("POST /api/login", app.APILogin)

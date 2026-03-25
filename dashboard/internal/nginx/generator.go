@@ -84,6 +84,14 @@ server {
 
     include /etc/nginx/snippets/hide-backend-headers.conf;
 
+    # Browsers request /favicon.ico implicitly. Answer locally to avoid proxy storms,
+    # upstream 499s (client closed), and useless Coraza work on static icon traffic.
+    location = /favicon.ico {
+        access_log off;
+        add_header Cache-Control "public, max-age=604800" always;
+        return 204;
+    }
+
 {{- range .ExcludePaths}}
     location {{.}} { coraza off; proxy_pass http://{{upstreamName $.Domain}}; }
 {{- end}}
