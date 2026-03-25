@@ -17,19 +17,46 @@ type Session struct {
 
 // ── Host / Reverse Proxy ──────────────────────────────────────────────────────
 
+// ListenPort represents a single port + protocol the server block listens on.
+type ListenPort struct {
+	Port  int  `json:"port"`
+	HTTPS bool `json:"https"`
+}
+
+// HostConfig holds the full configuration for a managed application / proxy host.
 type HostConfig struct {
-	Domain          string   `json:"domain"`
-	Enabled         bool     `json:"enabled"`
+	Domain      string `json:"domain"`
+	Name        string `json:"name,omitempty"`
+	Enabled     bool   `json:"enabled"`
+
+	// Listen ports (e.g. [{80,false},{443,true}])
+	// Legacy: if empty, defaults to port 80 HTTP.
+	ListenPorts []ListenPort `json:"listen_ports,omitempty"`
+
+	// Mode: "reverse_proxy" | "static" | "redirect"
+	Mode string `json:"mode"`
+
+	// Reverse proxy mode fields
 	UpstreamServers []string `json:"upstream_servers"`
 	LBAlgorithm     string   `json:"lb_algorithm"` // "round_robin" | "least_conn" | "ip_hash"
-	WAFMode         string   `json:"waf_mode"`     // "On" | "Off" | "DetectionOnly"
-	SSLEnabled      bool     `json:"ssl_enabled"`
-	SSLCertID       string   `json:"ssl_cert_id,omitempty"` // TLS certificate record (dashboard); resolves to paths
-	SSLCert         string   `json:"ssl_cert"`                // path to .crt file (optional if ssl_cert_id set)
-	SSLKey          string   `json:"ssl_key"`                 // path to .key file
-	HTTP2Enabled    bool     `json:"http2_enabled"`
-	HTTP3Enabled    bool     `json:"http3_enabled"`
-	ExcludePaths    []string `json:"waf_exclude_paths"`
+
+	// Static files mode
+	StaticRoot string `json:"static_root,omitempty"`
+
+	// Redirect mode
+	RedirectURL  string `json:"redirect_url,omitempty"`
+	RedirectCode int    `json:"redirect_code,omitempty"` // 301 | 302
+
+	// WAF
+	WAFMode      string   `json:"waf_mode"`              // "On" | "Off" | "DetectionOnly"
+	ExcludePaths []string `json:"waf_exclude_paths"`
+
+	// SSL / TLS (resolved at write time from ssl_cert_id)
+	SSLEnabled  bool   `json:"ssl_enabled"`
+	SSLCertID   string `json:"ssl_cert_id,omitempty"`
+	SSLCert     string `json:"ssl_cert"`  // resolved path to .crt
+	SSLKey      string `json:"ssl_key"`   // resolved path to .key
+	HTTP2Enabled bool  `json:"http2_enabled"`
 }
 
 // TLSCertificate — managed TLS cert (Let's Encrypt or custom PEM), stored in BoltDB; files under ssl_certs.

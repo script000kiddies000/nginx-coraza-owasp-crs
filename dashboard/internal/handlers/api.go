@@ -160,38 +160,128 @@ func (app *App) APISaveHost(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	// ── Basic validation ──────────────────────────────────────────────────────
+	h.Domain = strings.TrimSpace(h.Domain)
 	if h.Domain == "" {
 		jsonError(w, "domain is required", http.StatusBadRequest)
 		return
 	}
-	if len(h.UpstreamServers) == 0 {
-		jsonError(w, "at least one upstream server is required", http.StatusBadRequest)
+
+	// Default mode
+	if h.Mode == "" {
+		h.Mode = "reverse_proxy"
+	}
+	switch h.Mode {
+	case "reverse_proxy", "static", "redirect":
+	default:
+		jsonError(w, "mode must be reverse_proxy, static, or redirect", http.StatusBadRequest)
 		return
 	}
+
+	// ── Listen ports ──────────────────────────────────────────────────────────
+	// Filter out empty/zero ports
+	var validPorts []models.ListenPort
+	for _, lp := range h.ListenPorts {
+		if lp.Port > 0 && lp.Port <= 65535 {
+			validPorts = append(validPorts, lp)
+		}
+	}
+	if len(validPorts) == 0 {
+		// Legacy fallback
+		validPorts = []models.ListenPort{{Port: 80, HTTPS: false}}
+	}
+	h.ListenPorts = validPorts
+
+	// Derive ssl_enabled from HTTPS ports
+	h.SSLEnabled = false
+	for _, lp := range h.ListenPorts {
+		if lp.HTTPS {
+			h.SSLEnabled = true
+			break
+		}
+	}
+
+	// ── Mode-specific validation ───────────────────────────────────────────────
+	switch h.Mode {
+	case "reverse_proxy":
+		var clean []string
+		for _, s := range h.UpstreamServers {
+			if s = strings.TrimSpace(s); s != "" {
+				clean = append(clean, s)
+			}
+		}
+		if len(clean) == 0 {
+			jsonError(w, "at least one upstream server is required", http.StatusBadRequest)
+			return
+		}
+		h.UpstreamServers = clean
+		if h.LBAlgorithm == "" || len(clean) == 1 {
+			h.LBAlgorithm = "round_robin"
+		}
+		switch h.LBAlgorithm {
+		case "round_robin", "least_conn", "ip_hash":
+		default:
+			h.LBAlgorithm = "round_robin"
+		}
+
+	case "static":
+		h.StaticRoot = strings.TrimSpace(h.StaticRoot)
+		if h.StaticRoot == "" {
+			jsonError(w, "static_root is required for static mode", http.StatusBadRequest)
+			return
+		}
+		h.UpstreamServers = nil
+
+	case "redirect":
+		h.RedirectURL = strings.TrimSpace(h.RedirectURL)
+		if h.RedirectURL == "" {
+			jsonError(w, "redirect_url is required for redirect mode", http.StatusBadRequest)
+			return
+		}
+		if h.RedirectCode != 301 && h.RedirectCode != 302 {
+			h.RedirectCode = 301
+		}
+		h.UpstreamServers = nil
+	}
+
+	// ── WAF mode default ──────────────────────────────────────────────────────
 	if h.WAFMode == "" {
 		h.WAFMode = "On"
 	}
-	if h.LBAlgorithm == "" {
-		h.LBAlgorithm = "round_robin"
-	}
-
-	if err := resolveHostSSL(app.DB, &h); err != nil {
-		jsonError(w, err.Error(), http.StatusBadRequest)
+	switch h.WAFMode {
+	case "On", "Off", "DetectionOnly":
+	default:
+		jsonError(w, "waf_mode must be On, Off, or DetectionOnly", http.StatusBadRequest)
 		return
 	}
 
+	// ── SSL cert resolution ───────────────────────────────────────────────────
+	if h.SSLEnabled {
+		if err := resolveHostSSL(app.DB, &h); err != nil {
+			jsonError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else {
+		h.SSLCert = ""
+		h.SSLKey = ""
+		h.SSLCertID = ""
+	}
+
+	// ── Persist ───────────────────────────────────────────────────────────────
 	if err := store.SaveHost(app.DB, h); err != nil {
 		jsonError(w, "db: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	// ── Write nginx conf + reload ─────────────────────────────────────────────
 	if h.Enabled {
 		if err := nginx.WriteHostConf(h); err != nil {
 			jsonError(w, "nginx conf: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		if err := nginx.ReloadNginx(); err != nil {
-			// Config is written; log the reload warning but don't fail the request.
+			// Config written; log the reload warning but don't fail the API.
 			log.Printf("[hosts] nginx reload warning: %v", err)
 		}
 	}
@@ -199,6 +289,7 @@ func (app *App) APISaveHost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprint(w, `{"ok":true}`)
 }
+
 
 // APIDeleteHost handles DELETE /api/hosts/{domain} — remove host from DB + nginx conf.
 func (app *App) APIDeleteHost(w http.ResponseWriter, r *http.Request) {

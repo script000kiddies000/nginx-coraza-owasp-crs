@@ -17,9 +17,9 @@ import (
 const confDir = "/etc/nginx/conf.d"
 
 const (
-	defaultSSLDir  = "/etc/nginx/ssl_certs"
-	defaultSSLCrt  = defaultSSLDir + "/localhost.crt"
-	defaultSSLKey  = defaultSSLDir + "/localhost.key"
+	defaultSSLDir = "/etc/nginx/ssl_certs"
+	defaultSSLCrt = defaultSSLDir + "/localhost.crt"
+	defaultSSLKey = defaultSSLDir + "/localhost.key"
 )
 
 // upstreamName converts a domain like "example.com" to "flux_example_com"
@@ -29,27 +29,47 @@ func upstreamName(domain string) string {
 	return "flux_" + safe
 }
 
+func sslCertPath(p string) string {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return defaultSSLCrt
+	}
+	return p
+}
+
+func sslKeyPath(p string) string {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return defaultSSLKey
+	}
+	return p
+}
+
 // hostTemplate is the nginx server block template for a managed host.
+// It supports three modes: reverse_proxy, static, redirect.
 var hostTemplate = template.Must(template.New("host").Funcs(template.FuncMap{
 	"upstreamName": upstreamName,
-	"sslCertPath": func(p string) string {
-		p = strings.TrimSpace(p)
-		if p == "" {
-			return defaultSSLCrt
-		}
-		return p
-	},
-	"sslKeyPath": func(p string) string {
-		p = strings.TrimSpace(p)
-		if p == "" {
-			return defaultSSLKey
-		}
-		return p
-	},
+	"sslCertPath":  sslCertPath,
+	"sslKeyPath":   sslKeyPath,
 	"join":         strings.Join,
+	"hasHTTPS": func(ports []models.ListenPort) bool {
+		for _, p := range ports {
+			if p.HTTPS {
+				return true
+			}
+		}
+		return false
+	},
+	"redirectCode": func(code int) int {
+		if code == 302 {
+			return 302
+		}
+		return 301
+	},
 }).Parse(`# Managed by Flux WAF — do not edit manually
-# Domain: {{.Domain}}
-
+# Domain: {{.Domain}}{{if .Name}} ({{.Name}}){{end}}
+# Mode:   {{if .Mode}}{{.Mode}}{{else}}reverse_proxy{{end}}
+{{if or (not .Mode) (eq .Mode "reverse_proxy")}}
 upstream {{upstreamName .Domain}} {
 {{- if eq .LBAlgorithm "least_conn"}}
     least_conn;
@@ -61,11 +81,16 @@ upstream {{upstreamName .Domain}} {
 {{- end}}
     keepalive 32;
 }
-
+{{end}}
 server {
-    listen 80;
-{{- if .SSLEnabled}}
-    listen 443 ssl;
+{{- range .ListenPorts}}
+{{- if .HTTPS}}
+    listen {{.Port}} ssl;
+{{- else}}
+    listen {{.Port}};
+{{- end}}
+{{- end}}
+{{- if hasHTTPS .ListenPorts}}
     http2 on;
     ssl_certificate     {{sslCertPath .SSLCert}};
     ssl_certificate_key {{sslKeyPath .SSLKey}};
@@ -84,14 +109,23 @@ server {
 
     include /etc/nginx/snippets/hide-backend-headers.conf;
 
-    # Browsers request /favicon.ico implicitly. Answer locally to avoid proxy storms,
-    # upstream 499s (client closed), and useless Coraza work on static icon traffic.
     location = /favicon.ico {
         access_log off;
         add_header Cache-Control "public, max-age=604800" always;
         return 204;
     }
+{{if eq .Mode "redirect"}}
+    location / {
+        return {{redirectCode .RedirectCode}} {{.RedirectURL}};
+    }
+{{else if eq .Mode "static"}}
+    root {{.StaticRoot}};
+    index index.html index.htm;
 
+    location / {
+        try_files $uri $uri/ =404;
+    }
+{{else}}
 {{- range .ExcludePaths}}
     location {{.}} { coraza off; proxy_pass http://{{upstreamName $.Domain}}; }
 {{- end}}
@@ -106,15 +140,59 @@ server {
         proxy_set_header   X-Forwarded-Proto $scheme;
         proxy_set_header   X-Request-ID    $request_id;
     }
+{{end}}
 }
 `))
+
+// effectivePorts returns the listen ports to use, falling back to [{80, false}]
+// for legacy HostConfig entries that pre-date the ListenPorts field.
+func effectivePorts(h models.HostConfig) []models.ListenPort {
+	if len(h.ListenPorts) > 0 {
+		return h.ListenPorts
+	}
+	// Legacy: derive from old SSLEnabled flag
+	ports := []models.ListenPort{{Port: 80, HTTPS: false}}
+	if h.SSLEnabled {
+		ports = append(ports, models.ListenPort{Port: 443, HTTPS: true})
+	}
+	return ports
+}
 
 // WriteHostConf renders the nginx config for a HostConfig and writes it to
 // /etc/nginx/conf.d/<domain>.conf.
 func WriteHostConf(h models.HostConfig) error {
-	if len(h.UpstreamServers) == 0 {
-		return fmt.Errorf("host %q has no upstream servers", h.Domain)
+	// Fill effective ports
+	h.ListenPorts = effectivePorts(h)
+
+	// Default mode
+	if h.Mode == "" {
+		h.Mode = "reverse_proxy"
 	}
+
+	// Validate mode-specific requirements
+	switch h.Mode {
+	case "reverse_proxy":
+		if len(h.UpstreamServers) == 0 {
+			return fmt.Errorf("host %q has no upstream servers", h.Domain)
+		}
+	case "static":
+		if h.StaticRoot == "" {
+			return fmt.Errorf("host %q: static mode requires static_root", h.Domain)
+		}
+	case "redirect":
+		if h.RedirectURL == "" {
+			return fmt.Errorf("host %q: redirect mode requires redirect_url", h.Domain)
+		}
+	}
+
+	// Derive SSLEnabled from ports for template logic
+	for _, p := range h.ListenPorts {
+		if p.HTTPS {
+			h.SSLEnabled = true
+			break
+		}
+	}
+
 	path := filepath.Join(confDir, h.Domain+".conf")
 	f, err := os.Create(path)
 	if err != nil {

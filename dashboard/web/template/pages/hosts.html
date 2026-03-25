@@ -3,130 +3,159 @@
 
   <!-- Page header -->
   <div class="flex items-center justify-between mb-6">
-    <p class="text-gray-400 text-sm">Manage reverse proxy targets. Each host maps a domain to one or more backend servers.</p>
+    <p class="text-gray-400 text-sm">Manage applications. Each entry maps domains & ports to upstreams or files.</p>
     <button @click="openAdd()"
             class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
         <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/>
       </svg>
-      Add Host
+      Add Application
     </button>
   </div>
 
   <!-- Loading -->
   <template x-if="loading">
     <div class="flex items-center justify-center py-20 text-gray-600">
-      <svg class="animate-spin w-6 h-6 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <svg class="animate-spin w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"></path>
       </svg>
-      Loading hosts...
+      Loading...
     </div>
   </template>
 
   <!-- Empty state -->
   <template x-if="!loading && hosts.length === 0">
-    <div class="flex flex-col items-center justify-center py-20 text-center">
-      <div class="w-14 h-14 rounded-2xl bg-gray-800 border border-gray-700 flex items-center justify-center mb-4">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-7 h-7 text-gray-600">
+    <div class="flex flex-col items-center justify-center py-24 text-center">
+      <div class="w-16 h-16 rounded-2xl bg-gray-800 border border-gray-700 flex items-center justify-center mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-8 h-8 text-gray-600">
           <path d="M4 5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5ZM4 13a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2Z"/>
         </svg>
       </div>
-      <h3 class="text-white font-semibold mb-1">No hosts configured</h3>
-      <p class="text-gray-500 text-sm mb-5">Add your first reverse proxy target to get started.</p>
-      <button @click="openAdd()"
-              class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors">
-        Add first host
+      <h3 class="text-white font-semibold mb-1">No applications configured</h3>
+      <p class="text-gray-500 text-sm mb-5">Add your first application to start protecting traffic.</p>
+      <button @click="openAdd()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors">
+        Add Application
       </button>
     </div>
   </template>
 
-  <!-- Hosts table -->
+  <!-- Hosts cards -->
+  <!-- Hosts cards -->
   <template x-if="!loading && hosts.length > 0">
-    <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-      <table class="w-full text-sm">
-        <thead class="border-b border-gray-800">
-          <tr class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            <th class="text-left px-5 py-3">Domain</th>
-            <th class="text-left px-5 py-3">Upstream(s)</th>
-            <th class="text-left px-5 py-3">WAF Mode</th>
-            <th class="text-left px-5 py-3">SSL</th>
-            <th class="text-left px-5 py-3">LB</th>
-            <th class="text-right px-5 py-3">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-800">
-          <template x-for="host in hosts" :key="host.domain">
-            <tr class="hover:bg-gray-800/40 transition-colors">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      <template x-for="host in hosts" :key="host.id || host.domain">
+        <!-- Card Container -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 hover:border-emerald-500/30 transition-all duration-300 hover:shadow-[0_0_20px_-5px_rgba(16,185,129,0.15)] flex flex-col group relative">
+          
+          <!-- Header: Name & Actions -->
+          <div class="flex items-start justify-between gap-3 mb-5 border-b border-gray-800/60 pb-4">
+            <h3 class="text-white font-semibold text-[15px] truncate" x-text="host.name || host.domain"></h3>
+            <div class="flex items-center gap-1 -mr-2">
+              <button @click="openEdit(host)" 
+                      class="text-[10px] font-bold tracking-widest text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 px-2.5 py-1.5 rounded transition-colors uppercase">
+                Detail
+              </button>
+              <button @click="deleteHost(host.domain)" 
+                      class="text-gray-500 hover:text-rose-400 hover:bg-rose-500/10 p-1.5 rounded transition-colors group-hover:opacity-100 opacity-60">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Main Info Section -->
+          <div class="flex items-start gap-4 mb-6">
+            <!-- Left Info (Icon & Status) -->
+            <div class="flex flex-col items-center flex-shrink-0 w-16 pt-1">
+              <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-3 ring-1 ring-emerald-500/20 shadow-[0_0_15px_-3px_rgba(16,185,129,0.2)]">
+                 <i data-lucide="globe-2" class="w-5 h-5"></i>
+              </div>
+              <div :class="host.enabled ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/5' : 'border-gray-700 text-gray-500 bg-gray-800/50'" 
+                   class="text-[9px] font-bold tracking-widest px-2 py-0.5 border rounded-full w-full text-center">
+                 <span x-text="host.enabled ? 'DEFENSE' : 'DISABLED'"></span>
+              </div>
+            </div>
+
+            <!-- Right Info (Details Grid) -->
+            <div class="flex-1 min-w-0 space-y-3.5 pt-0.5">
               <!-- Domain -->
-              <td class="px-5 py-3.5">
-                <div class="flex items-center gap-2">
-                  <div :class="host.enabled ? 'bg-emerald-500' : 'bg-gray-600'"
-                       class="w-1.5 h-1.5 rounded-full flex-shrink-0"></div>
-                  <span class="font-mono text-white text-xs font-medium" x-text="host.domain"></span>
+              <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-1.5 text-gray-500">
+                  <i data-lucide="link-2" class="w-3.5 h-3.5"></i>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider">Domain</span>
                 </div>
-              </td>
-              <!-- Upstreams -->
-              <td class="px-5 py-3.5">
-                <div class="flex flex-wrap gap-1.5">
-                  <template x-for="(srv, i) in (host.upstream_servers || [])" :key="i">
-                    <span class="font-mono text-xs text-gray-300 bg-gray-800 border border-gray-700 px-2 py-0.5 rounded" x-text="srv"></span>
+                <span class="text-xs text-gray-200 font-medium truncate ml-5" x-text="host.domain"></span>
+              </div>
+              
+              <!-- Port -->
+              <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-1.5 text-gray-500">
+                  <i data-lucide="hard-drive" class="w-3.5 h-3.5"></i>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider">Listening Port</span>
+                </div>
+                <div class="flex flex-wrap gap-1.5 ml-5">
+                  <template x-for="(p, i) in (host.listen_ports || [])" :key="i">
+                    <span class="text-[10.5px] font-mono px-2 py-0.5 rounded font-semibold"
+                          :class="p.https ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20' : 'bg-sky-500/10 text-sky-400 ring-1 ring-inset ring-sky-500/20'"
+                          x-text="p.port + '/' + (p.https ? 'HTTPS' : 'HTTP')"></span>
+                  </template>
+                  <template x-if="!host.listen_ports || host.listen_ports.length === 0">
+                    <span class="text-[10.5px] font-mono px-2 py-0.5 rounded font-semibold bg-sky-500/10 text-sky-400 ring-1 ring-inset ring-sky-500/20">80/HTTP</span>
                   </template>
                 </div>
-              </td>
-              <!-- WAF Mode -->
-              <td class="px-5 py-3.5">
-                <span :class="{
-                    'text-emerald-400 bg-emerald-500/10 border-emerald-500/20': host.waf_mode === 'On',
-                    'text-rose-400 bg-rose-500/10 border-rose-500/20': host.waf_mode === 'Off',
-                    'text-yellow-400 bg-yellow-500/10 border-yellow-500/20': host.waf_mode === 'DetectionOnly'
-                  }"
-                  class="inline-flex items-center text-xs font-medium border px-2 py-0.5 rounded-full"
-                  x-text="host.waf_mode || 'On'">
-                </span>
-              </td>
-              <!-- SSL -->
-              <td class="px-5 py-3.5 max-w-[14rem]">
-                <template x-if="host.ssl_enabled">
-                  <div class="space-y-0.5">
-                    <span class="inline-flex items-center gap-1 text-xs text-emerald-400">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5 flex-shrink-0">
-                        <path fill-rule="evenodd" d="M8 1a3.5 3.5 0 0 0-3.5 3.5V7A1.5 1.5 0 0 0 3 8.5v5A1.5 1.5 0 0 0 4.5 15h7a1.5 1.5 0 0 0 1.5-1.5v-5A1.5 1.5 0 0 0 11 7V4.5A3.5 3.5 0 0 0 8 1Zm2 6V4.5a2 2 0 1 0-4 0V7h4Z" clip-rule="evenodd"/>
-                      </svg>
-                      HTTPS
-                    </span>
-                    <p class="text-[11px] text-gray-500 font-mono truncate" :title="certSummary(host)" x-text="certSummary(host)"></p>
-                  </div>
-                </template>
-                <template x-if="!host.ssl_enabled">
-                  <span class="text-xs text-gray-600">HTTP only</span>
-                </template>
-              </td>
-              <!-- LB -->
-              <td class="px-5 py-3.5">
-                <span class="text-xs text-gray-400 font-mono" x-text="host.lb_algorithm || 'round_robin'"></span>
-              </td>
-              <!-- Actions -->
-              <td class="px-5 py-3.5 text-right">
-                <div class="flex items-center justify-end gap-2">
-                  <button @click="openEdit(host)"
-                          class="text-gray-400 hover:text-white text-xs px-2.5 py-1 rounded-lg hover:bg-gray-700 transition-colors border border-gray-700">
-                    Edit
-                  </button>
-                  <button @click="deleteHost(host.domain)"
-                          class="text-rose-400 hover:text-rose-300 text-xs px-2.5 py-1 rounded-lg hover:bg-rose-500/10 transition-colors border border-rose-500/20">
-                    Delete
-                  </button>
+              </div>
+
+              <!-- Target -->
+              <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-1.5 text-gray-500">
+                  <i data-lucide="server" class="w-3.5 h-3.5"></i>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider">Target Resource</span>
                 </div>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
+                <div class="ml-5">
+                  <template x-if="host.mode !== 'redirect' && host.mode !== 'static'">
+                    <span class="text-xs font-mono text-gray-400 truncate block" x-text="(host.upstream_servers || []).join(', ')"></span>
+                  </template>
+                  <template x-if="host.mode === 'redirect'">
+                    <span class="text-xs font-mono text-purple-400 truncate block" x-text="'→ ' + (host.redirect_url || '')"></span>
+                  </template>
+                  <template x-if="host.mode === 'static'">
+                    <span class="text-xs font-mono text-amber-400 truncate block" x-text="'📁 ' + (host.static_root || '')"></span>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Badges -->
+          <div class="mt-auto pt-4 border-t border-gray-800/60 flex items-center justify-between gap-2">
+             <div class="flex items-center gap-2">
+               <!-- WAF Badge -->
+               <div :class="host.waf_mode === 'On' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' : (host.waf_mode === 'DetectionOnly' ? 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10' : 'border-gray-700 text-gray-500 bg-gray-800/50')" 
+                    class="px-2.5 py-1 text-[9px] font-bold border rounded uppercase flex items-center gap-1.5 tracking-widest">
+                 <div class="w-1.5 h-1.5 rounded-full shadow-[0_0_5px_currentColor]" :class="host.waf_mode === 'On' ? 'bg-emerald-400' : (host.waf_mode === 'DetectionOnly' ? 'bg-yellow-400' : 'bg-gray-500')"></div>
+                 WAF <span x-text="host.waf_mode || 'On'"></span>
+               </div>
+               
+               <!-- Mode Badge -->
+               <div class="px-2.5 py-1 text-[9px] font-bold border border-gray-700 text-gray-400 bg-gray-800/40 rounded uppercase tracking-widest">
+                 <span x-text="modeName(host.mode)"></span>
+               </div>
+             </div>
+             
+             <!-- LB Info Bubble -->
+             <template x-if="host.mode === 'reverse_proxy' && host.upstream_servers && host.upstream_servers.length > 1">
+               <div class="px-2 py-1 text-[9px] font-bold text-gray-500 tracking-widest">
+                 <span x-text="host.lb_algorithm === 'least_conn' ? 'LEAST CONN' : (host.lb_algorithm === 'ip_hash' ? 'IP HASH' : 'ROUND ROBIN')"></span>
+               </div>
+             </template>
+          </div>
+
+        </div>
+      </template>
     </div>
   </template>
 
-  <!-- ── Add / Edit Modal ──────────────────────────────────────────────────── -->
+  <!-- ── Modal ─────────────────────────────────────────────────────────────── -->
   <div x-show="showModal"
        x-transition:enter="transition ease-out duration-150"
        x-transition:enter-start="opacity-0"
@@ -134,18 +163,18 @@
        x-transition:leave="transition ease-in duration-100"
        x-transition:leave-start="opacity-100"
        x-transition:leave-end="opacity-0"
-       class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+       class="fixed inset-0 z-50 flex items-start justify-center bg-black/75 px-4 py-8 overflow-y-auto"
        @keydown.escape.window="showModal = false">
 
     <div @click.outside="showModal = false"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
          x-transition:enter-end="opacity-100 scale-100"
-         class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-xl shadow-2xl">
+         class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg shadow-2xl my-auto">
 
-      <!-- Modal header -->
+      <!-- Header -->
       <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800">
-        <h3 class="text-white font-semibold" x-text="isEdit ? 'Edit Host' : 'Add Host'"></h3>
+        <h3 class="text-white font-semibold" x-text="isEdit ? 'Edit Application' : 'Add Application'"></h3>
         <button @click="showModal = false" class="text-gray-500 hover:text-white transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
             <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/>
@@ -153,8 +182,8 @@
         </button>
       </div>
 
-      <!-- Modal body -->
-      <form @submit.prevent="save()" class="px-6 py-5 space-y-4">
+      <!-- Body -->
+      <form @submit.prevent="save()" class="px-6 py-5 space-y-5">
 
         <!-- Error -->
         <template x-if="error">
@@ -176,71 +205,191 @@
                         disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-mono">
         </div>
 
-        <!-- Upstream servers -->
+        <!-- ── Listen Ports ── -->
         <div>
-          <label class="block text-xs font-medium text-gray-400 mb-1.5">
-            Upstream Servers <span class="text-rose-400">*</span>
-            <span class="text-gray-600 font-normal ml-1">— one per line, e.g. 172.17.0.1:3000</span>
-          </label>
-          <textarea x-model="form.upstream_servers" rows="3" required
-                    placeholder="172.17.0.1:3000&#10;172.17.0.2:3000"
-                    class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3.5 py-2.5
-                           placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500
-                           transition-colors font-mono resize-none"></textarea>
+          <label class="block text-xs font-medium text-gray-400 mb-2">Listen Ports <span class="text-rose-400">*</span></label>
+          <div class="space-y-2">
+            <template x-for="(lp, idx) in form.listen_ports" :key="idx">
+              <div class="flex items-center gap-2">
+                <input x-model="lp.port" type="number" min="1" max="65535" placeholder="Port"
+                       class="flex-1 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2
+                              placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors font-mono">
+                <!-- HTTP/HTTPS toggle -->
+                <div class="flex rounded-lg overflow-hidden border border-gray-700 flex-shrink-0">
+                  <button type="button" @click="lp.https = false"
+                          :class="!lp.https ? 'bg-sky-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'"
+                          class="px-3 py-2 text-xs font-bold transition-colors">HTTP</button>
+                  <button type="button" @click="lp.https = true"
+                          :class="lp.https ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'"
+                          class="px-3 py-2 text-xs font-bold transition-colors">HTTPS</button>
+                </div>
+                <!-- Remove port -->
+                <button type="button" @click="removePort(idx)"
+                        x-show="form.listen_ports.length > 1"
+                        class="text-gray-600 hover:text-rose-400 transition-colors flex-shrink-0 p-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                    <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd"/>
+                  </svg>
+                </button>
+              </div>
+            </template>
+          </div>
+          <!-- Add port button -->
+          <button type="button" @click="addPort()"
+                  class="mt-2 w-full flex items-center justify-center gap-1.5 border border-dashed border-gray-700
+                         hover:border-emerald-500/50 hover:text-emerald-400 text-gray-500 text-xs font-semibold
+                         py-2 rounded-lg transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+              <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/>
+            </svg>
+            ADD LISTENING PORT
+          </button>
         </div>
 
-        <!-- WAF Mode + LB -->
-        <div class="grid grid-cols-2 gap-4">
+        <!-- ── SSL Cert (shown if any HTTPS port) ── -->
+        <template x-if="hasHttpsPort()">
           <div>
-            <label class="block text-xs font-medium text-gray-400 mb-1.5">WAF Mode</label>
-            <select x-model="form.waf_mode"
-                    class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3.5 py-2.5
-                           focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors">
-              <option value="On">On (Block)</option>
-              <option value="DetectionOnly">Detection Only</option>
-              <option value="Off">Off</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-gray-400 mb-1.5">Load Balancing</label>
-            <select x-model="form.lb_algorithm"
-                    class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3.5 py-2.5
-                           focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors">
-              <option value="round_robin">Round Robin</option>
-              <option value="least_conn">Least Connections</option>
-              <option value="ip_hash">IP Hash (sticky)</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- SSL -->
-        <div class="space-y-3 rounded-lg border border-gray-800 bg-gray-950/40 p-3">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <p class="text-sm text-white font-medium">HTTPS / SSL</p>
-              <p class="text-xs text-gray-500">Pilih sertifikat terkelola dari <a href="/ssl" class="text-emerald-500 hover:text-emerald-400">SSL</a></p>
-            </div>
-            <button type="button" @click="form.ssl_enabled = !form.ssl_enabled"
-                    :class="form.ssl_enabled ? 'bg-emerald-600' : 'bg-gray-700'"
-                    class="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none">
-              <span :class="form.ssl_enabled ? 'translate-x-6' : 'translate-x-1'"
-                    class="inline-block h-4 w-4 rounded-full bg-white transition-transform"></span>
-            </button>
-          </div>
-          <div x-show="form.ssl_enabled" x-cloak>
-            <label class="block text-xs font-medium text-gray-400 mb-1.5">TLS certificate</label>
+            <label class="block text-xs font-medium text-gray-400 mb-1.5">SSL Certificate</label>
             <select x-model="form.ssl_cert_id"
                     class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3.5 py-2.5
                            focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors font-mono">
-              <option value="">— Pilih sertifikat —</option>
+              <option value="">— Select certificate —</option>
               <template x-for="c in activeTlsCerts" :key="c.id">
                 <option :value="c.id" x-text="tlsOptionLabel(c)"></option>
               </template>
             </select>
-            <p class="text-xs text-amber-500/90 mt-1.5" x-show="form.ssl_enabled && activeTlsCerts.length === 0">
-              Belum ada sertifikat aktif. Tambah di halaman SSL (Let&apos;s Encrypt atau paste PEM).
+            <p class="text-xs text-amber-500/90 mt-1" x-show="activeTlsCerts.length === 0">
+              No active certs. Add one on the <a href="/ssl" class="text-emerald-500 hover:text-emerald-400">SSL page</a>.
             </p>
           </div>
+        </template>
+
+        <!-- ── Proxy Mode ── -->
+        <div>
+          <label class="block text-xs font-medium text-gray-400 mb-2">Mode <span class="text-rose-400">*</span></label>
+          <div class="grid grid-cols-3 gap-2">
+            <template x-for="m in [{id:'reverse_proxy',label:'Reverse Proxy',icon:'🔀'},{id:'static',label:'Static Files',icon:'📁'},{id:'redirect',label:'Redirect',icon:'↪'}]" :key="m.id">
+              <button type="button" @click="form.mode = m.id"
+                      :class="form.mode === m.id
+                        ? 'border-emerald-500 bg-emerald-500/10 text-white'
+                        : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600 hover:text-gray-300'"
+                      class="flex flex-col items-center gap-1 border rounded-xl py-3 px-2 text-xs font-semibold transition-colors cursor-pointer">
+                <span class="text-lg" x-text="m.icon"></span>
+                <span x-text="m.label"></span>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <!-- ── Upstream Servers (reverse proxy) ── -->
+        <template x-if="form.mode === 'reverse_proxy'">
+          <div>
+            <label class="block text-xs font-medium text-gray-400 mb-2">
+              Upstream Servers <span class="text-rose-400">*</span>
+              <span class="text-gray-600 font-normal ml-1">— e.g. http://192.168.1.10:8080</span>
+            </label>
+            <div class="space-y-2">
+              <template x-for="(srv, idx) in form.upstream_servers" :key="idx">
+                <div class="flex items-center gap-2">
+                  <input x-model="form.upstream_servers[idx]" type="text"
+                         placeholder="http://192.168.1.10:8080"
+                         class="flex-1 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3.5 py-2.5
+                                placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors font-mono">
+                  <button type="button" @click="removeUpstream(idx)"
+                          x-show="form.upstream_servers.length > 1"
+                          class="text-gray-600 hover:text-rose-400 transition-colors flex-shrink-0 p-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                      <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd"/>
+                    </svg>
+                  </button>
+                </div>
+              </template>
+            </div>
+            <!-- Add upstream button -->
+            <button type="button" @click="addUpstream()"
+                    class="mt-2 w-full flex items-center justify-center gap-1.5 border border-dashed border-gray-700
+                           hover:border-emerald-500/50 hover:text-emerald-400 text-gray-500 text-xs font-semibold
+                           py-2 rounded-lg transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+                <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/>
+              </svg>
+              ADD UPSTREAM
+            </button>
+
+            <!-- Load Balancing (only if > 1 upstream) -->
+            <template x-if="form.upstream_servers.length > 1">
+              <div class="mt-3">
+                <label class="block text-xs font-medium text-gray-400 mb-1.5">Load Balancing Algorithm</label>
+                <div class="grid grid-cols-3 gap-2">
+                  <template x-for="alg in [{id:'round_robin',label:'Round Robin'},{id:'least_conn',label:'Least Connections'},{id:'ip_hash',label:'IP Hash'}]" :key="alg.id">
+                    <button type="button" @click="form.lb_algorithm = alg.id"
+                            :class="form.lb_algorithm === alg.id
+                              ? 'border-emerald-500 bg-emerald-500/10 text-white'
+                              : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600 hover:text-gray-300'"
+                            class="border rounded-lg py-2 px-2 text-[11px] font-semibold text-center transition-colors cursor-pointer">
+                      <span x-text="alg.label"></span>
+                    </button>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- ── Static Files root ── -->
+        <template x-if="form.mode === 'static'">
+          <div>
+            <label class="block text-xs font-medium text-gray-400 mb-1.5">Document Root <span class="text-rose-400">*</span></label>
+            <input x-model="form.static_root" type="text" placeholder="/var/www/html"
+                   class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3.5 py-2.5
+                          placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors font-mono">
+          </div>
+        </template>
+
+        <!-- ── Redirect URL ── -->
+        <template x-if="form.mode === 'redirect'">
+          <div>
+            <label class="block text-xs font-medium text-gray-400 mb-1.5">Redirect To <span class="text-rose-400">*</span></label>
+            <input x-model="form.redirect_url" type="url" placeholder="https://example.com"
+                   class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3.5 py-2.5
+                          placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors font-mono">
+            <div class="mt-2 flex items-center gap-2">
+              <label class="text-xs font-medium text-gray-400">Code:</label>
+              <div class="flex gap-1.5">
+                <template x-for="code in [301, 302]" :key="code">
+                  <button type="button" @click="form.redirect_code = code"
+                          :class="form.redirect_code === code ? 'bg-emerald-600 text-white' : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white'"
+                          class="px-3 py-1 rounded text-xs font-bold transition-colors" x-text="code"></button>
+                </template>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- ── WAF Mode ── -->
+        <div>
+          <label class="block text-xs font-medium text-gray-400 mb-1.5">WAF Mode</label>
+          <div class="flex gap-2">
+            <template x-for="m in [{id:'On',label:'Block',cls:'emerald'},{id:'DetectionOnly',label:'Detect Only',cls:'yellow'},{id:'Off',label:'Off',cls:'rose'}]" :key="m.id">
+              <button type="button" @click="form.waf_mode = m.id"
+                      :class="{
+                        'border-emerald-500 bg-emerald-500/10 text-emerald-300': form.waf_mode === m.id && m.cls === 'emerald',
+                        'border-yellow-500 bg-yellow-500/10 text-yellow-300': form.waf_mode === m.id && m.cls === 'yellow',
+                        'border-rose-500 bg-rose-500/10 text-rose-300': form.waf_mode === m.id && m.cls === 'rose',
+                        'border-gray-700 bg-gray-800 text-gray-400 hover:text-gray-300': form.waf_mode !== m.id,
+                      }"
+                      class="flex-1 border rounded-lg py-2 text-xs font-semibold text-center transition-colors cursor-pointer"
+                      x-text="m.label"></button>
+            </template>
+          </div>
+        </div>
+
+        <!-- Application name -->
+        <div>
+          <label class="block text-xs font-medium text-gray-400 mb-1.5">Application Name <span class="text-gray-600 font-normal">(optional)</span></label>
+          <input x-model="form.name" type="text" placeholder="My App"
+                 class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3.5 py-2.5
+                        placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors">
         </div>
 
         <!-- Footer -->
@@ -252,8 +401,8 @@
           <button type="submit"
                   :disabled="saving"
                   :class="saving ? 'opacity-60 cursor-not-allowed' : 'hover:bg-emerald-500'"
-                  class="bg-emerald-600 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors">
-            <span x-text="saving ? 'Saving…' : (isEdit ? 'Save Changes' : 'Add Host')"></span>
+                  class="bg-emerald-600 text-white text-sm font-semibold px-6 py-2 rounded-lg transition-colors">
+            <span x-text="saving ? 'Saving…' : (isEdit ? 'Save Changes' : 'Add Application')"></span>
           </button>
         </div>
       </form>
@@ -279,7 +428,28 @@ function hostsApp() {
     },
 
     blank() {
-      return { domain: '', upstream_servers: '', waf_mode: 'On', lb_algorithm: 'round_robin', ssl_enabled: false, ssl_cert_id: '', enabled: true };
+      return {
+        domain: '',
+        name: '',
+        mode: 'reverse_proxy',
+        listen_ports: [{ port: 80, https: false }],
+        upstream_servers: [''],
+        lb_algorithm: 'round_robin',
+        static_root: '',
+        redirect_url: '',
+        redirect_code: 301,
+        waf_mode: 'On',
+        ssl_cert_id: '',
+        enabled: true
+      };
+    },
+
+    hasHttpsPort() {
+      return (this.form.listen_ports || []).some(p => p.https);
+    },
+
+    modeName(mode) {
+      return { reverse_proxy: 'Reverse Proxy', static: 'Static Files', redirect: 'Redirect' }[mode] || mode;
     },
 
     tlsOptionLabel(c) {
@@ -289,16 +459,31 @@ function hostsApp() {
 
     certSummary(host) {
       if (!host.ssl_enabled) return '';
-      const id = host.ssl_cert_id || '';
-      if (!id) return 'No certificate selected';
-      const c = (this.tlsCerts || []).find(x => x.id === id);
-      if (!c) return id;
-      const src = c.source === 'letsencrypt' ? 'LE' : 'custom';
-      return c.domain + ' · ' + src;
+      const c = (this.tlsCerts || []).find(x => x.id === host.ssl_cert_id);
+      if (!c) return host.ssl_cert_id || '';
+      return c.domain + ' · ' + (c.source === 'letsencrypt' ? 'LE' : 'custom');
+    },
+
+    addPort() {
+      this.form.listen_ports.push({ port: '', https: false });
+    },
+
+    removePort(idx) {
+      if (this.form.listen_ports.length > 1)
+        this.form.listen_ports.splice(idx, 1);
+    },
+
+    addUpstream() {
+      this.form.upstream_servers.push('');
+    },
+
+    removeUpstream(idx) {
+      if (this.form.upstream_servers.length > 1)
+        this.form.upstream_servers.splice(idx, 1);
     },
 
     async init() {
-      await Promise.all([this.fetch(), this.fetchTls()]);
+      await Promise.all([this.fetchHosts(), this.fetchTls()]);
     },
 
     async fetchTls() {
@@ -309,7 +494,7 @@ function hostsApp() {
       } catch (e) { this.tlsCerts = []; }
     },
 
-    async fetch() {
+    async fetchHosts() {
       this.loading = true;
       try {
         const r = await fetch('/api/hosts');
@@ -330,9 +515,16 @@ function hostsApp() {
     openEdit(host) {
       this.fetchTls();
       this.form = {
+        ...this.blank(),
         ...host,
-        upstream_servers: (host.upstream_servers || []).join('\n'),
-        ssl_cert_id: host.ssl_cert_id || ''
+        listen_ports: (host.listen_ports && host.listen_ports.length > 0)
+          ? host.listen_ports.map(p => ({ ...p }))
+          : [{ port: 80, https: false }],
+        upstream_servers: (host.upstream_servers && host.upstream_servers.length > 0)
+          ? [...host.upstream_servers]
+          : [''],
+        ssl_cert_id: host.ssl_cert_id || '',
+        redirect_code: host.redirect_code || 301,
       };
       this.isEdit = true;
       this.error = '';
@@ -341,17 +533,43 @@ function hostsApp() {
 
     async save() {
       this.error = '';
-      const servers = this.form.upstream_servers
-        .split(/[\n,]/).map(s => s.trim()).filter(s => s);
+
+      // Validate domain
       if (!this.form.domain.trim()) { this.error = 'Domain is required.'; return; }
-      if (servers.length === 0) { this.error = 'At least one upstream server is required.'; return; }
-      if (this.form.ssl_enabled && !(this.form.ssl_cert_id || '').trim()) {
-        this.error = 'HTTPS requires a managed TLS certificate. Choose one in the dropdown or add a certificate on the SSL page.';
+
+      // Validate ports
+      const ports = (this.form.listen_ports || []).filter(p => p.port);
+      if (ports.length === 0) { this.error = 'At least one listening port is required.'; return; }
+
+      // Validate SSL cert if HTTPS port present
+      if (this.hasHttpsPort() && !(this.form.ssl_cert_id || '').trim()) {
+        this.error = 'HTTPS port requires a TLS certificate. Select one or add on the SSL page.';
         return;
       }
 
-      const payload = { ...this.form, upstream_servers: servers, enabled: true };
-      if (!this.form.ssl_enabled) payload.ssl_cert_id = '';
+      // Mode-specific validation
+      if (this.form.mode === 'reverse_proxy') {
+        const servers = this.form.upstream_servers.map(s => s.trim()).filter(s => s);
+        if (servers.length === 0) { this.error = 'At least one upstream server is required.'; return; }
+      } else if (this.form.mode === 'static') {
+        if (!this.form.static_root.trim()) { this.error = 'Document root is required.'; return; }
+      } else if (this.form.mode === 'redirect') {
+        if (!this.form.redirect_url.trim()) { this.error = 'Redirect URL is required.'; return; }
+      }
+
+      const payload = {
+        ...this.form,
+        listen_ports: ports.map(p => ({
+          port: parseInt(p.port, 10),
+          https: p.https
+        })),
+        upstream_servers: this.form.mode === 'reverse_proxy'
+          ? this.form.upstream_servers.map(s => s.trim()).filter(s => s)
+          : [],
+        ssl_enabled: this.hasHttpsPort(),
+        enabled: true,
+      };
+
       this.saving = true;
       try {
         const r = await fetch('/api/hosts', {
@@ -360,9 +578,9 @@ function hostsApp() {
           body: JSON.stringify(payload)
         });
         const d = await r.json();
-        if (!d.ok) { this.error = d.error || 'Save failed.'; return; }
+        if (!d.ok) { this.error = d.error || 'Save failed.'; this.saving = false; return; }
         this.showModal = false;
-        await Promise.all([this.fetch(), this.fetchTls()]);
+        await this.fetchHosts();
       } catch(e) { this.error = 'Network error. Try again.'; }
       this.saving = false;
     },
@@ -373,7 +591,7 @@ function hostsApp() {
         const r = await fetch('/api/hosts/' + encodeURIComponent(domain), { method: 'DELETE' });
         const d = await r.json();
         if (!d.ok) { alert(d.error || 'Delete failed'); return; }
-        await this.fetch();
+        await this.fetchHosts();
       } catch(e) { alert('Network error'); }
     }
   }
