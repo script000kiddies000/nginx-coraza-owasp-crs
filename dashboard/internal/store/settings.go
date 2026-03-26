@@ -4,6 +4,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 
 	"flux-waf/internal/models"
+	"strings"
 )
 
 const (
@@ -65,6 +66,9 @@ func GetJA3Config(db *bolt.DB) models.JA3Config {
 			ents = append(ents, models.JA3FingerprintEntry{
 				Name: "JA3 " + short,
 				Hash: h,
+				Enabled: true,
+				Action:  "block",
+				Source:  "legacy",
 			})
 		}
 		c.Entries = ents
@@ -73,6 +77,49 @@ func GetJA3Config(db *bolt.DB) models.JA3Config {
 	}
 	if len(c.Entries) == 0 {
 		c.Entries = []models.JA3FingerprintEntry{}
+	}
+	if len(c.JA4Entries) == 0 && len(c.JA4Hashes) > 0 {
+		ents := make([]models.JA3FingerprintEntry, 0, len(c.JA4Hashes))
+		for _, h := range c.JA4Hashes {
+			short := h
+			if len(short) > 8 {
+				short = short[:8]
+			}
+			ents = append(ents, models.JA3FingerprintEntry{
+				Name: "JA4 " + short,
+				Hash: h,
+				Enabled: true,
+				Action:  "block",
+				Source:  "legacy",
+			})
+		}
+		c.JA4Entries = ents
+		c.JA4Hashes = nil
+		_ = put(db, BucketSettings, keyJA3, c)
+	}
+	if len(c.JA4Entries) == 0 {
+		c.JA4Entries = []models.JA3FingerprintEntry{}
+	}
+
+	// Backfill missing per-entry fields for older DB data.
+	// Older entries likely only stored `name` + `hash`, so default to enabled+block.
+	for i := range c.Entries {
+		actionEmpty := strings.TrimSpace(c.Entries[i].Action) == ""
+		if actionEmpty {
+			c.Entries[i].Action = "block"
+			c.Entries[i].Enabled = true
+		} else if c.Entries[i].Action != "block" && c.Entries[i].Action != "log" {
+			c.Entries[i].Action = "block"
+		}
+	}
+	for i := range c.JA4Entries {
+		actionEmpty := strings.TrimSpace(c.JA4Entries[i].Action) == ""
+		if actionEmpty {
+			c.JA4Entries[i].Action = "block"
+			c.JA4Entries[i].Enabled = true
+		} else if c.JA4Entries[i].Action != "block" && c.JA4Entries[i].Action != "log" {
+			c.JA4Entries[i].Action = "block"
+		}
 	}
 	// default enabled so existing snippet behavior remains active.
 	if !c.Enabled {
@@ -89,6 +136,7 @@ func GetJA3Config(db *bolt.DB) models.JA3Config {
 func SaveJA3Config(db *bolt.DB, c models.JA3Config) error {
 	// Persist new format only.
 	c.Hashes = nil
+	c.JA4Hashes = nil
 	return put(db, BucketSettings, keyJA3, c)
 }
 

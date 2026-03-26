@@ -1,50 +1,126 @@
 {{define "content"}}
-<div class="w-full min-h-[calc(100vh-6.5rem)] flex flex-col space-y-6" x-data="ja3App()" x-init="init()">
+<div class="w-full min-h-[calc(100vh-6.5rem)] flex flex-col space-y-6" x-data="jaApp()" x-init="init()">
   <p class="text-gray-400 text-sm">
-    Kelola daftar blokir JA3 fingerprint (TLS). Hash valid harus format hex 32 karakter.
-    Setelah simpan, file map JA3 ditulis ulang lalu nginx di-<strong>reload</strong>.
+    Kelola daftar blokir fingerprint TLS untuk <span class="font-semibold">JA3</span> dan <span class="font-semibold">JA4</span>.
+    Hash valid harus format hex 32 karakter. Setelah simpan, file map ditulis ulang lalu nginx di-<strong>reload</strong>.
   </p>
 
   <div x-show="msgOk" x-cloak class="text-sm text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-lg px-4 py-2" x-text="msgOk"></div>
   <div x-show="msgErr" x-cloak class="text-sm text-rose-400 border border-rose-500/30 bg-rose-500/10 rounded-lg px-4 py-2" x-text="msgErr"></div>
 
   <div class="grid lg:grid-cols-3 gap-6">
-    <div class="lg:col-span-2 rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-4">
+    <div class="lg:col-span-2 space-y-6">
+      <!-- JA3 -->
+      <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-4">
       <div class="flex items-center justify-between gap-3">
         <h2 class="text-sm font-semibold text-white">JA3 Blocklist</h2>
-        <span class="text-xs text-gray-500" x-text="entries.length + ' entri'"></span>
+        <span class="text-xs text-gray-500" x-text="ja3.entries.length + ' entri'"></span>
       </div>
 
       <label class="flex items-center gap-3 cursor-pointer">
-        <input type="checkbox" x-model="form.enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+        <input type="checkbox" x-model="ja3.enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
         <span class="text-sm text-gray-300">Aktifkan JA3 filtering</span>
       </label>
 
       <div class="grid md:grid-cols-3 gap-2">
-        <input type="text" x-model.trim="newName" placeholder="Nama fingerprint (contoh: Headless Chrome)"
+        <input type="text" x-model.trim="ja3.newName" placeholder="Nama fingerprint (contoh: Headless Chrome)"
           class="md:col-span-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200">
-        <input type="text" x-model.trim="newHash" placeholder="Hash JA3 (32 hex)"
+        <input type="text" x-model.trim="ja3.newHash" placeholder="Hash JA3 (32 hex)"
           class="md:col-span-2 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-200">
       </div>
       <div class="flex justify-end">
-        <button type="button" @click="addHash()"
+        <button type="button" @click="addJA3()"
           class="bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold px-4 rounded-lg">
           Tambah
         </button>
       </div>
 
       <ul class="divide-y divide-gray-800/80 border border-gray-800 rounded-lg overflow-hidden">
-        <template x-for="e in entries" :key="e.hash">
+        <template x-for="e in ja3.entries" :key="e.hash">
           <li class="px-3 py-2 flex items-center justify-between gap-3 bg-gray-950/40">
             <div class="min-w-0">
               <p class="text-sm text-gray-200 truncate" x-text="e.name"></p>
               <p class="text-xs font-mono text-cyan-300 break-all" x-text="e.hash"></p>
+              <div class="mt-1 flex items-center gap-2">
+                <label class="flex items-center gap-2 text-[12px] text-gray-300 cursor-pointer">
+                  <input type="checkbox" x-model="e.enabled"
+                    class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+                  <span x-text="e.enabled ? 'enabled' : 'disabled'"></span>
+                </label>
+                <select x-model="e.action"
+                  class="text-[12px] bg-gray-950 border border-gray-800 rounded px-2 py-1 text-gray-200">
+                  <option value="block">block</option>
+                  <option value="log">log</option>
+                </select>
+                <template x-if="e.builtin">
+                  <span class="text-[11px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-300 border border-gray-700/70">
+                    builtin
+                  </span>
+                </template>
+              </div>
             </div>
-            <button type="button" @click="removeHash(e.hash)" class="text-xs text-rose-400 hover:underline">Hapus</button>
+            <button type="button" @click="removeJA3(e.hash)" class="text-xs text-rose-400 hover:underline">Hapus</button>
           </li>
         </template>
-        <li x-show="!entries.length" class="px-3 py-8 text-center text-sm text-gray-600">Belum ada hash</li>
+        <li x-show="!ja3.entries.length" class="px-3 py-8 text-center text-sm text-gray-600">Belum ada hash</li>
       </ul>
+      </div>
+
+      <!-- JA4 -->
+      <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-4">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-sm font-semibold text-white">JA4 Blocklist</h2>
+          <span class="text-xs text-gray-500" x-text="ja4.entries.length + ' entri'"></span>
+        </div>
+
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" x-model="ja4.enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+          <span class="text-sm text-gray-300">Aktifkan JA4 filtering</span>
+        </label>
+
+        <div class="grid md:grid-cols-3 gap-2">
+          <input type="text" x-model.trim="ja4.newName" placeholder="Nama fingerprint (contoh: Chrome v131)"
+            class="md:col-span-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200">
+          <input type="text" x-model.trim="ja4.newHash" placeholder="Hash JA4 (32 hex)"
+            class="md:col-span-2 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-200">
+        </div>
+        <div class="flex justify-end">
+          <button type="button" @click="addJA4()"
+            class="bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold px-4 rounded-lg">
+            Tambah
+          </button>
+        </div>
+
+        <ul class="divide-y divide-gray-800/80 border border-gray-800 rounded-lg overflow-hidden">
+          <template x-for="e in ja4.entries" :key="e.hash">
+            <li class="px-3 py-2 flex items-center justify-between gap-3 bg-gray-950/40">
+              <div class="min-w-0">
+                <p class="text-sm text-gray-200 truncate" x-text="e.name"></p>
+                <p class="text-xs font-mono text-cyan-300 break-all" x-text="e.hash"></p>
+                <div class="mt-1 flex items-center gap-2">
+                  <label class="flex items-center gap-2 text-[12px] text-gray-300 cursor-pointer">
+                    <input type="checkbox" x-model="e.enabled"
+                      class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+                    <span x-text="e.enabled ? 'enabled' : 'disabled'"></span>
+                  </label>
+                  <select x-model="e.action"
+                    class="text-[12px] bg-gray-950 border border-gray-800 rounded px-2 py-1 text-gray-200">
+                    <option value="block">block</option>
+                    <option value="log">log</option>
+                  </select>
+                  <template x-if="e.builtin">
+                    <span class="text-[11px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-300 border border-gray-700/70">
+                      builtin
+                    </span>
+                  </template>
+                </div>
+              </div>
+              <button type="button" @click="removeJA4(e.hash)" class="text-xs text-rose-400 hover:underline">Hapus</button>
+            </li>
+          </template>
+          <li x-show="!ja4.entries.length" class="px-3 py-8 text-center text-sm text-gray-600">Belum ada hash</li>
+        </ul>
+      </div>
 
       <div class="flex justify-end">
         <button type="button" @click="save()" :disabled="saving"
@@ -57,26 +133,29 @@
     <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-3">
       <h2 class="text-sm font-semibold text-white">Info</h2>
       <p class="text-xs text-gray-500">Sumber variabel hash: <span class="font-mono">$http_ssl_ja3_hash</span></p>
+      <p class="text-xs text-gray-500">Sumber variabel hash: <span class="font-mono">$http_ssl_ja4_hash</span></p>
       <p class="text-xs text-gray-500">Format hash: <span class="font-mono">[a-f0-9]{32}</span></p>
       <p class="text-xs text-gray-500">Mode non-TLS (HTTP biasa) tetap allow by default.</p>
       <template x-if="mapFile?.path">
         <p class="text-xs text-gray-600 break-all">File: <span class="font-mono" x-text="mapFile.path"></span></p>
+      </template>
+      <template x-if="mapFileJA4?.path">
+        <p class="text-xs text-gray-600 break-all">File: <span class="font-mono" x-text="mapFileJA4.path"></span></p>
       </template>
     </div>
   </div>
 </div>
 
 <script>
-function ja3App() {
+function jaApp() {
   return {
     saving: false,
     msgOk: '',
     msgErr: '',
-    form: { enabled: true },
-    entries: [],
-    newName: '',
-    newHash: '',
+    ja3: { enabled: true, entries: [], newName: '', newHash: '' },
+    ja4: { enabled: true, entries: [], newName: '', newHash: '' },
     mapFile: null,
+    mapFileJA4: null,
     async init() {
       await this.load();
       this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
@@ -86,42 +165,80 @@ function ja3App() {
       try {
         const r = await fetch('/api/ja3/config');
         const d = await r.json();
-        this.form = d.config || { enabled: true };
-        this.entries = Array.isArray(this.form.entries)
-          ? this.form.entries.slice()
-          : (Array.isArray(this.form.hashes) ? this.form.hashes.map(h => ({ name: 'JA3 ' + h.slice(0, 8), hash: h })) : []);
+        const cfg = d.config || {};
+        this.ja3.enabled = (cfg.enabled !== undefined) ? !!cfg.enabled : true;
+        this.ja4.enabled = (cfg.ja4_enabled !== undefined) ? !!cfg.ja4_enabled : true;
+
+        const ja3Entries = Array.isArray(cfg.entries) ? cfg.entries : (Array.isArray(cfg.hashes) ? cfg.hashes.map(h => ({ name: 'JA3 ' + String(h).slice(0, 8), hash: h, enabled: true, action: 'block' })) : []);
+        const ja4Entries = Array.isArray(cfg.ja4_entries) ? cfg.ja4_entries : (Array.isArray(cfg.ja4_hashes) ? cfg.ja4_hashes.map(h => ({ name: 'JA4 ' + String(h).slice(0, 8), hash: h, enabled: true, action: 'block' })) : []);
+        this.ja3.entries = ja3Entries.slice();
+        this.ja4.entries = ja4Entries.slice();
+
         this.mapFile = d.map_file || null;
+        this.mapFileJA4 = d.map_file_ja4 || null;
       } catch (e) {
         this.msgErr = e.message || String(e);
       }
     },
-    addHash() {
-      const v = (this.newHash || '').trim().toLowerCase();
-      const n = (this.newName || '').trim();
+    addJA3() {
+      const v = (this.ja3.newHash || '').trim().toLowerCase();
+      const n = (this.ja3.newName || '').trim();
       if (!/^[a-f0-9]{32}$/.test(v)) {
         this.msgErr = 'Hash JA3 harus 32 karakter hex (a-f0-9).';
         return;
       }
-      if (this.entries.some(e => e.hash === v)) {
+      if (this.ja3.entries.some(e => e.hash === v)) {
         this.msgErr = 'Hash JA3 sudah ada.';
         return;
       }
-      this.entries.push({
+      this.ja3.entries.push({
         name: n || ('JA3 ' + v.slice(0, 8)),
-        hash: v
+        hash: v,
+        enabled: true,
+        action: 'block'
       });
-      this.entries.sort((a, b) => a.hash.localeCompare(b.hash));
-      this.newName = '';
-      this.newHash = '';
+      this.ja3.entries.sort((a, b) => a.hash.localeCompare(b.hash));
+      this.ja3.newName = '';
+      this.ja3.newHash = '';
       this.msgErr = '';
     },
-    removeHash(h) {
-      this.entries = this.entries.filter(x => x.hash !== h);
+    removeJA3(h) {
+      this.ja3.entries = this.ja3.entries.filter(x => x.hash !== h);
+    },
+    addJA4() {
+      const v = (this.ja4.newHash || '').trim().toLowerCase();
+      const n = (this.ja4.newName || '').trim();
+      if (!/^[a-f0-9]{32}$/.test(v)) {
+        this.msgErr = 'Hash JA4 harus 32 karakter hex (a-f0-9).';
+        return;
+      }
+      if (this.ja4.entries.some(e => e.hash === v)) {
+        this.msgErr = 'Hash JA4 sudah ada.';
+        return;
+      }
+      this.ja4.entries.push({
+        name: n || ('JA4 ' + v.slice(0, 8)),
+        hash: v,
+        enabled: true,
+        action: 'block'
+      });
+      this.ja4.entries.sort((a, b) => a.hash.localeCompare(b.hash));
+      this.ja4.newName = '';
+      this.ja4.newHash = '';
+      this.msgErr = '';
+    },
+    removeJA4(h) {
+      this.ja4.entries = this.ja4.entries.filter(x => x.hash !== h);
     },
     async save() {
       this.saving = true; this.msgOk = ''; this.msgErr = '';
       try {
-        const body = { enabled: !!this.form.enabled, entries: this.entries };
+        const body = {
+          enabled: !!this.ja3.enabled,
+          entries: this.ja3.entries,
+          ja4_enabled: !!this.ja4.enabled,
+          ja4_entries: this.ja4.entries
+        };
         const r = await fetch('/api/ja3/apply', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -130,7 +247,7 @@ function ja3App() {
         const t = await r.text();
         let j = {}; try { j = JSON.parse(t); } catch (_) {}
         if (!r.ok) throw new Error(j.error || t);
-        this.msgOk = 'Konfigurasi JA3 tersimpan dan nginx dimuat ulang.';
+        this.msgOk = 'Konfigurasi JA3/JA4 tersimpan dan nginx dimuat ulang.';
         await this.load();
       } catch (e) {
         this.msgErr = e.message || String(e);

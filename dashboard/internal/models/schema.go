@@ -109,11 +109,20 @@ type JA3Config struct {
 	Entries []JA3FingerprintEntry `json:"entries,omitempty"`
 	// Legacy compatibility: old UI/API used plain hash list.
 	Hashes  []string              `json:"hashes,omitempty"`
+
+	JA4Enabled bool                  `json:"ja4_enabled"`
+	JA4Entries []JA3FingerprintEntry `json:"ja4_entries,omitempty"`
+	// Legacy: plain JA4 hashes.
+	JA4Hashes  []string              `json:"ja4_hashes,omitempty"`
 }
 
 type JA3FingerprintEntry struct {
-	Name string `json:"name"`
-	Hash string `json:"hash"`
+	Name    string `json:"name"`
+	Hash    string `json:"hash"`
+	Enabled bool   `json:"enabled"`
+	Action  string `json:"action"` // "block" | "log"
+	Source  string `json:"source,omitempty"`
+	Builtin bool   `json:"builtin,omitempty"`
 }
 
 // ── Threat Intelligence ───────────────────────────────────────────────────────

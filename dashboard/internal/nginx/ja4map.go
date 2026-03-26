@@ -9,48 +9,46 @@ import (
 	"strings"
 )
 
-var reJA3Hex32 = regexp.MustCompile(`^[a-f0-9]{32}$`)
+var reJA4Hex32 = regexp.MustCompile(`^[a-f0-9]{32}$`)
 
-func JA3MapPath() string {
-	if p := os.Getenv("FLUX_JA3_MAP_PATH"); p != "" {
+func JA4MapPath() string {
+	if p := os.Getenv("FLUX_JA4_MAP_PATH"); p != "" {
 		return p
 	}
-	return "/etc/nginx/snippets/wafx-ja3-map.conf"
+	return "/etc/nginx/snippets/wafx-ja4-map.conf"
 }
 
-func NormalizeJA3Hash(v string) (string, bool) {
+func NormalizeJA4Hash(v string) (string, bool) {
 	s := strings.ToLower(strings.TrimSpace(v))
-	if !reJA3Hex32.MatchString(s) {
+	if !reJA4Hex32.MatchString(s) {
 		return "", false
 	}
 	return s, true
 }
 
-func sanitizeJA3Name(v string) string {
+func sanitizeJA4Name(v string) string {
 	s := strings.TrimSpace(v)
 	if s == "" {
 		return "Unnamed"
 	}
-	// Keep comments single-line and compact.
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.ReplaceAll(s, "\r", " ")
 	return s
 }
 
-func normalizeJA3Entries(entries []models.JA3FingerprintEntry) []models.JA3FingerprintEntry {
+func normalizeJA4Entries(entries []models.JA3FingerprintEntry) []models.JA3FingerprintEntry {
 	byHash := make(map[string]models.JA3FingerprintEntry, len(entries))
 	for _, e := range entries {
-		h, ok := NormalizeJA3Hash(e.Hash)
+		h, ok := NormalizeJA4Hash(e.Hash)
 		if !ok {
 			continue
 		}
 
-		name := sanitizeJA3Name(e.Name)
+		name := sanitizeJA4Name(e.Name)
 		action := strings.ToLower(strings.TrimSpace(e.Action))
 		if action != "log" && action != "block" {
 			action = "block"
 		}
-
 		enabled := e.Enabled
 
 		in := models.JA3FingerprintEntry{
@@ -76,13 +74,12 @@ func normalizeJA3Entries(entries []models.JA3FingerprintEntry) []models.JA3Finge
 			continue
 		}
 
-		// If both have same blocking state, prefer one with a better label.
+		// If both have same blocking state, prefer non-"Unnamed".
 		if prevBlocks == inBlocks && prev.Name == "Unnamed" && in.Name != "Unnamed" {
 			byHash[h] = in
 			continue
 		}
 	}
-
 	out := make([]models.JA3FingerprintEntry, 0, len(byHash))
 	for _, e := range byHash {
 		out = append(out, e)
@@ -91,7 +88,7 @@ func normalizeJA3Entries(entries []models.JA3FingerprintEntry) []models.JA3Finge
 	return out
 }
 
-func ParseJA3Entries(content string) []models.JA3FingerprintEntry {
+func ParseJA4Entries(content string) []models.JA3FingerprintEntry {
 	lines := strings.Split(content, "\n")
 	var list []models.JA3FingerprintEntry
 	for _, ln := range lines {
@@ -107,10 +104,10 @@ func ParseJA3Entries(content string) []models.JA3FingerprintEntry {
 		if i < 0 || j <= i {
 			continue
 		}
-		if h, ok := NormalizeJA3Hash(line[i+1 : j]); ok {
+		if h, ok := NormalizeJA4Hash(line[i+1 : j]); ok {
 			name := "Unnamed"
 			if k := strings.Index(line, "#"); k >= 0 {
-				name = sanitizeJA3Name(line[k+1:])
+				name = sanitizeJA4Name(line[k+1:])
 			}
 			list = append(list, models.JA3FingerprintEntry{
 				Name:    name,
@@ -122,26 +119,26 @@ func ParseJA3Entries(content string) []models.JA3FingerprintEntry {
 			})
 		}
 	}
-	return normalizeJA3Entries(list)
+	return normalizeJA4Entries(list)
 }
 
-func ReadJA3Entries(path string) ([]models.JA3FingerprintEntry, error) {
+func ReadJA4Entries(path string) ([]models.JA3FingerprintEntry, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return ParseJA3Entries(string(b)), nil
+	return ParseJA4Entries(string(b)), nil
 }
 
-func WriteJA3Map(enabled bool, entries []models.JA3FingerprintEntry) error {
-	path := JA3MapPath()
-	list := normalizeJA3Entries(entries)
+func WriteJA4Map(enabled bool, entries []models.JA3FingerprintEntry) error {
+	path := JA4MapPath()
+	list := normalizeJA4Entries(entries)
 
 	var b strings.Builder
-	b.WriteString("## Flux WAF JA3 Management — generated, do not edit manually\n")
-	b.WriteString("## Source variable from nginx-ssl-fingerprint: $http_ssl_ja3_hash\n")
+	b.WriteString("## Flux WAF JA4 Management — generated, do not edit manually\n")
+	b.WriteString("## Source variable from nginx-ssl-fingerprint: $http_ssl_ja4_hash\n")
 	b.WriteString("## This map must be included from nginx.conf inside `http {}`.\n")
-	b.WriteString("map $http_ssl_ja3_hash $wafx_ja3_blocked {\n")
+	b.WriteString("map $http_ssl_ja4_hash $wafx_ja4_blocked {\n")
 	b.WriteString("    default 0;\n\n")
 	if enabled {
 		for _, e := range list {
@@ -151,7 +148,7 @@ func WriteJA3Map(enabled bool, entries []models.JA3FingerprintEntry) error {
 			b.WriteString(fmt.Sprintf("    \"%s\" 1; # %s\n", e.Hash, e.Name))
 		}
 	} else {
-		b.WriteString("    # JA3 filtering disabled from dashboard\n")
+		b.WriteString("    # JA4 filtering disabled from dashboard\n")
 	}
 	b.WriteString("}\n")
 	return os.WriteFile(path, []byte(b.String()), 0o644)
