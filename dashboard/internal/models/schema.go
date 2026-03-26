@@ -57,6 +57,30 @@ type HostConfig struct {
 	SSLCert     string `json:"ssl_cert"`  // resolved path to .crt
 	SSLKey      string `json:"ssl_key"`   // resolved path to .key
 	HTTP2Enabled bool  `json:"http2_enabled"`
+
+	// Optional per-host security engines override state.
+	SecurityOverrides HostSecurityOverrides `json:"security_overrides,omitempty"`
+}
+
+type SecurityOverrideMode string
+
+const (
+	SecurityModeInherit  SecurityOverrideMode = "inherit"
+	SecurityModeOverride SecurityOverrideMode = "override"
+	SecurityModeDisabled SecurityOverrideMode = "disabled"
+)
+
+type SecurityFeatureOverride struct {
+	Mode   SecurityOverrideMode `json:"mode"`
+	Custom map[string]any       `json:"custom,omitempty"`
+}
+
+type HostSecurityOverrides struct {
+	VirtualPatching SecurityFeatureOverride `json:"virtual_patching"`
+	BotThreshold    SecurityFeatureOverride `json:"bot_threshold"`
+	GeoIP           SecurityFeatureOverride `json:"geoip"`
+	DLP             SecurityFeatureOverride `json:"dlp"`
+	WordPress       SecurityFeatureOverride `json:"wordpress_security"`
 }
 
 // TLSCertificate — managed TLS cert (Let's Encrypt or custom PEM), stored in BoltDB; files under ssl_certs.

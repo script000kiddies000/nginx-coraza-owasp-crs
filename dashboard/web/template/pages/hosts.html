@@ -150,6 +150,25 @@
                 class="px-2.5 py-1 text-[9px] font-bold border border-gray-700 text-gray-400 bg-gray-800/40 rounded uppercase tracking-widest">
                 <span x-text="modeName(host.mode)"></span>
               </div>
+
+              <!-- Per-host security override badges (inherit global => grey; override => green) -->
+              <div class="flex items-center gap-1">
+                <template x-for="b in [
+                  {k:'virtual_patching', t:'VP'},
+                  {k:'bot_threshold', t:'BOT'},
+                  {k:'geoip', t:'GEO'},
+                  {k:'dlp', t:'DLP'},
+                  {k:'wordpress_security', t:'WP'},
+                ]" :key="b.k">
+                  <span class="px-2 py-1 text-[9px] font-bold border rounded uppercase tracking-widest"
+                    :class="(host.security_overrides?.[b.k]?.mode || 'inherit') === 'override'
+                      ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
+                      : ((host.security_overrides?.[b.k]?.mode || 'inherit') === 'disabled'
+                        ? 'border-gray-700 text-gray-500 bg-gray-800/50'
+                        : 'border-sky-500/30 text-sky-300 bg-sky-500/10')"
+                    x-text="b.t"></span>
+                </template>
+              </div>
             </div>
 
             <!-- LB Info Bubble -->
@@ -204,6 +223,22 @@
             <span x-text="error"></span>
           </div>
         </template>
+
+        <!-- Tabs (underline style) -->
+        <div class="border-b border-gray-800">
+          <div class="flex items-center gap-6 overflow-x-auto">
+            <template x-for="t in modalTabs" :key="t.id">
+              <button type="button" @click="modalTab = t.id"
+                class="relative pb-3 pt-1 text-sm font-semibold whitespace-nowrap transition-colors"
+                :class="modalTab === t.id ? 'text-cyan-300' : 'text-gray-500 hover:text-gray-300'">
+                <span x-text="t.label"></span>
+                <span x-show="modalTab === t.id" x-cloak class="absolute left-0 right-0 -bottom-[1px] h-[2px] bg-cyan-400 rounded-full"></span>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <div x-show="modalTab === 'general'" class="space-y-5">
 
         <!-- Domain -->
         <div>
@@ -397,6 +432,154 @@
           <input x-model="form.name" type="text" placeholder="My App"
             class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3.5 py-2.5
                         placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors">
+        </div>
+
+        </div>
+
+        <!-- Virtual Patching -->
+        <div x-show="modalTab === 'virtual_patching'" class="space-y-4">
+          <div class="rounded-xl border border-gray-800 bg-gray-950/30 p-4">
+            <h4 class="text-sm font-semibold text-white mb-3">Virtual Patching</h4>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="m in securityModes" :key="'vp-' + m.id">
+                <button type="button" @click="setSecurityMode('virtual_patching', m.id)"
+                  :class="form.security_overrides.virtual_patching.mode === m.id ? m.activeClass : 'border-gray-700 bg-gray-800/60 text-gray-400 hover:text-gray-200'"
+                  class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors" x-text="m.label"></button>
+              </template>
+            </div>
+            <template x-if="form.security_overrides.virtual_patching.mode === 'override'">
+              <div class="mt-4 grid md:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs text-gray-400 mb-1">Profile</label>
+                  <select x-model="form.security_overrides.virtual_patching.custom.profile"
+                    class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2">
+                    <option value="safe">Safe</option>
+                    <option value="balanced">Balanced</option>
+                    <option value="strict">Strict</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-400 mb-1">Notes</label>
+                  <input x-model="form.security_overrides.virtual_patching.custom.notes" type="text" placeholder="Optional notes"
+                    class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2">
+                </div>
+              </div>
+            </template>
+            <p class="text-xs text-gray-500 mt-3">Pilih Override untuk set custom per-host. Disabled mematikan fitur ini untuk host ini.</p>
+          </div>
+        </div>
+
+        <!-- Bot Threshold -->
+        <div x-show="modalTab === 'bot_threshold'" class="space-y-4">
+          <div class="rounded-xl border border-gray-800 bg-gray-950/30 p-4">
+            <h4 class="text-sm font-semibold text-white mb-3">Bot Threshold</h4>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="m in securityModes" :key="'bt-' + m.id">
+                <button type="button" @click="setSecurityMode('bot_threshold', m.id)"
+                  :class="form.security_overrides.bot_threshold.mode === m.id ? m.activeClass : 'border-gray-700 bg-gray-800/60 text-gray-400 hover:text-gray-200'"
+                  class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors" x-text="m.label"></button>
+              </template>
+            </div>
+            <template x-if="form.security_overrides.bot_threshold.mode === 'override'">
+              <div class="mt-4 grid md:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs text-gray-400 mb-1">Threshold</label>
+                  <input x-model.number="form.security_overrides.bot_threshold.custom.threshold" type="number" min="1" max="100000"
+                    class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 font-mono">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-400 mb-1">Login RPM</label>
+                  <input x-model.number="form.security_overrides.bot_threshold.custom.login_rpm" type="number" min="1" max="10000"
+                    class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 font-mono">
+                </div>
+              </div>
+            </template>
+            <p class="text-xs text-gray-500 mt-3">Pakai Override jika traffic host ini butuh threshold bot berbeda dari global.</p>
+          </div>
+        </div>
+
+        <!-- GeoIP -->
+        <div x-show="modalTab === 'geoip'" class="space-y-4">
+          <div class="rounded-xl border border-gray-800 bg-gray-950/30 p-4">
+            <h4 class="text-sm font-semibold text-white mb-3">GeoIP Blocking</h4>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="m in securityModes" :key="'geo-' + m.id">
+                <button type="button" @click="setSecurityMode('geoip', m.id)"
+                  :class="form.security_overrides.geoip.mode === m.id ? m.activeClass : 'border-gray-700 bg-gray-800/60 text-gray-400 hover:text-gray-200'"
+                  class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors" x-text="m.label"></button>
+              </template>
+            </div>
+            <template x-if="form.security_overrides.geoip.mode === 'override'">
+              <div class="mt-4">
+                <label class="block text-xs text-gray-400 mb-1">Blocked countries (ISO2, comma separated)</label>
+                <input x-model="form.security_overrides.geoip.custom.blocked_countries" type="text" placeholder="RU,CN,KP"
+                  class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 font-mono">
+              </div>
+            </template>
+            <p class="text-xs text-gray-500 mt-3">Cocok di-override jika host ini punya kebijakan negara berbeda dari global.</p>
+          </div>
+        </div>
+
+        <!-- DLP -->
+        <div x-show="modalTab === 'dlp'" class="space-y-4">
+          <div class="rounded-xl border border-gray-800 bg-gray-950/30 p-4">
+            <h4 class="text-sm font-semibold text-white mb-3">Data Guard (DLP)</h4>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="m in securityModes" :key="'dlp-' + m.id">
+                <button type="button" @click="setSecurityMode('dlp', m.id)"
+                  :class="form.security_overrides.dlp.mode === m.id ? m.activeClass : 'border-gray-700 bg-gray-800/60 text-gray-400 hover:text-gray-200'"
+                  class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors" x-text="m.label"></button>
+              </template>
+            </div>
+            <template x-if="form.security_overrides.dlp.mode === 'override'">
+              <div class="mt-4 grid md:grid-cols-2 gap-3">
+                <label class="inline-flex items-center gap-2 text-xs text-gray-300">
+                  <input type="checkbox" x-model="form.security_overrides.dlp.custom.inspect_request_body"
+                    class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+                  Inspect request body
+                </label>
+                <label class="inline-flex items-center gap-2 text-xs text-gray-300">
+                  <input type="checkbox" x-model="form.security_overrides.dlp.custom.inspect_response_body"
+                    class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+                  Inspect response body
+                </label>
+              </div>
+            </template>
+            <p class="text-xs text-gray-500 mt-3">Gunakan Disabled untuk host yang tidak butuh inspeksi konten sensitif.</p>
+          </div>
+        </div>
+
+        <!-- WordPress Security -->
+        <div x-show="modalTab === 'wordpress_security'" class="space-y-4">
+          <div class="rounded-xl border border-gray-800 bg-gray-950/30 p-4">
+            <h4 class="text-sm font-semibold text-white mb-3">WordPress Security</h4>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="m in securityModes" :key="'wp-' + m.id">
+                <button type="button" @click="setSecurityMode('wordpress_security', m.id)"
+                  :class="form.security_overrides.wordpress_security.mode === m.id ? m.activeClass : 'border-gray-700 bg-gray-800/60 text-gray-400 hover:text-gray-200'"
+                  class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors" x-text="m.label"></button>
+              </template>
+            </div>
+            <template x-if="form.security_overrides.wordpress_security.mode === 'override'">
+              <div class="mt-4 grid md:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs text-gray-400 mb-1">Profile</label>
+                  <select x-model="form.security_overrides.wordpress_security.custom.profile"
+                    class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2">
+                    <option value="safe">Safe</option>
+                    <option value="balanced">Balanced</option>
+                    <option value="strict">Strict</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-400 mb-1">Login path</label>
+                  <input x-model="form.security_overrides.wordpress_security.custom.login_path" type="text" placeholder="/wp-login.php"
+                    class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 font-mono">
+                </div>
+              </div>
+            </template>
+            <p class="text-xs text-gray-500 mt-3">Gunakan Override hanya untuk host WordPress yang memang butuh tuning khusus.</p>
+          </div>
         </div>
 
         <!-- Footer -->
@@ -598,6 +781,7 @@
       tlsCerts: [],
       loading: true,
       showModal: false,
+      modalTab: 'general',
       isEdit: false,
       saving: false,
       error: '',
@@ -612,6 +796,19 @@
       // Detail modal state
       showDetailModal: false,
       detailHost: {},
+      modalTabs: [
+        { id: 'general', label: 'General' },
+        { id: 'virtual_patching', label: 'Virtual Patching' },
+        { id: 'bot_threshold', label: 'Bot Threshold' },
+        { id: 'geoip', label: 'GeoIP' },
+        { id: 'dlp', label: 'DLP' },
+        { id: 'wordpress_security', label: 'WordPress Security' },
+      ],
+      securityModes: [
+        { id: 'inherit', label: 'Inherit Global', activeClass: 'border-sky-500/40 bg-sky-500/10 text-sky-300' },
+        { id: 'override', label: 'Override (Custom)', activeClass: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' },
+        { id: 'disabled', label: 'Disabled', activeClass: 'border-gray-500/40 bg-gray-500/10 text-gray-300' },
+      ],
 
       get activeTlsCerts() {
         return (this.tlsCerts || []).filter(c => (c.status || '').toLowerCase() === 'active');
@@ -631,8 +828,73 @@
           redirect_code: 301,
           waf_mode: 'On',
           ssl_cert_id: '',
-          enabled: true
+          enabled: true,
+          security_overrides: {
+            virtual_patching: { mode: 'inherit', custom: { profile: 'balanced', notes: '' } },
+            bot_threshold: { mode: 'inherit', custom: { threshold: 0, login_rpm: 0 } },
+            geoip: { mode: 'inherit', custom: { blocked_countries: '' } },
+            dlp: { mode: 'inherit', custom: { inspect_request_body: true, inspect_response_body: false } },
+            wordpress_security: { mode: 'inherit', custom: { profile: 'balanced', login_path: '/wp-login.php' } },
+          }
         };
+      },
+
+      normalizeOverrideMode(v) {
+        const m = String(v || '').trim().toLowerCase();
+        return (m === 'override' || m === 'disabled') ? m : 'inherit';
+      },
+
+      normalizeSecurityOverrides(raw) {
+        const o = raw || {};
+        return {
+          virtual_patching: {
+            mode: this.normalizeOverrideMode(o?.virtual_patching?.mode),
+            custom: (o?.virtual_patching?.custom && typeof o.virtual_patching.custom === 'object') ? o.virtual_patching.custom : { profile: 'balanced', notes: '' }
+          },
+          bot_threshold: {
+            mode: this.normalizeOverrideMode(o?.bot_threshold?.mode),
+            custom: (o?.bot_threshold?.custom && typeof o.bot_threshold.custom === 'object') ? o.bot_threshold.custom : { threshold: 0, login_rpm: 0 }
+          },
+          geoip: {
+            mode: this.normalizeOverrideMode(o?.geoip?.mode),
+            custom: (o?.geoip?.custom && typeof o.geoip.custom === 'object') ? o.geoip.custom : { blocked_countries: '' }
+          },
+          dlp: {
+            mode: this.normalizeOverrideMode(o?.dlp?.mode),
+            custom: (o?.dlp?.custom && typeof o.dlp.custom === 'object') ? o.dlp.custom : { inspect_request_body: true, inspect_response_body: false }
+          },
+          wordpress_security: {
+            mode: this.normalizeOverrideMode(o?.wordpress_security?.mode),
+            custom: (o?.wordpress_security?.custom && typeof o.wordpress_security.custom === 'object') ? o.wordpress_security.custom : { profile: 'balanced', login_path: '/wp-login.php' }
+          },
+        };
+      },
+
+      securityModeOf(tabId) {
+        if (tabId === 'virtual_patching') return this.form?.security_overrides?.virtual_patching?.mode || 'inherit';
+        if (tabId === 'bot_threshold') return this.form?.security_overrides?.bot_threshold?.mode || 'inherit';
+        if (tabId === 'geoip') return this.form?.security_overrides?.geoip?.mode || 'inherit';
+        if (tabId === 'dlp') return this.form?.security_overrides?.dlp?.mode || 'inherit';
+        if (tabId === 'wordpress_security') return this.form?.security_overrides?.wordpress_security?.mode || 'inherit';
+        return 'inherit';
+      },
+
+      securityModeLabel(mode) {
+        if (mode === 'override') return 'custom';
+        if (mode === 'disabled') return 'off';
+        return 'inherit';
+      },
+
+      securityBadgeClass(mode) {
+        if (mode === 'override') return 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10';
+        if (mode === 'disabled') return 'border-gray-600 text-gray-400 bg-gray-800/60';
+        return 'border-sky-500/40 text-sky-300 bg-sky-500/10';
+      },
+
+      setSecurityMode(featureKey, mode) {
+        if (!this.form.security_overrides) this.form.security_overrides = this.normalizeSecurityOverrides({});
+        if (!this.form.security_overrides[featureKey]) this.form.security_overrides[featureKey] = { mode: 'inherit' };
+        this.form.security_overrides[featureKey].mode = this.normalizeOverrideMode(mode);
       },
 
       hasHttpsPort() {
@@ -686,6 +948,7 @@
           waf_mode: h.waf_mode ?? h.WAFMode ?? h.wafMode ?? 'On',
           ssl_cert_id: h.ssl_cert_id ?? h.SSLCertID ?? h.sslCertID ?? h.ssl_cert ?? '',
           ssl_enabled: !!(h.ssl_enabled ?? h.SSLEnabled ?? h.sslEnabled ?? false),
+          security_overrides: this.normalizeSecurityOverrides(h.security_overrides ?? h.SecurityOverrides ?? {}),
         };
       },
 
@@ -789,6 +1052,7 @@
       openAdd() {
         this.fetchTls();
         this.form = this.blank();
+        this.modalTab = 'general';
         this.isEdit = false;
         this.error = '';
         this.showModal = true;
@@ -819,7 +1083,9 @@
             : [''],
           ssl_cert_id: nh.ssl_cert_id || '',
           redirect_code: nh.redirect_code || 301,
+          security_overrides: this.normalizeSecurityOverrides(nh.security_overrides || {}),
         };
+        this.modalTab = 'general';
         this.isEdit = true;
         this.error = '';
         this.showModal = true;
@@ -863,6 +1129,7 @@
             : [],
           ssl_enabled: this.hasHttpsPort(),
           enabled: (this.form.enabled !== undefined) ? !!this.form.enabled : true,
+          security_overrides: this.normalizeSecurityOverrides(this.form.security_overrides || {}),
           previous_domain: (this.isEdit && orig && orig !== dom) ? orig : '',
         };
 
