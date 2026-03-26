@@ -40,6 +40,7 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	mux.HandleFunc("GET /virtual-patching", app.RequireAuth(app.PageVirtualPatching))
 	mux.HandleFunc("GET /geo-blocking", app.RequireAuth(app.PageGeoBlocking))
 	mux.HandleFunc("GET /bot-management", app.RequireAuth(app.PageBotManagement))
+	mux.HandleFunc("GET /ja3-management", app.RequireAuth(app.PageJA3Management))
 	mux.HandleFunc("GET /ip-reputations", app.RequireAuth(app.PageIPReputations))
 	mux.HandleFunc("GET /wordpress-security", app.RequireAuth(app.PageWPSecurity))
 	mux.HandleFunc("GET /data-guard", app.RequireAuth(app.PageDataGuard))
@@ -94,6 +95,8 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	mux.HandleFunc("GET /api/advbot/status", app.RequireAuth(app.APIBotStatus))
 	mux.HandleFunc("GET /api/advbot/blocked", app.RequireAuth(app.APIBotBlockedIPs))
 	mux.HandleFunc("POST /api/advbot/unblock", app.RequireAuth(app.APIBotUnblock))
+	mux.HandleFunc("GET /api/ja3/config", app.RequireAuth(app.APIGetJA3Config))
+	mux.HandleFunc("POST /api/ja3/apply", app.RequireAuth(app.APIApplyJA3Config))
 
 	mux.HandleFunc("GET /api/threat-intel/config", app.RequireAuth(app.APIGetThreatIntelConfig))
 	mux.HandleFunc("POST /api/threat-intel/config", app.RequireAuth(app.APIPostThreatIntelConfig))

@@ -104,6 +104,18 @@ type AdvBotConfig struct {
 	WhitelistIPs       []string `json:"whitelist_ips"`
 }
 
+type JA3Config struct {
+	Enabled bool                  `json:"enabled"`
+	Entries []JA3FingerprintEntry `json:"entries,omitempty"`
+	// Legacy compatibility: old UI/API used plain hash list.
+	Hashes  []string              `json:"hashes,omitempty"`
+}
+
+type JA3FingerprintEntry struct {
+	Name string `json:"name"`
+	Hash string `json:"hash"`
+}
+
 // ── Threat Intelligence ───────────────────────────────────────────────────────
 
 type ThreatIntelData struct {

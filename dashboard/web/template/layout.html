@@ -28,6 +28,7 @@
     a[href="/rules"] .nav-ic    { color:#34d399; background:rgba(5,150,105,.15); border-color:rgba(52,211,153,.30); }
     a[href="/virtual-patching"] .nav-ic,
     a[href="/bot-management"] .nav-ic,
+    a[href="/ja3-management"] .nav-ic,
     a[href="/threat-intel"] .nav-ic,
     a[href="/ip-reputations"] .nav-ic,
     a[href="/geo-blocking"] .nav-ic,
@@ -77,7 +78,7 @@
         initNav() {
           this.loadNavState();
           const active = document.body.getAttribute('data-flux-active') || '';
-          const open = { hosts: 'edge', ssl: 'edge', wafsettings: 'waf', rules: 'waf', vpatch: 'engines', botmgmt: 'engines', threatintel: 'engines', iprep: 'engines', geoblock: 'engines', dlp: 'engines', wpsec: 'engines', secreport: 'rep', atkreport: 'rep', seclogs: 'logs', logs: 'logs', 'nginx-mon': 'mon', 'srv-mon': 'mon', settings: 'sys', users: 'sys' };
+          const open = { hosts: 'edge', ssl: 'edge', wafsettings: 'waf', rules: 'waf', vpatch: 'engines', botmgmt: 'engines', ja3: 'engines', threatintel: 'engines', iprep: 'engines', geoblock: 'engines', dlp: 'engines', wpsec: 'engines', secreport: 'rep', atkreport: 'rep', seclogs: 'logs', logs: 'logs', 'nginx-mon': 'mon', 'srv-mon': 'mon', settings: 'sys', users: 'sys' };
           const g = open[active];
           if (g) this.navG[g] = true;
         },
@@ -148,23 +149,19 @@
     <a href="/hosts" title="Hosts"
        x-show="!sidebarOpen || navG.edge"
        :class="navRow(sidebarOpen, true, 'edge')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
               {{if eq .ActiveMenu "hosts"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-        <path d="M4 5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5ZM4 13a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2Z"/>
-      </svg>
+              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
+      <span class="nav-ic"><i data-lucide="server"></i></span>
       <span x-show="sidebarOpen" x-cloak class="truncate">Hosts & Upstreams</span>
     </a>
     <a href="/ssl" title="SSL"
        x-show="!sidebarOpen || navG.edge"
        :class="navRow(sidebarOpen, true, 'edge')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
               {{if eq .ActiveMenu "ssl"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-gray-800{{end}}">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0">
-        <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z" clip-rule="evenodd"/>
-      </svg>
+              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
+      <span class="nav-ic"><i data-lucide="lock"></i></span>
       <span x-show="sidebarOpen" x-cloak class="truncate">SSL / TLS</span>
     </a>
 
@@ -215,7 +212,16 @@
               {{if eq .ActiveMenu "botmgmt"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
               {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
       <span class="nav-ic"><i data-lucide="bot"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Bot Management</span>
+      <span x-show="sidebarOpen" x-cloak class="truncate">Bot Threshold</span>
+    </a>
+    <a href="/ja3-management" title="JA3 Fingerprint"
+       x-show="!sidebarOpen || navG.engines"
+       :class="navRow(sidebarOpen, true, 'engines')"
+       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
+              {{if eq .ActiveMenu "ja3"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
+      <span class="nav-ic"><i data-lucide="fingerprint"></i></span>
+      <span x-show="sidebarOpen" x-cloak class="truncate">JA3 Fingerprint</span>
     </a>
     <a href="/threat-intel" title="Threat Intel"
        x-show="!sidebarOpen || navG.engines"

@@ -8,47 +8,68 @@
   <div x-show="msgOk" x-cloak class="text-sm text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-lg px-4 py-2" x-text="msgOk"></div>
   <div x-show="msgErr" x-cloak class="text-sm text-rose-400 border border-rose-500/30 bg-rose-500/10 rounded-lg px-4 py-2" x-text="msgErr"></div>
 
-  <div class="grid md:grid-cols-2 gap-6">
-    <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-4">
-      <h2 class="text-sm font-semibold text-white">Pengaturan</h2>
-      <label class="flex items-center gap-3 cursor-pointer">
-        <input type="checkbox" x-model="form.antibot_enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
-        <span class="text-sm text-gray-300">Antibot enabled</span>
-      </label>
-      <div>
-        <label class="text-xs text-gray-500 uppercase">Bot threshold</label>
-        <input type="number" x-model.number="form.bot_threshold" min="1" max="100000"
-               class="w-full mt-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-200">
+  <div class="grid xl:grid-cols-3 gap-6">
+    <div class="xl:col-span-2 space-y-6">
+      <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-4">
+        <h2 class="text-sm font-semibold text-white">Bot Threshold & Login Protection</h2>
+        <p class="text-xs text-gray-500 -mt-1">
+          Bagian ini untuk deteksi berbasis perilaku traffic (rate / window), bukan fingerprint TLS.
+        </p>
+
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" x-model="form.antibot_enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+          <span class="text-sm text-gray-300">Antibot enabled</span>
+        </label>
+
+        <div>
+          <label class="text-xs text-gray-500 uppercase">Bot threshold</label>
+          <input type="number" x-model.number="form.bot_threshold" min="1" max="100000"
+                 class="w-full mt-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-200">
+          <p class="text-[11px] text-gray-600 mt-1">Ambang pemicu challenge/blokir dari modul antibot.</p>
+        </div>
+
+        <div>
+          <label class="text-xs text-gray-500 uppercase">Challenge type</label>
+          <select x-model="form.challenge_type" class="w-full mt-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200">
+            <option value="js">js</option>
+            <option value="captcha">captcha</option>
+            <option value="none">none</option>
+            <option value="off">off</option>
+          </select>
+        </div>
+
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" x-model="form.limit_login_enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+          <span class="text-sm text-gray-300">Limit login (RPM)</span>
+        </label>
+        <input type="number" x-model.number="form.limit_login_rpm" min="1" max="10000"
+               class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-200">
+
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" x-model="form.cred_stuff_enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
+          <span class="text-sm text-gray-300">Credential stuffing window</span>
+        </label>
+        <input type="number" x-model.number="form.cred_stuff_window_min" min="1" max="1440"
+               class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-200">
+
+        <div>
+          <label class="text-xs text-gray-500 uppercase">Whitelist IP (satu per baris)</label>
+          <textarea x-model="whitelistText" rows="3" class="w-full mt-1 font-mono text-sm bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-gray-200"></textarea>
+        </div>
       </div>
-      <div>
-        <label class="text-xs text-gray-500 uppercase">Challenge type</label>
-        <select x-model="form.challenge_type" class="w-full mt-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200">
-          <option value="js">js</option>
-          <option value="captcha">captcha</option>
-          <option value="none">none</option>
-          <option value="off">off</option>
-        </select>
+
+      <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-5 space-y-3">
+        <h2 class="text-sm font-semibold text-white">JA3 Fingerprint (TLS)</h2>
+        <p class="text-xs text-gray-500">
+          Pengaturan JA3 dipisah ke halaman khusus agar daftar fingerprint lebih mudah dikelola.
+        </p>
+        <a href="/ja3-management"
+          class="inline-flex items-center gap-2 text-sm font-semibold text-cyan-300 hover:text-cyan-200">
+          <i data-lucide="fingerprint" class="w-4 h-4"></i>
+          Buka JA3 Management
+        </a>
       </div>
-      <label class="flex items-center gap-3 cursor-pointer">
-        <input type="checkbox" x-model="form.limit_login_enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
-        <span class="text-sm text-gray-300">Limit login (RPM)</span>
-      </label>
-      <input type="number" x-model.number="form.limit_login_rpm" min="1" max="10000"
-             class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-200">
-      <label class="flex items-center gap-3 cursor-pointer">
-        <input type="checkbox" x-model="form.cred_stuff_enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
-        <span class="text-sm text-gray-300">Credential stuffing window</span>
-      </label>
-      <input type="number" x-model.number="form.cred_stuff_window_min" min="1" max="1440"
-             class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-200">
-      <label class="flex items-center gap-3 cursor-pointer">
-        <input type="checkbox" x-model="form.ja3_enabled" class="rounded border-gray-600 bg-gray-800 text-emerald-500">
-        <span class="text-sm text-gray-300">JA3 fingerprint (perlu map/snippet nginx)</span>
-      </label>
-      <div>
-        <label class="text-xs text-gray-500 uppercase">Whitelist IP (satu per baris)</label>
-        <textarea x-model="whitelistText" rows="3" class="w-full mt-1 font-mono text-sm bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-gray-200"></textarea>
-      </div>
+
       <button type="button" @click="save()" :disabled="saving"
               class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg">Simpan</button>
     </div>

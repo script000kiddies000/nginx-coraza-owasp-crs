@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -155,11 +156,16 @@ func (app *App) APIGetHosts(w http.ResponseWriter, r *http.Request) {
 
 // APISaveHost handles POST /api/hosts — add or update a host, write nginx conf, reload.
 func (app *App) APISaveHost(w http.ResponseWriter, r *http.Request) {
-	var h models.HostConfig
-	if err := json.NewDecoder(r.Body).Decode(&h); err != nil {
+	var body struct {
+		models.HostConfig
+		PreviousDomain string `json:"previous_domain,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		jsonError(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	h := body.HostConfig
+	prev := strings.TrimSpace(body.PreviousDomain)
 
 	// ── Basic validation ──────────────────────────────────────────────────────
 	h.Domain = strings.TrimSpace(h.Domain)
@@ -266,6 +272,32 @@ func (app *App) APISaveHost(w http.ResponseWriter, r *http.Request) {
 		h.SSLCert = ""
 		h.SSLKey = ""
 		h.SSLCertID = ""
+	}
+
+	// ── Rename domain (edit): delete old DB key + nginx conf when previous_domain differs ──
+	if prev != "" && prev != h.Domain {
+		if _, err := store.GetHost(app.DB, prev); err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				jsonError(w, "previous host not found: "+prev, http.StatusBadRequest)
+				return
+			}
+			jsonError(w, "db: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if _, err := store.GetHost(app.DB, h.Domain); err == nil {
+			jsonError(w, "domain already exists: "+h.Domain, http.StatusConflict)
+			return
+		} else if !errors.Is(err, store.ErrNotFound) {
+			jsonError(w, "db: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := store.DeleteHost(app.DB, prev); err != nil {
+			jsonError(w, "db: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := nginx.DeleteHostConf(prev); err != nil {
+			log.Printf("[hosts] rename: delete old conf %q: %v", prev, err)
+		}
 	}
 
 	// ── Persist ───────────────────────────────────────────────────────────────

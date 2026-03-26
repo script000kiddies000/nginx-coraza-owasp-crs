@@ -94,6 +94,79 @@ func (app *App) APIBotUnblock(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"ip": body.IP})
 }
 
+// ── JA3 Management ────────────────────────────────────────────────────────────
+
+func (app *App) APIGetJA3Config(w http.ResponseWriter, r *http.Request) {
+	cfg := store.GetJA3Config(app.DB)
+	// If DB list is empty, try to bootstrap from existing snippet once.
+	if len(cfg.Entries) == 0 {
+		if list, err := nginx.ReadJA3Entries(nginx.JA3MapPath()); err == nil && len(list) > 0 {
+			cfg.Entries = list
+			_ = store.SaveJA3Config(app.DB, cfg)
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"config":   cfg,
+		"map_file": nginx.StatConfigFile(nginx.JA3MapPath()),
+	})
+}
+
+func (app *App) APIApplyJA3Config(w http.ResponseWriter, r *http.Request) {
+	var body models.JA3Config
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	entries := body.Entries
+	// Legacy client compatibility: allow plain hash array.
+	if len(entries) == 0 && len(body.Hashes) > 0 {
+		for _, h := range body.Hashes {
+			entries = append(entries, models.JA3FingerprintEntry{
+				Name: "JA3 " + strings.TrimSpace(h),
+				Hash: h,
+			})
+		}
+	}
+	normalized := make([]models.JA3FingerprintEntry, 0, len(entries))
+	for _, e := range entries {
+		v, ok := nginx.NormalizeJA3Hash(e.Hash)
+		if !ok {
+			jsonError(w, "invalid JA3 hash: "+strings.TrimSpace(e.Hash), http.StatusBadRequest)
+			return
+		}
+		name := strings.TrimSpace(e.Name)
+		if name == "" {
+			short := v
+			if len(short) > 8 {
+				short = short[:8]
+			}
+			name = "JA3 " + short
+		}
+		normalized = append(normalized, models.JA3FingerprintEntry{
+			Name: name,
+			Hash: v,
+		})
+	}
+	body.Entries = normalized
+	body.Hashes = nil
+
+	if err := store.SaveJA3Config(app.DB, body); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := nginx.WriteJA3Map(body.Enabled, body.Entries); err != nil {
+		jsonError(w, "write ja3 map: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := nginx.ReloadNginx(); err != nil {
+		log.Printf("[ja3] nginx reload: %v", err)
+		jsonError(w, "saved but nginx reload failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, body)
+}
+
 // ── Virtual Patching ──────────────────────────────────────────────────────────
 
 func vpatchRulesPath() string {

@@ -9,6 +9,7 @@ import (
 const (
 	keyWAF      = "waf"
 	keyAdvBot   = "advbot"
+	keyJA3      = "ja3"
 	keyDLP      = "dlp"
 	keyThreatIntel = "threat_intel"
 	keyACME        = "acme_account"
@@ -46,6 +47,49 @@ func GetAdvBotConfig(db *bolt.DB) models.AdvBotConfig {
 
 func SaveAdvBotConfig(db *bolt.DB, c models.AdvBotConfig) error {
 	return put(db, BucketSettings, keyAdvBot, c)
+}
+
+// ── JA3 Config ────────────────────────────────────────────────────────────────
+
+func GetJA3Config(db *bolt.DB) models.JA3Config {
+	var c models.JA3Config
+	_ = get(db, BucketSettings, keyJA3, &c)
+	if len(c.Entries) == 0 && len(c.Hashes) > 0 {
+		// Migrate legacy hashes -> named entries.
+		ents := make([]models.JA3FingerprintEntry, 0, len(c.Hashes))
+		for _, h := range c.Hashes {
+			short := h
+			if len(short) > 8 {
+				short = short[:8]
+			}
+			ents = append(ents, models.JA3FingerprintEntry{
+				Name: "JA3 " + short,
+				Hash: h,
+			})
+		}
+		c.Entries = ents
+		c.Hashes = nil
+		_ = put(db, BucketSettings, keyJA3, c)
+	}
+	if len(c.Entries) == 0 {
+		c.Entries = []models.JA3FingerprintEntry{}
+	}
+	// default enabled so existing snippet behavior remains active.
+	if !c.Enabled {
+		// keep false if explicitly saved false with hashes.
+		var raw models.JA3Config
+		err := get(db, BucketSettings, keyJA3, &raw)
+		if err == ErrNotFound {
+			c.Enabled = true
+		}
+	}
+	return c
+}
+
+func SaveJA3Config(db *bolt.DB, c models.JA3Config) error {
+	// Persist new format only.
+	c.Hashes = nil
+	return put(db, BucketSettings, keyJA3, c)
 }
 
 // ── DLP Config ────────────────────────────────────────────────────────────────

@@ -9,9 +9,13 @@ WAF stack berbasis **Nginx custom build** + **Coraza WAF** + **OWASP CRS v4** da
 - GeoIP2 country blocking (`ngx_http_geoip2_module`)
 - Auto-bootstrap GeoLite MMDB saat startup (fallback mirror)
 - Threat intel IP blocking (Spamhaus / ET / AbuseIPDB)
+- Data Guard (DLP) — inspection settings (request/response body), max body size (KB), alert-on-block, plus pattern catalog
+- Virtual Patching — CVE catalog dibaca dari `vpatch.rules` (read-only preview) + flag operasional (DB) untuk trigger nginx reload
+- GeoIP blocking — UI autocomplete (nama/singkat ISO), list dengan bendera, dan daftar blokir yang rapi
 - DLP rules + basic direct-block rules (SQLi, XSS, traversal, RCE)
 - Custom error pages + `X-Request-ID` correlation
-- Attack Map Globe 3D (renderer `globe.gl` + fallback canvas)
+- Attack Map — plane/globe tuning (multi-domain legend + agregasi trail) dan globe performance tuning
+- Sidebar UI — ikon pakai library (Lucide) untuk konsistensi tampilan menu
 
 ## Ports
 
@@ -148,3 +152,9 @@ Pastikan `coraza_rules_file` tidak di-load ganda pada level `http {}` dan `serve
 - Repo ini memakai **s6-overlay** sebagai init/process supervisor.
 - Untuk production, ganti cert self-signed dengan cert valid (mis. Let's Encrypt).
 - Lihat `CHANGELOG.md` untuk detail perubahan terbaru.
+
+## TODO / Planned
+- Let's Encrypt (auto-issue + auto-renew) untuk TLS customer cert.
+- ClamAV malware scanning (saat ini masih TODO/opsional).
+- DLP auto quarantine (UI sudah ada placeholder; implementasi ekspansi belum penuh).
+- Virtual Patching mode `aggressive` (penegakan kebijakan/aturan otomatis masih belum dilanjutkan).

@@ -57,7 +57,11 @@ func (app *App) PageGeoBlocking(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) PageBotManagement(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "bot-management", models.PageData{Title: "Bot Management", ActiveMenu: "botmgmt"})
+	app.render(w, r, "bot-management", models.PageData{Title: "Bot Threshold", ActiveMenu: "botmgmt"})
+}
+
+func (app *App) PageJA3Management(w http.ResponseWriter, r *http.Request) {
+	app.render(w, r, "ja3-management", models.PageData{Title: "JA3 Fingerprint", ActiveMenu: "ja3"})
 }
 
 func (app *App) PageIPReputations(w http.ResponseWriter, r *http.Request) {

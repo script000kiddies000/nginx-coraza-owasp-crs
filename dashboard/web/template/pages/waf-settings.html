@@ -32,7 +32,7 @@
       <div class="grid sm:grid-cols-3 gap-2">
         <template x-for="opt in modes" :key="opt.v">
           <label class="cursor-pointer">
-            <input type="radio" class="peer sr-only" name="wafmode" :value="opt.v" x-model="form.mode">
+            <input type="radio" class="peer sr-only" name="wafmode" :value="opt.v" x-model="form.mode" @change="onModeChanged()">
             <div class="rounded-lg border px-3 py-3 text-center text-sm transition-colors peer-checked:border-emerald-500/60 peer-checked:bg-emerald-500/10 peer-checked:text-emerald-300 border-gray-700 text-gray-400 hover:border-gray-600">
               <span class="font-semibold block" x-text="opt.label"></span>
               <span class="text-xs opacity-70 mt-1 block" x-text="opt.hint"></span>
@@ -45,9 +45,27 @@
 
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-6">
     <h2 class="text-sm font-semibold text-white border-b border-gray-800 pb-3">OWASP CRS — penyetelan</h2>
+
+    <div>
+      <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Preset tuning</label>
+      <select x-model="form.preset" @change="onPresetChange()"
+        class="w-full max-w-lg bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:ring-2 focus:ring-emerald-500/40 outline-none">
+        <option value="Auto">Auto (ikuti mode WAF)</option>
+        <option value="Safe">Safe (min false-positive)</option>
+        <option value="Balance">Balance (recommended)</option>
+        <option value="Strict">Strict</option>
+        <option value="Aggressive">Aggressive</option>
+        <option value="Custom">Custom (manual)</option>
+      </select>
+      <p class="text-xs text-gray-600 mt-2">
+        Jika pilih selain <span class="font-mono">Custom</span>, angka <span class="font-mono">paranoia_level</span> dan <span class="font-mono">inbound threshold</span> akan diisi otomatis.
+      </p>
+    </div>
+
     <div>
       <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Paranoia level (1–4)</label>
       <input type="range" min="1" max="4" step="1" x-model.number="form.paranoia_level"
+        @input="setManualCustom()"
              class="w-full accent-emerald-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer">
       <div class="flex justify-between text-xs text-gray-600 mt-1">
         <span>1 — default</span>
@@ -63,6 +81,7 @@
         Inbound anomaly score threshold (1–999)
       </label>
       <input id="anomaly_in" type="number" min="1" max="999" x-model.number="form.anomaly_inbound"
+        @input="setManualCustom()"
              class="w-full max-w-xs bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono focus:ring-2 focus:ring-emerald-500/40 outline-none">
     </div>
   </div>
@@ -90,12 +109,74 @@ function wafSettingsApp() {
     saving: false,
     okMsg: '',
     errMsg: '',
-    form: { mode: 'On', paranoia_level: 1, anomaly_inbound: 5 },
+    form: { mode: 'On', paranoia_level: 1, anomaly_inbound: 5, preset: 'Auto' },
     modes: [
       { v: 'On', label: 'On', hint: 'Blokir pelanggaran' },
       { v: 'DetectionOnly', label: 'Detection only', hint: 'Log saja' },
       { v: 'Off', label: 'Off', hint: 'WAF mati' }
     ],
+
+    // Applies a safe preset mapping so users don't need to guess threshold values.
+    // Note: mapping is heuristic; always start from Auto/Balance for new apps.
+    applyPreset(preset) {
+      const p = (preset || '').toString();
+      if (p === 'Safe') {
+        this.form.paranoia_level = 1;
+        this.form.anomaly_inbound = 7;
+        return;
+      }
+      if (p === 'Balance') {
+        this.form.paranoia_level = 1;
+        this.form.anomaly_inbound = 5;
+        return;
+      }
+      if (p === 'Strict') {
+        this.form.paranoia_level = 2;
+        this.form.anomaly_inbound = 4;
+        return;
+      }
+      if (p === 'Aggressive') {
+        this.form.paranoia_level = 4;
+        this.form.anomaly_inbound = 3;
+        return;
+      }
+      if (p === 'Auto') {
+        // Auto mapping depends on SecRuleEngine mode.
+        if (this.form.mode === 'DetectionOnly') {
+          this.form.paranoia_level = 1;
+          this.form.anomaly_inbound = 7;
+        } else if (this.form.mode === 'Off') {
+          // Off: threshold value doesn't really matter; keep a sane baseline.
+          this.form.paranoia_level = 1;
+          this.form.anomaly_inbound = 5;
+        } else {
+          // On (blocking)
+          this.form.paranoia_level = 1;
+          this.form.anomaly_inbound = 5;
+        }
+        return;
+      }
+      // Custom: do nothing.
+    },
+
+    onPresetChange() {
+      if (this.form.preset !== 'Custom') {
+        this.applyPreset(this.form.preset);
+      }
+    },
+
+    onModeChanged() {
+      if (this.form.preset === 'Auto') {
+        this.applyPreset('Auto');
+      }
+    },
+
+    setManualCustom() {
+      if (this.form.preset !== 'Custom') {
+        this.form.preset = 'Custom';
+      }
+    },
+
     async load() {
       this.loading = true;
       this.okMsg = '';
@@ -104,11 +185,28 @@ function wafSettingsApp() {
         const r = await fetch('/api/waf/settings');
         if (!r.ok) throw new Error(await r.text() || r.statusText);
         const d = await r.json();
-        this.form = {
-          mode: d.mode || 'On',
-          paranoia_level: Number(d.paranoia_level) || 1,
-          anomaly_inbound: Number(d.anomaly_inbound) || 5
-        };
+        this.form.mode = d.mode || 'On';
+        this.form.paranoia_level = Number(d.paranoia_level) || 1;
+        this.form.anomaly_inbound = Number(d.anomaly_inbound) || 5;
+
+        // Detect current values as one of presets, otherwise fallback to Custom.
+        const pl = this.form.paranoia_level;
+        const th = this.form.anomaly_inbound;
+        if (this.form.mode === 'On' && pl === 1 && th === 5) {
+          this.form.preset = 'Auto';
+        } else if (this.form.mode === 'DetectionOnly' && pl === 1 && th === 7) {
+          this.form.preset = 'Auto';
+        } else if (pl === 1 && th === 7) {
+          this.form.preset = 'Safe';
+        } else if (pl === 1 && th === 5) {
+          this.form.preset = 'Balance';
+        } else if (pl === 2 && th === 4) {
+          this.form.preset = 'Strict';
+        } else if (pl === 4 && th === 3) {
+          this.form.preset = 'Aggressive';
+        } else {
+          this.form.preset = 'Custom';
+        }
       } catch (e) {
         this.errMsg = e.message || String(e);
       } finally {
@@ -123,6 +221,8 @@ function wafSettingsApp() {
         const r = await fetch('/api/waf/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          // Backend only needs (mode, paranoia_level, anomaly_inbound).
+          // Extra fields like `preset` are harmless (ignored by Go json decoder).
           body: JSON.stringify(this.form)
         });
         const t = await r.text();
