@@ -1,6 +1,6 @@
 {{define "content"}}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/public/css/leaflet.css">
+<link rel="stylesheet" href="/public/css/fonts.css">
 <style>
   .flux-ct-map .leaflet-container { background: #0a0d12; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
   .flux-ct-map .leaflet-control-zoom a {
@@ -177,11 +177,11 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<script src="https://cdn.jsdelivr.net/npm/d3-geo@3"></script>
-<script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/globe.gl@2.33.1/dist/globe.gl.min.js"></script>
+<script src="/public/js/leaflet.min.js"></script>
+<script src="/public/js/d3-geo.min.js"></script>
+<script src="/public/js/topojson.min.js"></script>
+<script src="/public/js/three.min.js"></script>
+<script src="/public/js/globe.gl.min.js"></script>
 <script>
 function attackMapApp() {
   return {
@@ -828,7 +828,7 @@ function attackMapApp() {
       if (!this.globe3d) {
         this.globe3d = Globe()(container)
           .backgroundColor('rgba(0,0,0,0)')
-          .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
+          .globeImageUrl('/public/img/earth-blue-marble.jpg')
           // Skip bump map for lighter GPU work; reference "safelIne-like" globe still looks good.
           .atmosphereColor('#67e8f9')
           .atmosphereAltitude(0.12)
@@ -1067,7 +1067,7 @@ function attackMapApp() {
       try {
         // Optional world landmass for globe (non-blocking).
         try {
-          const topo = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(r => r.json());
+          const topo = await fetch('/public/data/countries-110m.json').then(r => r.json());
           this.globeLandFeatures = topojson.feature(topo, topo.objects.countries).features || [];
         } catch (_) {
           this.globeLandFeatures = null;

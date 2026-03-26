@@ -184,8 +184,8 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="/public/js/apexcharts.min.js"></script>
+<script src="/public/js/d3.min.js"></script>
 <script>
 function dashboardApp() {
   const donutColors = ['#22d3ee','#34d399','#a78bfa','#fb923c','#f472b6','#facc15','#60a5fa','#4ade80','#f87171','#94a3b8'];
@@ -278,7 +278,7 @@ function dashboardApp() {
     async loadWorldGeo() {
       if (this.worldGeo) return this.worldGeo;
       try {
-        const r = await fetch('https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson');
+        const r = await fetch('/public/data/world.geojson');
         if (!r.ok) throw new Error('geojson status ' + r.status);
         this.worldGeo = await r.json();
       } catch (e) {

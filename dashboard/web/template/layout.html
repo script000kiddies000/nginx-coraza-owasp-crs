@@ -46,11 +46,13 @@
     aside nav a:hover .nav-ic { filter:brightness(1.15); }
     aside nav a.nav-active .nav-ic { box-shadow:0 0 10px currentColor; filter:brightness(1.2); }
   </style>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Local JS Libraries -->
+  <script src="/public/js/tailwindcss.min.js"></script>
+  <script defer src="/public/js/alpine.min.js"></script>
+  <script src="/public/js/lucide.min.js"></script>
+  
+  <!-- Local Google Fonts (Inter) -->
+  <link href="/public/css/fonts.css" rel="stylesheet">
   <script>
     tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter','sans-serif'] } } } }
   </script>
