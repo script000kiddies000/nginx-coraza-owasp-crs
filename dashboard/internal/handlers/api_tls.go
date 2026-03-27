@@ -139,6 +139,28 @@ func (app *App) APITLSLetsEncrypt(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, rec)
 }
 
+// APITLSSelfSigned generates self-signed certificate for local/testing use.
+func (app *App) APITLSSelfSigned(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Domain string `json:"domain"`
+		Days   int    `json:"days"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	rec, err := tlsmgmt.GenerateSelfSignedCertificate(app.DB, body.Domain, body.Days)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := nginx.ReloadNginx(); err != nil {
+		jsonError(w, "certificate generated but nginx reload failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, rec)
+}
+
 // APITLSDelete removes cert files and DB record if not in use.
 func (app *App) APITLSDelete(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimSpace(r.PathValue("id"))

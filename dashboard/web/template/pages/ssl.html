@@ -1,6 +1,6 @@
 {{define "content"}}
 <div class="w-full min-h-[calc(100vh-6.5rem)] flex flex-col space-y-6" x-data="tlsCertsApp()" x-init="init()"
-     @keydown.escape.window="showModalLE = false; showModalCustom = false">
+     @keydown.escape.window="showModalLE = false; showModalCustom = false; showModalSelf = false">
 
   <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
     <div>
@@ -103,10 +103,16 @@
         </span>
         <h2 class="text-sm font-semibold text-white truncate">Custom / upload</h2>
       </div>
-      <button type="button" @click="openModalCustom()"
-              class="shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors">
-        + Upload certificate
-      </button>
+      <div class="flex items-center gap-2 shrink-0">
+        <button type="button" @click="openModalSelf()"
+                class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors">
+          + Generate self-signed
+        </button>
+        <button type="button" @click="openModalCustom()"
+                class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors">
+          + Upload certificate
+        </button>
+      </div>
     </div>
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
@@ -147,6 +153,45 @@
           </tr>
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- Modal: Self-signed -->
+  <div x-show="showModalSelf" x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 py-8">
+    <div class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col"
+         @click.outside="showModalSelf = false">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-800 shrink-0">
+        <div>
+          <h3 class="text-white font-semibold">Generate self-signed</h3>
+          <p class="text-xs text-gray-500 mt-0.5">Built-in cert untuk dev/internal use</p>
+        </div>
+        <button type="button" @click="showModalSelf = false" class="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-gray-800">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
+        </button>
+      </div>
+      <div class="px-5 py-4 overflow-y-auto flex-1 space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-400 mb-1">Domain/IP <span class="text-rose-400">*</span></label>
+          <input type="text" x-model="selfForm.domain" placeholder="example.local atau 10.10.10.10"
+                 class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 font-mono focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-400 mb-1">Valid days</label>
+          <input type="number" min="1" max="3650" x-model.number="selfForm.days"
+                 class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 font-mono focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 outline-none">
+        </div>
+        <p class="text-xs text-gray-600 leading-relaxed">
+          Sertifikat ini otomatis disimpan sebagai managed certificate (source: self-signed), jadi langsung bisa dipilih di menu Hosts.
+        </p>
+      </div>
+      <div class="flex items-center justify-end gap-3 px-5 py-4 border-t border-gray-800 shrink-0">
+        <button type="button" @click="showModalSelf = false" class="text-gray-400 hover:text-white text-sm px-4 py-2 rounded-lg hover:bg-gray-800">Cancel</button>
+        <button type="button" @click="submitSelfSigned()" :disabled="busy"
+                class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+          <span x-text="busy ? 'Generating…' : 'Generate certificate'"></span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -267,9 +312,11 @@ function tlsCertsApp() {
     msgErr: '',
     showModalLE: false,
     showModalCustom: false,
+    showModalSelf: false,
     busy: false,
     leForm: { domain: '', email: '', staging: false },
     custForm: { domain: '', cert_pem: '', key_pem: '', chain_pem: '' },
+    selfForm: { domain: '', days: 365 },
 
     get leList() {
       return (this.certificates || []).filter(c => c.source === 'letsencrypt');
@@ -301,6 +348,7 @@ function tlsCertsApp() {
     openModalLE() {
       this.msgErr = '';
       this.leForm = { domain: '', email: '', staging: false };
+      this.showModalSelf = false;
       this.showModalCustom = false;
       this.showModalLE = true;
     },
@@ -308,8 +356,17 @@ function tlsCertsApp() {
     openModalCustom() {
       this.msgErr = '';
       this.custForm = { domain: '', cert_pem: '', key_pem: '', chain_pem: '' };
+      this.showModalSelf = false;
       this.showModalLE = false;
       this.showModalCustom = true;
+    },
+
+    openModalSelf() {
+      this.msgErr = '';
+      this.selfForm = { domain: '', days: 365 };
+      this.showModalLE = false;
+      this.showModalCustom = false;
+      this.showModalSelf = true;
     },
 
     readFileTo(e, field) {
@@ -381,6 +438,32 @@ function tlsCertsApp() {
         if (!r.ok) throw new Error(j.error || t);
         this.msgOk = 'Custom certificate saved' + (j.domain ? (' for ' + j.domain) : '');
         this.showModalCustom = false;
+        await this.load();
+      } catch (e) {
+        this.msgErr = e.message || String(e);
+      } finally {
+        this.busy = false;
+      }
+    },
+
+    async submitSelfSigned() {
+      this.busy = true;
+      this.msgOk = '';
+      this.msgErr = '';
+      try {
+        const r = await fetch('/api/tls/certificates/self-signed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            domain: (this.selfForm.domain || '').trim(),
+            days: Number(this.selfForm.days || 365)
+          })
+        });
+        const t = await r.text();
+        let j = {}; try { j = JSON.parse(t); } catch (_) {}
+        if (!r.ok) throw new Error(j.error || t);
+        this.msgOk = 'Self-signed certificate generated' + (j.domain ? (' for ' + j.domain) : '');
+        this.showModalSelf = false;
         await this.load();
       } catch (e) {
         this.msgErr = e.message || String(e);

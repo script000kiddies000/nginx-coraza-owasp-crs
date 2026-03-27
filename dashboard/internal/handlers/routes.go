@@ -79,6 +79,7 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	mux.HandleFunc("GET /api/tls/certificates", app.RequireAuth(app.APITLSList))
 	mux.HandleFunc("POST /api/tls/certificates/custom", app.RequireAuth(app.APITLSCustom))
 	mux.HandleFunc("POST /api/tls/certificates/letsencrypt", app.RequireAuth(app.APITLSLetsEncrypt))
+	mux.HandleFunc("POST /api/tls/certificates/self-signed", app.RequireAuth(app.APITLSSelfSigned))
 	mux.HandleFunc("DELETE /api/tls/certificates/{id}", app.RequireAuth(app.APITLSDelete))
 
 	mux.HandleFunc("GET /api/waf/settings", app.RequireAuth(app.APIGetWAFSettings))
