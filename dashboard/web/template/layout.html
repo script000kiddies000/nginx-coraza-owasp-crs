@@ -5,59 +5,124 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{.Title}} — Flux WAF</title>
-  <!-- x-cloak MUST come before Alpine to avoid flash of unstyled content -->
   <style>[x-cloak]{display:none!important}</style>
   <style>
-    /* ── Lucide icon chips ── */
-    .nav-ic {
-      display:inline-flex; align-items:center; justify-content:center;
-      width:30px; height:30px; min-width:30px;
-      border-radius:8px; flex-shrink:0;
-      background:rgba(51,65,85,0.22);
-      border:1px solid rgba(71,85,105,0.35);
-      color:#94a3b8;
-      transition:background .15s, box-shadow .15s;
+    :root {
+      --sb-width: 236px;
+      --sb-collapsed: 64px;
+      --sb-bg: #0d1117;
+      --sb-border: rgba(255,255,255,0.06);
+      --sb-hover: rgba(255,255,255,0.05);
+      --sb-active-bg: rgba(16,185,129,0.10);
+      --sb-active-border: #10b981;
     }
-    .nav-ic svg { width:15px; height:15px; }
-    /* per-route colors */
-    a[href="/"] .nav-ic         { color:#818cf8; background:rgba(79,70,229,.15); border-color:rgba(99,102,241,.30); }
-    a[href="/attack-map"] .nav-ic { color:#38bdf8; background:rgba(2,132,199,.15); border-color:rgba(14,165,233,.30); }
-    a[href="/hosts"] .nav-ic,
-    a[href="/ssl"] .nav-ic      { color:#22d3ee; background:rgba(8,145,178,.15); border-color:rgba(34,211,238,.30); }
-    a[href="/waf/settings"] .nav-ic,
-    a[href="/rules"] .nav-ic    { color:#34d399; background:rgba(5,150,105,.15); border-color:rgba(52,211,153,.30); }
-    a[href="/virtual-patching"] .nav-ic,
-    a[href="/bot-management"] .nav-ic,
-    a[href="/ja3-management"] .nav-ic,
-    a[href="/threat-intel"] .nav-ic,
-    a[href="/ip-reputations"] .nav-ic,
-    a[href="/geo-blocking"] .nav-ic,
-    a[href="/data-guard"] .nav-ic,
-    a[href="/wordpress-security"] .nav-ic { color:#f59e0b; background:rgba(180,83,9,.15); border-color:rgba(251,191,36,.30); }
-    a[href="/security-report"] .nav-ic,
-    a[href="/attack-report"] .nav-ic    { color:#94a3b8; background:rgba(71,85,105,.15); border-color:rgba(148,163,184,.30); }
-    a[href="/security-logs"] .nav-ic,
-    a[href="/logs"] .nav-ic,
-    a[href="/event-logs"] .nav-ic       { color:#fb7185; background:rgba(190,24,93,.15); border-color:rgba(251,113,133,.30); }
-    a[href="/monitoring/nginx"] .nav-ic,
-    a[href="/monitoring/server"] .nav-ic { color:#4ade80; background:rgba(22,163,74,.15); border-color:rgba(74,222,128,.30); }
-    a[href="/settings"] .nav-ic,
-    a[href="/settings/users"] .nav-ic   { color:#a78bfa; background:rgba(124,58,237,.15); border-color:rgba(167,139,250,.30); }
-    /* hover / active glow */
-    aside nav a:hover .nav-ic { filter:brightness(1.15); }
-    aside nav a.nav-active .nav-ic { box-shadow:0 0 10px currentColor; filter:brightness(1.2); }
+    .sidebar {
+      width: var(--sb-width);
+      min-width: var(--sb-width);
+      background: var(--sb-bg);
+      border-right: 1px solid var(--sb-border);
+      transition: width .26s, min-width .26s;
+    }
+    .sidebar.collapsed {
+      width: var(--sb-collapsed);
+      min-width: var(--sb-collapsed);
+    }
+    .sidebar-nav { scrollbar-width: none; }
+    .sidebar-nav::-webkit-scrollbar { display: none; }
+    .nav-section { padding: 12px 10px 4px; }
+    .nav-section span {
+      font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.22);
+    }
+    .nav-item, .nav-group-label, .nav-sub-item {
+      display: flex; align-items: center; gap: 10px; border-radius: 8px; text-decoration: none;
+      color: #6b7280; transition: background .15s, color .15s;
+    }
+    .nav-item, .nav-group-label { height: 38px; padding: 0 10px; font-size: 13px; border-left: 2px solid transparent; }
+    .nav-sub-item { height: 34px; padding: 0 10px; font-size: 12.5px; border-left: 2px solid transparent; }
+    .nav-item:hover, .nav-group-label:hover, .nav-sub-item:hover { background: var(--sb-hover); color: #d1d5db; }
+    .nav-item.active, .nav-sub-item.active {
+      background: var(--sb-active-bg); color: #f9fafb; border-left-color: var(--sb-active-border); font-weight: 600;
+    }
+    .nav-icon-wrap {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; min-width: 30px; border-radius: 7px;
+      background: rgba(51,65,85,.22); border: 1px solid rgba(71,85,105,.35); color: #94a3b8;
+    }
+    .nav-sub-item .nav-icon-wrap { width: 24px; height: 24px; min-width: 24px; }
+    .nav-icon-wrap svg { width: 15px; height: 15px; }
+    .nav-sub-item .nav-icon-wrap svg { width: 13px; height: 13px; }
+    /* per-route icon colors (restore colored icon chips) */
+    a[href="/"] .nav-icon-wrap,
+    a[href="/dashboard"] .nav-icon-wrap { color:#818cf8; background:rgba(79,70,229,.15); border-color:rgba(99,102,241,.30); }
+    a[href="/attack-map"] .nav-icon-wrap { color:#38bdf8; background:rgba(2,132,199,.15); border-color:rgba(14,165,233,.30); }
+    a[href="/hosts"] .nav-icon-wrap,
+    a[href="/ssl"] .nav-icon-wrap { color:#22d3ee; background:rgba(8,145,178,.15); border-color:rgba(34,211,238,.30); }
+    a[href="/waf/settings"] .nav-icon-wrap,
+    a[href="/rules"] .nav-icon-wrap { color:#34d399; background:rgba(5,150,105,.15); border-color:rgba(52,211,153,.30); }
+    a[href="/virtual-patching"] .nav-icon-wrap,
+    a[href="/bot-management"] .nav-icon-wrap,
+    a[href="/ja3-management"] .nav-icon-wrap,
+    a[href="/threat-intel"] .nav-icon-wrap,
+    a[href="/ip-reputations"] .nav-icon-wrap,
+    a[href="/geo-blocking"] .nav-icon-wrap,
+    a[href="/data-guard"] .nav-icon-wrap,
+    a[href="/wordpress-security"] .nav-icon-wrap { color:#f59e0b; background:rgba(180,83,9,.15); border-color:rgba(251,191,36,.30); }
+    a[href="/security-report"] .nav-icon-wrap,
+    a[href="/attack-report"] .nav-icon-wrap { color:#94a3b8; background:rgba(71,85,105,.15); border-color:rgba(148,163,184,.30); }
+    a[href="/security-logs"] .nav-icon-wrap,
+    a[href="/logs"] .nav-icon-wrap,
+    a[href="/event-logs"] .nav-icon-wrap { color:#fb7185; background:rgba(190,24,93,.15); border-color:rgba(251,113,133,.30); }
+    a[href="/monitoring/nginx"] .nav-icon-wrap,
+    a[href="/monitoring/server"] .nav-icon-wrap { color:#4ade80; background:rgba(22,163,74,.15); border-color:rgba(74,222,128,.30); }
+    a[href="/settings"] .nav-icon-wrap,
+    a[href="/settings/users"] .nav-icon-wrap { color:#a78bfa; background:rgba(124,58,237,.15); border-color:rgba(167,139,250,.30); }
+    .nav-item:hover .nav-icon-wrap, .nav-sub-item:hover .nav-icon-wrap { filter: brightness(1.12); }
+    .nav-item.active .nav-icon-wrap, .nav-sub-item.active .nav-icon-wrap { box-shadow: 0 0 10px currentColor; filter: brightness(1.18); }
+    .nav-group-arrow { margin-left: auto; width: 13px; height: 13px; color: #6b7280; transition: transform .2s; }
+    .nav-group-label.open .nav-group-arrow { transform: rotate(90deg); }
+    .nav-group-children { display: flex; flex-direction: column; gap: 1px; padding: 2px 0 2px 12px; }
+    .sidebar.collapsed .nav-label, .sidebar.collapsed .nav-section span, .sidebar.collapsed .nav-group-arrow { display: none; }
+    .sidebar.collapsed .nav-item, .sidebar.collapsed .nav-group-label, .sidebar.collapsed .nav-sub-item {
+      justify-content: center; padding: 0 4px; gap: 0; border-left-width: 0;
+    }
+    /* Keep sub-menu items visible in collapsed mode. */
+    .sidebar.collapsed .nav-group-children { display: flex; padding-left: 0; }
+    .sidebar.collapsed .nav-sub-item { height: 38px; font-size: 13px; }
+    .sidebar.collapsed .nav-sub-item .nav-icon-wrap { width: 30px; height: 30px; min-width: 30px; }
+    .sidebar.collapsed .nav-sub-item .nav-icon-wrap svg { width: 15px; height: 15px; }
+    /* Tooltip labels on collapsed menu */
+    .sidebar.collapsed .nav-item[data-tip],
+    .sidebar.collapsed .nav-sub-item[data-tip] { position: relative; }
+    .sidebar.collapsed .nav-item[data-tip]::after,
+    .sidebar.collapsed .nav-sub-item[data-tip]::after {
+      content: attr(data-tip);
+      position: absolute;
+      left: calc(100% + 10px);
+      top: 50%;
+      transform: translateY(-50%);
+      background: #1f2937;
+      color: #f9fafb;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+      transition: opacity .15s;
+      z-index: 1000;
+    }
+    .sidebar.collapsed .nav-item[data-tip]:hover::after,
+    .sidebar.collapsed .nav-sub-item[data-tip]:hover::after { opacity: 1; }
   </style>
-  <!-- Local JS Libraries -->
   <script src="/public/js/tailwindcss.min.js"></script>
   <script defer src="/public/js/alpine.min.js"></script>
   <script src="/public/js/lucide.min.js"></script>
-  
-  <!-- Local Google Fonts (Inter) -->
   <link href="/public/css/fonts.css" rel="stylesheet">
   <script>
     tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter','sans-serif'] } } } }
-  </script>
-  <script>
     function fluxSidebar() {
       return {
         sidebarOpen: true,
@@ -66,27 +131,24 @@
           try {
             const raw = localStorage.getItem('flux_nav_g');
             if (raw) Object.assign(this.navG, JSON.parse(raw));
+            const so = localStorage.getItem('flux_sidebar_open');
+            if (so !== null) this.sidebarOpen = so === '1';
           } catch (e) {}
         },
         saveNavState() {
-          try { localStorage.setItem('flux_nav_g', JSON.stringify(this.navG)); } catch (e) {}
+          try {
+            localStorage.setItem('flux_nav_g', JSON.stringify(this.navG));
+            localStorage.setItem('flux_sidebar_open', this.sidebarOpen ? '1' : '0');
+          } catch (e) {}
         },
-        toggleG(k) {
-          this.navG[k] = !this.navG[k];
-          this.saveNavState();
-        },
+        toggleG(k) { this.navG[k] = !this.navG[k]; this.saveNavState(); },
+        toggleSidebar() { this.sidebarOpen = !this.sidebarOpen; this.saveNavState(); },
         initNav() {
           this.loadNavState();
           const active = document.body.getAttribute('data-flux-active') || '';
-          const open = { hosts: 'edge', ssl: 'edge', wafsettings: 'waf', rules: 'waf', vpatch: 'engines', botmgmt: 'engines', ja3: 'engines', threatintel: 'engines', iprep: 'engines', geoblock: 'engines', dlp: 'engines', wpsec: 'engines', secreport: 'rep', atkreport: 'rep', seclogs: 'logs', logs: 'logs', 'nginx-mon': 'mon', 'srv-mon': 'mon', settings: 'sys', users: 'sys' };
+          const open = { hosts: 'edge', ssl: 'edge', wafsettings: 'waf', rules: 'waf', vpatch: 'engines', botmgmt: 'engines', ja3: 'engines', threatintel: 'engines', iprep: 'engines', geoblock: 'engines', dlp: 'engines', wpsec: 'engines', secreport: 'rep', atkreport: 'rep', seclogs: 'logs', logs: 'logs', eventlogs: 'logs', 'nginx-mon': 'mon', 'srv-mon': 'mon', settings: 'sys', users: 'sys' };
           const g = open[active];
           if (g) this.navG[g] = true;
-        },
-        navRow(sidebarOpen, inGroup, groupKey) {
-          if (!sidebarOpen) return 'px-0 justify-center';
-          if (inGroup && this.navG[groupKey]) return 'pl-8 px-3 gap-3';
-          if (inGroup) return 'px-3 gap-3';
-          return 'px-3 gap-3';
         }
       };
     }
@@ -96,331 +158,154 @@
       data-flux-active="{{.ActiveMenu}}"
       x-data="fluxSidebar()"
       x-init="initNav()">
-
-<!-- ── Sidebar ───────────────────────────────────────────────────────────── -->
-<aside :class="sidebarOpen ? 'w-60' : 'w-14'"
-       class="fixed inset-y-0 left-0 z-40 flex flex-col transition-all duration-[250ms] overflow-hidden"
-       style="background:#0d1117; border-right:1px solid rgba(255,255,255,0.06);">
-
-  <!-- Brand -->
-  <div class="flex items-center h-14 px-3 flex-shrink-0 gap-2.5" style="border-bottom:1px solid rgba(255,255,255,0.06);">
-    <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,#10b981,#0d9488);box-shadow:0 0 14px rgba(16,185,129,.35);">
-      <i data-lucide="shield-check" style="width:16px;height:16px;color:white;"></i>
+<aside :class="sidebarOpen ? 'sidebar' : 'sidebar collapsed'" class="fixed inset-y-0 left-0 z-40 flex flex-col overflow-hidden">
+  <div class="relative flex items-center h-14 border-b border-white/10"
+       :class="sidebarOpen ? 'px-3 gap-2.5' : 'px-2 justify-center'">
+    <div class="min-w-0 aspect-square flex-shrink-0 rounded-lg flex items-center justify-center"
+         :class="sidebarOpen ? 'w-8 h-8 min-w-8 min-h-8' : 'w-7 h-7 min-w-7 min-h-7'"
+         style="background:linear-gradient(135deg,#10b981,#0d9488);box-shadow:0 0 14px rgba(16,185,129,.35);">
+      <i data-lucide="shield-check" class="w-4 h-4 text-white"></i>
     </div>
     <div x-show="sidebarOpen" x-cloak class="flex flex-col min-w-0">
       <span class="text-white font-bold text-sm leading-none">Flux WAF</span>
-      <span class="text-[9px] font-semibold tracking-widest" style="color:#10b981">NGINX · CORAZA</span>
+      <span class="text-[9px] font-semibold tracking-widest text-emerald-400">NGINX · CORAZA</span>
     </div>
-    <button type="button" @click="sidebarOpen = !sidebarOpen"
-            :class="sidebarOpen ? 'ml-auto' : 'mx-auto'"
-            class="flex-shrink-0 p-1.5 rounded-lg transition-colors" style="color:#4b5563;"
-            onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='transparent'">
-      <i x-show="sidebarOpen" x-cloak data-lucide="panel-left-close" style="width:15px;height:15px;"></i>
-      <i x-show="!sidebarOpen" data-lucide="panel-left-open" style="width:15px;height:15px;"></i>
+    <button type="button" @click="toggleSidebar()"
+            :class="sidebarOpen ? 'ml-auto' : 'absolute right-1.5'"
+            class="p-1.5 rounded-lg text-gray-500 hover:bg-white/10">
+      <i x-show="sidebarOpen" x-cloak data-lucide="panel-left-close" class="w-4 h-4"></i>
+      <i x-show="!sidebarOpen" data-lucide="panel-left-open" class="w-4 h-4"></i>
     </button>
   </div>
 
-  <nav class="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2 space-y-0.5" style="scrollbar-width:none">
-
-    <a href="/" title="Dashboard"
-       :class="navRow(sidebarOpen, false, '')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "dashboard"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="layout-dashboard"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Dashboard</span>
+  <nav class="sidebar-nav flex-1 overflow-y-auto px-2 py-2">
+    <a href="/" data-tip="Dashboard" class="nav-item {{if eq .ActiveMenu "dashboard"}}active{{end}}">
+      <span class="nav-icon-wrap"><i data-lucide="layout-dashboard"></i></span><span class="nav-label">Dashboard</span>
+    </a>
+    <a href="/attack-map" data-tip="Attack Map" class="nav-item {{if eq .ActiveMenu "attackmap"}}active{{end}}">
+      <span class="nav-icon-wrap"><i data-lucide="radar"></i></span><span class="nav-label">Attack Map</span>
     </a>
 
-    <a href="/attack-map" title="Attack Map"
-       :class="navRow(sidebarOpen, false, '')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "attackmap"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="radar"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Attack Map</span>
-    </a>
+    <div class="nav-section" x-show="sidebarOpen" x-cloak><span>Edge Network</span></div>
+    <div class="nav-group-label" x-show="sidebarOpen" x-cloak :class="navG.edge ? 'open' : ''" @click="toggleG('edge')">
+      <span class="nav-icon-wrap"><i data-lucide="network"></i></span><span class="nav-label">Edge Network</span><i data-lucide="chevron-right" class="nav-group-arrow"></i>
+    </div>
+    <div class="nav-group-children" x-show="!sidebarOpen || navG.edge">
+      <a href="/hosts" class="nav-sub-item {{if eq .ActiveMenu "hosts"}}active{{end}}">
+        <span class="nav-icon-wrap"><i data-lucide="server"></i></span><span class="nav-label">Hosts & Upstreams</span>
+      </a>
+      <a href="/ssl" class="nav-sub-item {{if eq .ActiveMenu "ssl"}}active{{end}}">
+        <span class="nav-icon-wrap"><i data-lucide="lock"></i></span><span class="nav-label">SSL / TLS</span>
+      </a>
+    </div>
 
-    <!-- Edge Network -->
-    <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('edge')"
-            class="w-full flex items-center justify-between h-8 px-2 rounded text-[10px] font-bold uppercase tracking-widest mt-4 mb-0.5 transition-colors hover:text-gray-300" style="color:rgba(255,255,255,0.25);">
-      <span>Edge Network</span>
-      <i data-lucide="chevron-down" class="w-3 h-3 transition-transform" :class="navG.edge ? 'rotate-180' : ''"></i>
-    </button>
-    <a href="/hosts" title="Hosts"
-       x-show="!sidebarOpen || navG.edge"
-       :class="navRow(sidebarOpen, true, 'edge')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "hosts"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="server"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Hosts & Upstreams</span>
-    </a>
-    <a href="/ssl" title="SSL"
-       x-show="!sidebarOpen || navG.edge"
-       :class="navRow(sidebarOpen, true, 'edge')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "ssl"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="lock"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">SSL / TLS</span>
-    </a>
+    <div class="nav-section" x-show="sidebarOpen" x-cloak><span>WAF</span></div>
+    <div class="nav-group-label" x-show="sidebarOpen" x-cloak :class="navG.waf ? 'open' : ''" @click="toggleG('waf')">
+      <span class="nav-icon-wrap"><i data-lucide="shield"></i></span><span class="nav-label">WAF</span><i data-lucide="chevron-right" class="nav-group-arrow"></i>
+    </div>
+    <div class="nav-group-children" x-show="!sidebarOpen || navG.waf">
+      <a href="/waf/settings" class="nav-sub-item {{if eq .ActiveMenu "wafsettings"}}active{{end}}">
+        <span class="nav-icon-wrap"><i data-lucide="shield"></i></span><span class="nav-label">WAF Settings</span>
+      </a>
+      <a href="/rules" class="nav-sub-item {{if eq .ActiveMenu "rules"}}active{{end}}">
+        <span class="nav-icon-wrap"><i data-lucide="code-2"></i></span><span class="nav-label">Custom Rules</span>
+      </a>
+    </div>
 
-    <!-- WAF -->
-    <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('waf')"
-            class="w-full flex items-center justify-between h-8 px-2 rounded text-[10px] font-bold uppercase tracking-widest mt-4 mb-0.5 transition-colors hover:text-gray-300" style="color:rgba(255,255,255,0.25);">
-      <span>WAF</span>
-      <i data-lucide="chevron-down" class="w-3 h-3 transition-transform" :class="navG.waf ? 'rotate-180' : ''"></i>
-    </button>
-    <a href="/waf/settings" title="WAF Settings"
-       x-show="!sidebarOpen || navG.waf"
-       :class="navRow(sidebarOpen, true, 'waf')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "wafsettings"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="shield"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">WAF Settings</span>
-    </a>
-    <a href="/rules" title="Custom Rules"
-       x-show="!sidebarOpen || navG.waf"
-       :class="navRow(sidebarOpen, true, 'waf')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "rules"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="code-2"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Custom Rules</span>
-    </a>
+    <div class="nav-section" x-show="sidebarOpen" x-cloak><span>Security Engines</span></div>
+    <div class="nav-group-label" x-show="sidebarOpen" x-cloak :class="navG.engines ? 'open' : ''" @click="toggleG('engines')">
+      <span class="nav-icon-wrap"><i data-lucide="shield-check"></i></span><span class="nav-label">Security Engines</span><i data-lucide="chevron-right" class="nav-group-arrow"></i>
+    </div>
+    <div class="nav-group-children" x-show="!sidebarOpen || navG.engines">
+      <a href="/virtual-patching" class="nav-sub-item {{if eq .ActiveMenu "vpatch"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="bandage"></i></span><span class="nav-label">Virtual Patching</span></a>
+      <a href="/bot-management" class="nav-sub-item {{if eq .ActiveMenu "botmgmt"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="bot"></i></span><span class="nav-label">Bot Threshold</span></a>
+      <a href="/ja3-management" class="nav-sub-item {{if eq .ActiveMenu "ja3"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="fingerprint"></i></span><span class="nav-label">JA3 Fingerprint</span></a>
+      <a href="/threat-intel" class="nav-sub-item {{if eq .ActiveMenu "threatintel"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="flame"></i></span><span class="nav-label">Threat Intel</span></a>
+      <a href="/ip-reputations" class="nav-sub-item {{if eq .ActiveMenu "iprep"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="globe-2"></i></span><span class="nav-label">IP Reputations</span></a>
+      <a href="/geo-blocking" class="nav-sub-item {{if eq .ActiveMenu "geoblock"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="map-pin"></i></span><span class="nav-label">Geo IP Blocking</span></a>
+      <a href="/data-guard" class="nav-sub-item {{if eq .ActiveMenu "dlp"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="database-zap"></i></span><span class="nav-label">Data Guard (DLP)</span></a>
+      <a href="/wordpress-security" class="nav-sub-item {{if eq .ActiveMenu "wpsec"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="shield-half"></i></span><span class="nav-label">WordPress Security</span></a>
+    </div>
 
-    <!-- Security engines -->
-    <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('engines')"
-            class="w-full flex items-center justify-between h-8 px-2 rounded text-[10px] font-bold uppercase tracking-widest mt-4 mb-0.5 transition-colors hover:text-gray-300" style="color:rgba(255,255,255,0.25);">
-      <span>Security Engines</span>
-      <i data-lucide="chevron-down" class="w-3 h-3 transition-transform" :class="navG.engines ? 'rotate-180' : ''"></i>
-    </button>
-    <a href="/virtual-patching" title="Virtual Patching"
-       x-show="!sidebarOpen || navG.engines"
-       :class="navRow(sidebarOpen, true, 'engines')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "vpatch"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="bandage"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Virtual Patching</span>
-    </a>
-    <a href="/bot-management" title="Bot Management"
-       x-show="!sidebarOpen || navG.engines"
-       :class="navRow(sidebarOpen, true, 'engines')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "botmgmt"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="bot"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Bot Threshold</span>
-    </a>
-    <a href="/ja3-management" title="JA3 Fingerprint"
-       x-show="!sidebarOpen || navG.engines"
-       :class="navRow(sidebarOpen, true, 'engines')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "ja3"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="fingerprint"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">JA3 Fingerprint</span>
-    </a>
-    <a href="/threat-intel" title="Threat Intel"
-       x-show="!sidebarOpen || navG.engines"
-       :class="navRow(sidebarOpen, true, 'engines')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "threatintel"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="flame"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Threat Intel</span>
-    </a>
-    <a href="/ip-reputations" title="IP Reputations"
-       x-show="!sidebarOpen || navG.engines"
-       :class="navRow(sidebarOpen, true, 'engines')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "iprep"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="globe-2"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">IP Reputations</span>
-    </a>
-    <a href="/geo-blocking" title="Geo IP Blocking"
-       x-show="!sidebarOpen || navG.engines"
-       :class="navRow(sidebarOpen, true, 'engines')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "geoblock"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="map-pin"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Geo IP Blocking</span>
-    </a>
-    <a href="/data-guard" title="Data Guard (DLP)"
-       x-show="!sidebarOpen || navG.engines"
-       :class="navRow(sidebarOpen, true, 'engines')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "dlp"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="database-zap"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Data Guard (DLP)</span>
-    </a>
-    <a href="/wordpress-security" title="WordPress Security"
-       x-show="!sidebarOpen || navG.engines"
-       :class="navRow(sidebarOpen, true, 'engines')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "wpsec"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="shield-half"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">WordPress Security</span>
-    </a>
+    <div class="nav-section" x-show="sidebarOpen" x-cloak><span>Reports</span></div>
+    <div class="nav-group-label" x-show="sidebarOpen" x-cloak :class="navG.rep ? 'open' : ''" @click="toggleG('rep')">
+      <span class="nav-icon-wrap"><i data-lucide="file-text"></i></span><span class="nav-label">Reports</span><i data-lucide="chevron-right" class="nav-group-arrow"></i>
+    </div>
+    <div class="nav-group-children" x-show="!sidebarOpen || navG.rep">
+      <a href="/security-report" class="nav-sub-item {{if eq .ActiveMenu "secreport"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="file-bar-chart-2"></i></span><span class="nav-label">Security Report</span></a>
+      <a href="/attack-report" class="nav-sub-item {{if eq .ActiveMenu "atkreport"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="zap"></i></span><span class="nav-label">Attack Report</span></a>
+    </div>
 
-    <!-- Reports -->
-    <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('rep')"
-            class="w-full flex items-center justify-between h-8 px-2 rounded text-[10px] font-bold uppercase tracking-widest mt-4 mb-0.5 transition-colors hover:text-gray-300" style="color:rgba(255,255,255,0.25);">
-      <span>Reports</span>
-      <i data-lucide="chevron-down" class="w-3 h-3 transition-transform" :class="navG.rep ? 'rotate-180' : ''"></i>
-    </button>
-    <a href="/security-report" title="Security Report"
-       x-show="!sidebarOpen || navG.rep"
-       :class="navRow(sidebarOpen, true, 'rep')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "secreport"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="file-bar-chart-2"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Security Report</span>
-    </a>
-    <a href="/attack-report" title="Attack Report"
-       x-show="!sidebarOpen || navG.rep"
-       :class="navRow(sidebarOpen, true, 'rep')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "atkreport"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="zap"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Attack Report</span>
-    </a>
+    <div class="nav-section" x-show="sidebarOpen" x-cloak><span>Logs & Analytics</span></div>
+    <div class="nav-group-label" x-show="sidebarOpen" x-cloak :class="navG.logs ? 'open' : ''" @click="toggleG('logs')">
+      <span class="nav-icon-wrap"><i data-lucide="line-chart"></i></span><span class="nav-label">Logs & Analytics</span><i data-lucide="chevron-right" class="nav-group-arrow"></i>
+    </div>
+    <div class="nav-group-children" x-show="!sidebarOpen || navG.logs">
+      <a href="/security-logs" class="nav-sub-item {{if eq .ActiveMenu "seclogs"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="shield-alert"></i></span><span class="nav-label">Security Events</span></a>
+      <a href="/logs" class="nav-sub-item {{if eq .ActiveMenu "logs"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="scroll-text"></i></span><span class="nav-label">Access Logs</span></a>
+      <a href="/event-logs" class="nav-sub-item {{if eq .ActiveMenu "eventlogs"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="activity"></i></span><span class="nav-label">Event Logs</span></a>
+    </div>
 
-    <!-- Logs -->
-    <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('logs')"
-            class="w-full flex items-center justify-between h-8 px-2 rounded text-[10px] font-bold uppercase tracking-widest mt-4 mb-0.5 transition-colors hover:text-gray-300" style="color:rgba(255,255,255,0.25);">
-      <span>Logs &amp; Analytics</span>
-      <i data-lucide="chevron-down" class="w-3 h-3 transition-transform" :class="navG.logs ? 'rotate-180' : ''"></i>
-    </button>
-    <a href="/security-logs" title="Security Events"
-       x-show="!sidebarOpen || navG.logs"
-       :class="navRow(sidebarOpen, true, 'logs')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "seclogs"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="shield-alert"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Security Events</span>
-    </a>
-    <a href="/logs" title="Access Logs"
-       x-show="!sidebarOpen || navG.logs"
-       :class="navRow(sidebarOpen, true, 'logs')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "logs"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="scroll-text"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Access Logs</span>
-    </a>
-    <a href="/event-logs" title="Event Logs"
-       x-show="!sidebarOpen || navG.logs"
-       :class="navRow(sidebarOpen, true, 'logs')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "eventlogs"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="activity"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Event Logs</span>
-    </a>
+    <div class="nav-section" x-show="sidebarOpen" x-cloak><span>Monitoring</span></div>
+    <div class="nav-group-label" x-show="sidebarOpen" x-cloak :class="navG.mon ? 'open' : ''" @click="toggleG('mon')">
+      <span class="nav-icon-wrap"><i data-lucide="activity"></i></span><span class="nav-label">Monitoring</span><i data-lucide="chevron-right" class="nav-group-arrow"></i>
+    </div>
+    <div class="nav-group-children" x-show="!sidebarOpen || navG.mon">
+      <a href="/monitoring/nginx" class="nav-sub-item {{if eq .ActiveMenu "nginx-mon"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="monitor-dot"></i></span><span class="nav-label">Nginx Status</span></a>
+      <a href="/monitoring/server" class="nav-sub-item {{if eq .ActiveMenu "srv-mon"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="cpu"></i></span><span class="nav-label">Server Health</span></a>
+    </div>
 
-    <!-- Monitoring -->
-    <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('mon')"
-            class="w-full flex items-center justify-between h-8 px-2 rounded text-[10px] font-bold uppercase tracking-widest mt-4 mb-0.5 transition-colors hover:text-gray-300" style="color:rgba(255,255,255,0.25);">
-      <span>Monitoring</span>
-      <i data-lucide="chevron-down" class="w-3 h-3 transition-transform" :class="navG.mon ? 'rotate-180' : ''"></i>
-    </button>
-    <a href="/monitoring/nginx" title="Nginx Status"
-       x-show="!sidebarOpen || navG.mon"
-       :class="navRow(sidebarOpen, true, 'mon')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "nginx-mon"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="monitor-dot"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Nginx Status</span>
-    </a>
-    <a href="/monitoring/server" title="Server Health"
-       x-show="!sidebarOpen || navG.mon"
-       :class="navRow(sidebarOpen, true, 'mon')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "srv-mon"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="cpu"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Server Health</span>
-    </a>
-
-    <!-- System -->
-    <button type="button" x-show="sidebarOpen" x-cloak @click="toggleG('sys')"
-            class="w-full flex items-center justify-between h-8 px-2 rounded text-[10px] font-bold uppercase tracking-widest mt-4 mb-0.5 transition-colors hover:text-gray-300" style="color:rgba(255,255,255,0.25);">
-      <span>System</span>
-      <i data-lucide="chevron-down" class="w-3 h-3 transition-transform" :class="navG.sys ? 'rotate-180' : ''"></i>
-    </button>
-    <a href="/settings" title="Settings"
-       x-show="!sidebarOpen || navG.sys"
-       :class="navRow(sidebarOpen, true, 'sys')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "settings"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="settings-2"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">Settings</span>
-    </a>
-    <a href="/settings/users" title="Users"
-       x-show="!sidebarOpen || navG.sys"
-       :class="navRow(sidebarOpen, true, 'sys')"
-       class="flex items-center h-10 rounded-lg text-sm font-medium transition-colors gap-2.5
-              {{if eq .ActiveMenu "users"}}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-              {{else}}text-gray-400 hover:text-white hover:bg-white/5{{end}}">
-      <span class="nav-ic"><i data-lucide="users"></i></span>
-      <span x-show="sidebarOpen" x-cloak class="truncate">User Management</span>
-    </a>
+    <div class="nav-section" x-show="sidebarOpen" x-cloak><span>System</span></div>
+    <div class="nav-group-label" x-show="sidebarOpen" x-cloak :class="navG.sys ? 'open' : ''" @click="toggleG('sys')">
+      <span class="nav-icon-wrap"><i data-lucide="settings-2"></i></span><span class="nav-label">System</span><i data-lucide="chevron-right" class="nav-group-arrow"></i>
+    </div>
+    <div class="nav-group-children" x-show="!sidebarOpen || navG.sys">
+      <a href="/settings" class="nav-sub-item {{if eq .ActiveMenu "settings"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="settings-2"></i></span><span class="nav-label">Settings</span></a>
+      <a href="/settings/users" class="nav-sub-item {{if eq .ActiveMenu "users"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="users"></i></span><span class="nav-label">User Management</span></a>
+    </div>
   </nav>
 
-  <!-- User & Logout -->
-  <div class="flex-shrink-0 p-2" style="border-top:1px solid rgba(255,255,255,0.06);">
-    <div x-show="sidebarOpen" x-cloak class="flex items-center gap-2 px-2 py-1.5 mb-1 rounded-lg" style="background:rgba(255,255,255,0.04);">
-      <div class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-xs text-white" style="background:linear-gradient(135deg,#818cf8,#38bdf8);">
+  <div class="p-2 border-t border-white/10">
+    <div x-show="sidebarOpen" x-cloak class="flex items-center gap-2 px-2 py-1.5 mb-1 rounded-lg bg-white/5">
+      <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white bg-gradient-to-br from-indigo-400 to-sky-400">
         {{printf "%.1s" .Username}}
       </div>
       <div class="min-w-0 flex-1">
         <p class="text-white text-xs font-semibold truncate">{{if .Username}}{{.Username}}{{else}}admin{{end}}</p>
-        <p class="text-xs" style="color:#374151;">Administrator</p>
+        <p class="text-xs text-gray-500">Administrator</p>
       </div>
     </div>
     <form action="/api/logout" method="POST">
-      <button type="submit"
-              :class="sidebarOpen ? 'px-3 gap-2 justify-start' : 'px-0 justify-center'"
-              class="w-full flex items-center h-9 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors text-sm">
-        <i data-lucide="log-out" class="w-4 h-4 flex-shrink-0"></i>
-      <span x-show="sidebarOpen" x-cloak class="font-medium">Logout</span>
+      <button type="submit" :class="sidebarOpen ? 'justify-start px-3 gap-2' : 'justify-center px-0'" class="w-full h-9 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-sm flex items-center">
+        <i data-lucide="log-out" class="w-4 h-4"></i>
+        <span x-show="sidebarOpen" x-cloak class="font-medium">Logout</span>
       </button>
     </form>
   </div>
 </aside>
 
-<!-- ── Main content ──────────────────────────────────────────────────────── -->
-<div :class="sidebarOpen ? 'ml-60' : 'ml-14'" class="transition-all duration-200 min-h-screen flex flex-col">
-  <header class="h-14 bg-gray-900/80 backdrop-blur border-b border-gray-800 flex items-center px-6 gap-4 sticky top-0 z-30">
+<div :style="sidebarOpen ? 'margin-left:236px' : 'margin-left:64px'" class="transition-all duration-200 min-h-screen flex flex-col">
+  <header class="h-14 bg-gray-900/80 backdrop-blur border-b border-gray-800 flex items-center px-6 sticky top-0 z-30">
     <h1 class="text-sm font-semibold text-white">{{.Title}}</h1>
-    <div class="ml-auto"></div>
   </header>
   <main class="flex-1 p-6">
     {{template "content" .}}
   </main>
 </div>
 
-</body>
 <script>
-  // Init Lucide icons (runs after Alpine hydration)
-  document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.nav-item, .nav-sub-item').forEach(function (el) {
+      if (el.getAttribute('data-tip')) return;
+      const lbl = el.querySelector('.nav-label');
+      if (lbl && lbl.textContent) el.setAttribute('data-tip', lbl.textContent.trim());
+    });
     if (window.lucide) lucide.createIcons();
   });
-  document.addEventListener('alpine:initialized', function() {
+  document.addEventListener('alpine:initialized', function () {
     if (window.lucide) lucide.createIcons();
   });
 </script>
+</body>
 </html>
 {{end}}
