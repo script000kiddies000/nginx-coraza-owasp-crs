@@ -16,8 +16,8 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 
 	mux := http.NewServeMux()
 
-	// Static assets — served directly from embedded FS
-	mux.Handle("GET /public/", http.StripPrefix("/public/", http.FileServer(http.FS(publicFS()))))
+	// Static assets — long-lived immutable cache (versioned via layout query).
+	mux.Handle("GET /public/", publicHandler(app.assetVersion))
 
 	// Browsers request /favicon.ico implicitly; avoid 404 noise in dev (dashboard :9080).
 	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {

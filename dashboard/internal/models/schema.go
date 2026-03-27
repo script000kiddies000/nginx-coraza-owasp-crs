@@ -304,6 +304,7 @@ type PageData struct {
 	Title      string
 	ActiveMenu string
 	Username   string
+	AssetVersion string
 	Flash      FlashMsg
 	Data       any
 }

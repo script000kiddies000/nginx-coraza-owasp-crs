@@ -117,10 +117,10 @@
     .sidebar.collapsed .nav-item[data-tip]:hover::after,
     .sidebar.collapsed .nav-sub-item[data-tip]:hover::after { opacity: 1; }
   </style>
-  <script src="/public/js/tailwindcss.min.js"></script>
-  <script defer src="/public/js/alpine.min.js"></script>
-  <script src="/public/js/lucide.min.js"></script>
-  <link href="/public/css/fonts.css" rel="stylesheet">
+  <script src="/public/js/tailwindcss.min.js?v={{.AssetVersion}}"></script>
+  <script defer src="/public/js/alpine.min.js?v={{.AssetVersion}}"></script>
+  <script src="/public/js/lucide.min.js?v={{.AssetVersion}}"></script>
+  <link href="/public/css/fonts.css?v={{.AssetVersion}}" rel="stylesheet">
   <script>
     tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter','sans-serif'] } } } }
     function fluxSidebar() {

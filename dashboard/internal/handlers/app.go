@@ -7,6 +7,9 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
+	"time"
 
 	bolt "go.etcd.io/bbolt"
 
@@ -21,8 +24,9 @@ const contextKeyUsername contextKey = "username"
 
 // App holds shared dependencies for all HTTP handlers.
 type App struct {
-	DB   *bolt.DB
-	base *template.Template // parsed layout.html, cloned per request
+	DB           *bolt.DB
+	base         *template.Template // parsed layout.html, cloned per request
+	assetVersion string
 }
 
 // NewApp initialises the App and pre-parses the master layout template.
@@ -31,7 +35,11 @@ func NewApp(db *bolt.DB) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse layout template: %w", err)
 	}
-	return &App{DB: db, base: base}, nil
+	assetVersion := os.Getenv("FLUX_ASSET_VERSION")
+	if assetVersion == "" {
+		assetVersion = strconv.FormatInt(time.Now().Unix(), 36)
+	}
+	return &App{DB: db, base: base, assetVersion: assetVersion}, nil
 }
 
 // render clones the base layout, adds the named page template, and executes
@@ -40,6 +48,9 @@ func NewApp(db *bolt.DB) (*App, error) {
 func (app *App) render(w http.ResponseWriter, r *http.Request, page string, data models.PageData) {
 	if data.Username == "" {
 		data.Username = usernameFromCtx(r)
+	}
+	if data.AssetVersion == "" {
+		data.AssetVersion = app.assetVersion
 	}
 
 	t, err := app.base.Clone()
@@ -53,6 +64,7 @@ func (app *App) render(w http.ResponseWriter, r *http.Request, page string, data
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "private, no-cache, max-age=0, must-revalidate")
 	if err = t.ExecuteTemplate(w, "layout", data); err != nil {
 		log.Printf("[render] %s: %v", page, err)
 	}
@@ -67,6 +79,7 @@ func (app *App) renderLogin(w http.ResponseWriter, errMsg string) {
 	}
 	data := struct{ Error string }{Error: errMsg}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "private, no-cache, max-age=0, must-revalidate")
 	if err = t.ExecuteTemplate(w, "login", data); err != nil {
 		log.Printf("[renderLogin] %v", err)
 	}
@@ -76,6 +89,7 @@ func (app *App) renderLogin(w http.ResponseWriter, errMsg string) {
 // payload nil → {"ok":true}; map → keys merged with "ok":true; other values → marshalled and merged with "ok":true.
 func jsonOK(w http.ResponseWriter, payload any) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
 	if payload == nil {
 		_, _ = w.Write([]byte(`{"ok":true}`))
 		return
@@ -107,6 +121,7 @@ func jsonOK(w http.ResponseWriter, payload any) {
 // jsonError writes a JSON error response.
 func jsonError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(code)
 	fmt.Fprintf(w, `{"ok":false,"error":%q}`, msg)
 }
