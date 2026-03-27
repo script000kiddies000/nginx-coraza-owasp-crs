@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"flux-waf/internal/logs"
@@ -117,6 +119,81 @@ func (app *App) APIDashboardProtection(w http.ResponseWriter, r *http.Request) {
 			"detail": "Request body rules",
 		},
 	})
+}
+
+// APIDashboardRPS serves realtime requests/second from reverse-proxy traffic.
+func (app *App) APIDashboardRPS(w http.ResponseWriter, r *http.Request) {
+	hosts, _ := store.ListHosts(app.DB)
+	allow := make(map[string]struct{}, len(hosts))
+	for _, h := range hosts {
+		d := strings.ToLower(strings.TrimSpace(h.Domain))
+		if d != "" {
+			allow[d] = struct{}{}
+		}
+	}
+
+	entries, err := logs.ReadAccessJSONRecent(logs.DefaultAccessJSONLog, 4<<20, 12000)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	now := time.Now().UTC()
+	cutoff := now.Add(-1 * time.Second)
+	rps := 0
+	for _, e := range entries {
+		t := parseLogTime(asString(e["time"]))
+		if t.IsZero() {
+			continue
+		}
+		if t.Before(cutoff) {
+			break // entries are newest first
+		}
+		h := normalizeHost(asString(e["host"]))
+		if h == "" {
+			continue
+		}
+		if _, ok := allow[h]; ok {
+			rps++
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"rps": rps,
+		"at":  now.Format(time.RFC3339),
+	})
+}
+
+func asString(v any) string {
+	if v == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(v))
+}
+
+func parseLogTime(s string) time.Time {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return time.Time{}
+	}
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t
+	}
+	if len(s) >= 19 {
+		if t, err := time.Parse("2006-01-02T15:04:05", s[:19]); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
+}
+
+func normalizeHost(h string) string {
+	h = strings.ToLower(strings.TrimSpace(h))
+	if i := strings.IndexByte(h, ':'); i > 0 {
+		h = h[:i]
+	}
+	return h
 }
 
 func wafStateLabel(mode string) string {

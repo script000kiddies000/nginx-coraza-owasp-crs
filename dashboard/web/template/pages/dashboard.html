@@ -22,8 +22,8 @@
     </template>
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 col-span-2 xl:col-span-4 min-h-[130px] flex flex-col">
       <div class="flex items-center justify-between mb-1.5">
-        <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Query per second (avg per bucket)</p>
-        <span class="text-xs font-mono text-cyan-400/90" x-text="liveQps.toFixed(3) + ' req/s'"></span>
+        <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Requests per second (realtime)</p>
+        <span class="text-xs font-mono text-cyan-400/90" x-text="Math.round(liveQps) + ' req/s'"></span>
       </div>
       <div class="h-[96px] mt-auto px-1 pb-1 flex items-end gap-[4px]">
         <template x-for="(h, i) in qpsBarsDisplay()" :key="'qpsbar-'+i">
@@ -202,6 +202,7 @@ function dashboardApp() {
     protection: {},
     protectionRows: [],
     _refreshTimer: null,
+    _rpsTimer: null,
     _qpsTickTimer: null,
     _charts: {},
     topCards: [],
@@ -366,18 +367,21 @@ function dashboardApp() {
     startQpsTicker() {
       if (this._qpsTickTimer) clearInterval(this._qpsTickTimer);
       this._qpsTickTimer = setInterval(() => {
-        const last = Number(this.qpsRealtime[this.qpsRealtime.length - 1] || 0);
-        const target = Number(this.qpsTarget || 0);
-        const drift = (target - last) * 0.32;
-        const noise = target > 0
-          ? (Math.random() - 0.5) * target * 0.16
-          : Math.random() * 0.01;
-        let next = last + drift + noise;
-        if (next < 0) next = 0;
+        const next = Math.max(0, Number(this.qpsTarget || 0));
         this.qpsRealtime.push(next);
         if (this.qpsRealtime.length > 30) this.qpsRealtime.shift();
         this.liveQps = next;
       }, 1000);
+    },
+    async fetchRPS() {
+      try {
+        const r = await fetch('/api/dashboard/rps');
+        if (!r.ok) throw new Error('status ' + r.status);
+        const payload = await r.json();
+        const v = Math.max(0, Number(payload?.rps || 0));
+        this.qpsTarget = v;
+        this.liveQps = v;
+      } catch (_) {}
     },
     teardownCharts() {
       for (const k of Object.keys(this._charts)) {
@@ -493,7 +497,7 @@ function dashboardApp() {
         const payload = await r.json();
         if (!payload || typeof payload !== 'object' || !payload.time_series) throw new Error('invalid payload');
         this.analytics = payload;
-        this.qpsTarget = Number(payload.summary?.qps_avg || 0);
+        // realtime RPS is fetched from /api/dashboard/rps
       } catch (e) {
         console.warn('[dashboard] fetchAnalytics failed:', e);
       }
@@ -513,12 +517,15 @@ function dashboardApp() {
       window.addEventListener('resize', () => this.drawGeoMap());
       await this.fetchProtection();
       await this.fetchAnalytics();
+      await this.fetchRPS();
       this._refreshTimer = setInterval(() => {
         this.fetchProtection();
         this.fetchAnalytics();
       }, 30000);
+      this._rpsTimer = setInterval(() => this.fetchRPS(), 1000);
       window.addEventListener('pagehide', () => {
         if (this._refreshTimer) clearInterval(this._refreshTimer);
+        if (this._rpsTimer) clearInterval(this._rpsTimer);
         if (this._qpsTickTimer) clearInterval(this._qpsTickTimer);
         this.teardownCharts();
       }, { once: true });

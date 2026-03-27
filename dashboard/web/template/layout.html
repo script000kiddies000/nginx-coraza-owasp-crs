@@ -8,8 +8,8 @@
   <style>[x-cloak]{display:none!important}</style>
   <style>
     :root {
-      --sb-width: 236px;
-      --sb-collapsed: 64px;
+      --sb-width: 252px;
+      --sb-collapsed: 72px;
       --sb-bg: #0d1117;
       --sb-border: rgba(255,255,255,0.06);
       --sb-hover: rgba(255,255,255,0.05);
@@ -29,28 +29,28 @@
     }
     .sidebar-nav { scrollbar-width: none; }
     .sidebar-nav::-webkit-scrollbar { display: none; }
-    .nav-section { padding: 12px 10px 4px; }
+    .nav-section { padding: 13px 12px 5px; }
     .nav-section span {
-      font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.22);
+      font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.30);
     }
     .nav-item, .nav-group-label, .nav-sub-item {
       display: flex; align-items: center; gap: 10px; border-radius: 8px; text-decoration: none;
       color: #6b7280; transition: background .15s, color .15s;
     }
-    .nav-item, .nav-group-label { height: 38px; padding: 0 10px; font-size: 13px; border-left: 2px solid transparent; }
-    .nav-sub-item { height: 34px; padding: 0 10px; font-size: 12.5px; border-left: 2px solid transparent; }
+    .nav-item, .nav-group-label { height: 42px; padding: 0 12px; font-size: 14px; border-left: 2px solid transparent; }
+    .nav-sub-item { height: 39px; padding: 0 12px; font-size: 13.5px; border-left: 2px solid transparent; }
     .nav-item:hover, .nav-group-label:hover, .nav-sub-item:hover { background: var(--sb-hover); color: #d1d5db; }
     .nav-item.active, .nav-sub-item.active {
       background: var(--sb-active-bg); color: #f9fafb; border-left-color: var(--sb-active-border); font-weight: 600;
     }
     .nav-icon-wrap {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 30px; height: 30px; min-width: 30px; border-radius: 7px;
+      width: 32px; height: 32px; min-width: 32px; border-radius: 8px;
       background: rgba(51,65,85,.22); border: 1px solid rgba(71,85,105,.35); color: #94a3b8;
     }
-    .nav-sub-item .nav-icon-wrap { width: 24px; height: 24px; min-width: 24px; }
-    .nav-icon-wrap svg { width: 15px; height: 15px; }
-    .nav-sub-item .nav-icon-wrap svg { width: 13px; height: 13px; }
+    .nav-sub-item .nav-icon-wrap { width: 30px; height: 30px; min-width: 30px; }
+    .nav-icon-wrap svg { width: 17px; height: 17px; }
+    .nav-sub-item .nav-icon-wrap svg { width: 15px; height: 15px; }
     /* per-route icon colors (restore colored icon chips) */
     a[href="/"] .nav-icon-wrap,
     a[href="/dashboard"] .nav-icon-wrap { color:#818cf8; background:rgba(79,70,229,.15); border-color:rgba(99,102,241,.30); }
@@ -87,9 +87,9 @@
     }
     /* Keep sub-menu items visible in collapsed mode. */
     .sidebar.collapsed .nav-group-children { display: flex; padding-left: 0; }
-    .sidebar.collapsed .nav-sub-item { height: 38px; font-size: 13px; }
-    .sidebar.collapsed .nav-sub-item .nav-icon-wrap { width: 30px; height: 30px; min-width: 30px; }
-    .sidebar.collapsed .nav-sub-item .nav-icon-wrap svg { width: 15px; height: 15px; }
+    .sidebar.collapsed .nav-sub-item { height: 42px; font-size: 14px; }
+    .sidebar.collapsed .nav-sub-item .nav-icon-wrap { width: 34px; height: 34px; min-width: 34px; }
+    .sidebar.collapsed .nav-sub-item .nav-icon-wrap svg { width: 17px; height: 17px; }
     /* Tooltip labels on collapsed menu */
     .sidebar.collapsed .nav-item[data-tip],
     .sidebar.collapsed .nav-sub-item[data-tip] { position: relative; }
@@ -284,7 +284,7 @@
   </div>
 </aside>
 
-<div :style="sidebarOpen ? 'margin-left:236px' : 'margin-left:64px'" class="transition-all duration-200 min-h-screen flex flex-col">
+<div :style="sidebarOpen ? 'margin-left:252px' : 'margin-left:72px'" class="transition-all duration-200 min-h-screen flex flex-col">
   <header class="h-14 bg-gray-900/80 backdrop-blur border-b border-gray-800 flex items-center px-6 sticky top-0 z-30">
     <h1 class="text-sm font-semibold text-white">{{.Title}}</h1>
   </header>

@@ -65,6 +65,7 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	mux.HandleFunc("GET /api/stats", app.RequireAuth(app.APIStats))
 	mux.HandleFunc("GET /api/dashboard/analytics", app.RequireAuth(app.APIDashboardAnalytics))
 	mux.HandleFunc("GET /api/dashboard/protection", app.RequireAuth(app.APIDashboardProtection))
+	mux.HandleFunc("GET /api/dashboard/rps", app.RequireAuth(app.APIDashboardRPS))
 	mux.HandleFunc("GET /api/traffic", app.RequireAuth(app.APITraffic))
 	mux.HandleFunc("GET /api/security-events", app.RequireAuth(app.APISecurityEvents))
 	mux.HandleFunc("GET /api/logs/access", app.RequireAuth(app.APIGetAccessLogs))
