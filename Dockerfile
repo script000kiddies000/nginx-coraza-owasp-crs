@@ -1,13 +1,12 @@
 # ==============================================================================
-# STAGE 1: Build libcoraza (Go → C shared library)
-#
-# libcoraza adalah wrapper C-callable di atas engine WAF Coraza (Go).
-# Harus dibangun PERTAMA karena coraza-nginx module membutuhkan
-# libcoraza.so + header C-nya saat kompilasi nginx.
+# Versi build (pin — diubah sengaja agar image reproduksibel).
+# Pairing: coraza-nginx v0.10.x ↔ libcoraza v1.1+ (lihat release notes coraza-nginx).
 # ==============================================================================
 # golang:1.25-bookworm sudah bundled Go 1.25 — apt golang (1.19) terlalu lama
 # libcoraza go.mod mensyaratkan go 1.25.0 minimum
 FROM golang:1.25-bookworm AS builder-coraza
+
+ARG LIBCORAZA_VERSION=v1.2.1
 
 RUN apt-get update && apt-get install -y \
     build-essential git curl \
@@ -21,7 +20,7 @@ WORKDIR /build
 #   ./configure → detect Go, set prefix=/usr/local
 #   make        → go build -buildmode=c-shared → libcoraza.so
 #   make install → copy ke /usr/local/lib + /usr/local/include
-RUN git clone --depth 1 https://github.com/corazawaf/libcoraza.git && \
+RUN git clone --branch "${LIBCORAZA_VERSION}" --depth 1 https://github.com/corazawaf/libcoraza.git && \
     cd libcoraza && \
     ./build.sh && \
     ./configure && \
@@ -46,6 +45,13 @@ RUN git clone --depth 1 https://github.com/corazawaf/libcoraza.git && \
 # ==============================================================================
 FROM golang:1.25-bookworm AS builder-nginx
 
+ARG NGINX_VERSION=1.27.4
+ARG OPENSSL_PKG_VERSION=3.4.0
+ARG NGINX_SSL_FP_TAG=v1.0.2
+ARG NGX_GEOIP2_TAG=3.4
+ARG CORAZA_NGINX_VERSION=v0.10.1
+ARG CRS_VERSION=v4.24.1
+
 # TODO (aktifkan saat test masing-masing modul):
 #   libgd-dev     → Image filter module
 #   libxslt-dev   → XSLT filter module
@@ -65,35 +71,35 @@ WORKDIR /build
 # OpenSSL 3.4.0 — tarball dari openssl.org (bukan git clone branch!)
 # phuslu last update Feb 2025, openssl-3.4.0 release Oct 2024 → versi yang digunakan saat patch dibuat
 # git clone --depth=1 openssl-3.4 branch = HEAD terbaru (March 2026) → patch GAGAL karena code sudah berubah
-RUN wget -q https://www.openssl.org/source/openssl-3.4.0.tar.gz && \
-    tar xzf openssl-3.4.0.tar.gz && \
-    mv openssl-3.4.0 openssl-3.4
+RUN wget -q "https://www.openssl.org/source/openssl-${OPENSSL_PKG_VERSION}.tar.gz" && \
+    tar xzf "openssl-${OPENSSL_PKG_VERSION}.tar.gz" && \
+    mv "openssl-${OPENSSL_PKG_VERSION}" openssl-3.4
 
-# Nginx 1.27.4 — versi terbaru di 1.27.x, sesuai support matrix phuslu
-RUN wget -q https://nginx.org/download/nginx-1.27.4.tar.gz && \
-    tar xzf nginx-1.27.4.tar.gz
+# Nginx — pin sesuai support matrix phuslu (nginx-1.27.patch)
+RUN wget -q "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz" && \
+    tar xzf "nginx-${NGINX_VERSION}.tar.gz"
 
 # nginx-ssl-fingerprint (phuslu): JA3/JA4 TLS fingerprint
 # Wajib patch nginx + openssl source sebelum build
-RUN git clone --depth=1 https://github.com/phuslu/nginx-ssl-fingerprint.git
+RUN git clone --branch "${NGINX_SSL_FP_TAG}" --depth 1 https://github.com/phuslu/nginx-ssl-fingerprint.git
 
 # Patch 1: tambahkan ClientHello capture ke OpenSSL 3.4 source
 RUN patch -p1 -d openssl-3.4 < nginx-ssl-fingerprint/patches/openssl.openssl-3.4.patch
 
 # Patch 2: tambahkan fp_ja3_* fields ke ngx_ssl_connection_t di nginx 1.27
-RUN patch -p1 -d nginx-1.27.4 < nginx-ssl-fingerprint/patches/nginx-1.27.patch
+RUN patch -p1 -d "nginx-${NGINX_VERSION}" < nginx-ssl-fingerprint/patches/nginx-1.27.patch
 
 # ngx_http_geoip2_module: GeoIP2 MaxMind dynamic module
-RUN git clone --depth 1 https://github.com/leev/ngx_http_geoip2_module.git
+RUN git clone --branch "${NGX_GEOIP2_TAG}" --depth 1 https://github.com/leev/ngx_http_geoip2_module.git
 
-# coraza-nginx: nginx dynamic module yang menghubungkan nginx → libcoraza
-RUN git clone --depth 1 https://github.com/corazawaf/coraza-nginx.git
+# coraza-nginx: pin ke release stabil (kompatibel dengan libcoraza di stage 1)
+RUN git clone --branch "${CORAZA_NGINX_VERSION}" --depth 1 https://github.com/corazawaf/coraza-nginx.git
 
-# OWASP CRS v4 — latest main branch
-RUN git clone --depth 1 \
+# OWASP CRS v4 — pin tag (bukan main)
+RUN git clone --branch "${CRS_VERSION}" --depth 1 \
     https://github.com/coreruleset/coreruleset.git /build/crs
 
-WORKDIR /build/nginx-1.27.4
+WORKDIR /build/nginx-${NGINX_VERSION}
 
 # Configure flags aktif:
 #   --with-openssl=../openssl-3.4     → custom OpenSSL yang sudah di-patch phuslu

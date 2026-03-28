@@ -4,6 +4,9 @@
 # Local logs / runtime
 logs/*
 
+# Local baseline snapshot (pre-dashboard), not tracked
+old code/
+
 # Blueprints / research notes
 blueprint*
 
