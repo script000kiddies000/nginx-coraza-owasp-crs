@@ -8,7 +8,7 @@ FROM golang:1.25-bookworm AS builder-coraza
 
 ARG LIBCORAZA_VERSION=v1.2.1
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     build-essential git curl \
     libtool autoconf automake \
     && rm -rf /var/lib/apt/lists/*
@@ -32,8 +32,8 @@ RUN git clone --branch "${LIBCORAZA_VERSION}" --depth 1 https://github.com/coraz
 # STAGE 2: Build Nginx 1.27.4 dari source
 #
 # Versions (sesuai phuslu support matrix: nginx-1.27 + openssl-3.4 ✅):
-#   - Nginx 1.27.4
-#   - OpenSSL 3.4 branch (clone dari GitHub — phuslu patch butuh source tree)
+#   - Nginx 1.27.4 (tarball nginx.org)
+#   - OpenSSL 3.4.x — tarball openssl.org + patch phuslu (bukan git HEAD branch)
 #   - nginx-ssl-fingerprint (phuslu) → JA3/JA4, STATIC, butuh patch manual
 #   - coraza-nginx → WAF engine, DYNAMIC module
 #
@@ -56,7 +56,7 @@ ARG CRS_VERSION=v4.24.1
 #   libgd-dev     → Image filter module
 #   libxslt-dev   → XSLT filter module
 #   libxml2-dev   → dependency xslt
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     build-essential libpcre3-dev zlib1g-dev libssl-dev git wget patch \
     libmaxminddb-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -111,13 +111,14 @@ WORKDIR /build/nginx-${NGINX_VERSION}
 #   --add-module=../nginx-ssl-fingerprint   → JA3/JA4 STATIC (nginx sudah di-patch)
 #   --add-dynamic-module=../coraza-nginx    → Coraza WAF DYNAMIC module
 #
-# TODO — aktifkan satu per satu setelah build dasar sukses:
+# Stream WAJIB: nginx-ssl-fingerprint mengompilasi ngx_stream_ssl_fingerprint_preread_module
+# (butuh ngx_stream.h) — tanpa --with-stream build gagal.
+#
+# TODO — aktifkan satu per satu jika perlu:
 #   --with-http_v3_module                   → HTTP/3 QUIC (OpenSSL 3.4 sudah support)
 #   --with-http_geoip_module=dynamic        → GeoIP (butuh libgeoip-dev + libgeoip1)
 #   --with-http_image_filter_module=dynamic → Image filter (butuh libgd-dev + libgd3)
 #   --with-http_xslt_filter_module=dynamic  → XSLT (butuh libxslt-dev + libxslt1.1)
-#   --with-stream                           → TCP/UDP stream proxy
-#   --with-stream_ssl_module                → TLS di stream
 #   --with-stream_geoip_module=dynamic      → GeoIP di stream
 RUN ./configure \
       --prefix=/usr/share/nginx \
@@ -134,6 +135,8 @@ RUN ./configure \
       --with-http_realip_module \
       --with-http_sub_module \
       --with-http_stub_status_module \
+      --with-stream \
+      --with-stream_ssl_module \
       --add-module=../nginx-ssl-fingerprint \
       --add-dynamic-module=../ngx_http_geoip2_module \
       --add-dynamic-module=../coraza-nginx && \
@@ -207,10 +210,10 @@ RUN id -u www-data &>/dev/null || useradd -r -s /bin/false www-data
 COPY --from=builder-nginx /usr/sbin/nginx          /usr/sbin/nginx
 COPY --from=builder-nginx /usr/share/nginx         /usr/share/nginx
 
-# ── libcoraza.so — WAJIB ada di /usr/local/lib ──────────────────────────────
-# nginx worker me-dlopen() file ini saat startup, bukan saat link time.
-COPY --from=builder-coraza /usr/local/lib/libcoraza.so \
-                            /usr/local/lib/libcoraza.so
+# ── libcoraza — WAJIB ada di /usr/local/lib ─────────────────────────────────
+# nginx worker me-dlopen() saat startup. Pakai wildcard agar soname + symlink ikut
+# (hanya libcoraza.so bisa putus jika target .so.* tidak ikut ter-copy).
+COPY --from=builder-coraza /usr/local/lib/libcoraza.so* /usr/local/lib/
 
 # ── OWASP CRS v4 rules (baked into image) ───────────────────────────────────
 COPY --from=builder-nginx /build/crs /etc/nginx/coraza/crs
