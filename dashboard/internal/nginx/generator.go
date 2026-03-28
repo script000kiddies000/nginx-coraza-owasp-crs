@@ -133,7 +133,9 @@ server {
         root             /etc/nginx;
         add_header       Cache-Control "no-store" always;
         add_header       X-Request-ID  $request_id always;
+        add_header       X-Flux-Block-Reason $flux_block_reason_display always;
         sub_filter       '__REQUEST_ID__' $request_id;
+        sub_filter       '__FLUX_BLOCK_REASON__' $flux_block_reason_display;
         sub_filter_once  on;
     }
 {{if eq .Mode "redirect"}}
