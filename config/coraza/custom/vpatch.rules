@@ -25,9 +25,9 @@ SecRule REQUEST_URI "@rx (?i)/remote/hostcheck_validate|/remote/login\?lang=" \
 # CVE-2023-44487 — HTTP/2 Rapid Reset (DoS) [high]
 # CVE-2023-44487 — HTTP/2 Rapid Reset monitoring
 # Primary mitigation: nginx http2_max_concurrent_streams + limit_conn
-# This rule logs excessive reset patterns for alerting
-SecRule REQUEST_METHOD "@rx ^(GET|HEAD|POST|PUT|DELETE|PATCH|OPTIONS)$" \
-    "id:9900013,phase:1,pass,log,msg:'CVE-2023-44487 HTTP/2 Rapid Reset monitoring active',tag:'CVE-2023-44487'"
+# Disabled: rule matched every normal request (method regex too broad); noisy in audit log.
+# SecRule REQUEST_METHOD "@rx ^(GET|HEAD|POST|PUT|DELETE|PATCH|OPTIONS)$" \
+#     "id:9900013,phase:1,pass,log,msg:'CVE-2023-44487 HTTP/2 Rapid Reset monitoring active',tag:'CVE-2023-44487'"
 
 # CVE-2022-40684 — Fortinet Auth Bypass [critical]
 # CVE-2022-40684 — Fortinet FortiOS auth bypass

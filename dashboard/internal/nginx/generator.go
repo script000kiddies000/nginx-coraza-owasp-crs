@@ -124,8 +124,12 @@ server {
     error_page 500          /errors/500.html;
     error_page 502 503 504  /errors/502.html;
 
+    # Subrequest internal untuk error_page — jangan jalankan CRS di sini.
+    # Tanpa ini, GET ke /errors/*.html bisa ter-audit sebagai GET+body (920170) dan
+    # menambah anomaly score / noise saat respons utama sudah 403/502 dari WAF/upstream.
     location ^~ /errors/ {
         internal;
+        coraza off;
         root             /etc/nginx;
         add_header       Cache-Control "no-store" always;
         add_header       X-Request-ID  $request_id always;
