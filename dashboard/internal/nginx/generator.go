@@ -114,6 +114,24 @@ server {
         add_header Cache-Control "public, max-age=604800" always;
         return 204;
     }
+
+    # Custom error pages (shared)
+    error_page 400          /errors/400.html;
+    error_page 401          /errors/401.html;
+    error_page 403          /errors/403.html;
+    error_page 404          /errors/404.html;
+    error_page 429          /errors/429.html;
+    error_page 500          /errors/500.html;
+    error_page 502 503 504  /errors/502.html;
+
+    location ^~ /errors/ {
+        internal;
+        root             /etc/nginx;
+        add_header       Cache-Control "no-store" always;
+        add_header       X-Request-ID  $request_id always;
+        sub_filter       '__REQUEST_ID__' $request_id;
+        sub_filter_once  on;
+    }
 {{if eq .Mode "redirect"}}
     location / {
         return {{redirectCode .RedirectCode}} {{.RedirectURL}};
@@ -131,6 +149,7 @@ server {
 {{- end}}
 
     location / {
+        proxy_intercept_errors on;
         proxy_pass         http://{{upstreamName .Domain}};
         proxy_http_version 1.1;
         proxy_set_header   Connection      "";
