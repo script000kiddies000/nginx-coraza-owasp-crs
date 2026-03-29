@@ -3,11 +3,14 @@
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
     <h1 class="text-lg font-semibold text-white tracking-tight">Dashboard</h1>
     <div class="flex flex-wrap items-center gap-2 shrink-0">
-      <template x-for="opt in [{k:'24h',l:'24 jam'},{k:'7d',l:'7 hari'},{k:'30d',l:'30 hari'}]" :key="opt.k">
+      <template x-for="opt in [{k:'1h',l:'1 jam',i:'clock-3'},{k:'6h',l:'6 jam',i:'timer'},{k:'24h',l:'24 jam',i:'calendar-days'},{k:'7d',l:'7 hari',i:'calendar-range'},{k:'30d',l:'30 hari',i:'calendar'}]" :key="opt.k">
         <button type="button" @click="setRange(opt.k)"
-                class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border"
+                class="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors border inline-flex items-center gap-1.5"
                 :class="range === opt.k ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-gray-900 text-gray-400 border-gray-800 hover:text-white hover:border-gray-700'"
-                x-text="opt.l"></button>
+                :title="opt.l">
+          <i data-lucide="" :data-lucide="opt.i" class="w-3.5 h-3.5"></i>
+          <span x-text="opt.l"></span>
+        </button>
       </template>
     </div>
   </div>
@@ -23,7 +26,7 @@
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 col-span-2 xl:col-span-4 min-h-[130px] flex flex-col">
       <div class="flex items-center justify-between mb-1.5">
         <p class="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Requests per second (realtime)</p>
-        <span class="text-xs font-mono text-cyan-400/90" x-text="Math.round(liveQps) + ' req/s'"></span>
+        <span class="text-xs font-mono text-cyan-400/90" x-text="fmtRps(liveQps) + ' req/s'"></span>
       </div>
       <div class="h-[96px] mt-auto px-1 pb-1 flex items-end gap-[4px]">
         <template x-for="(h, i) in qpsBarsDisplay()" :key="'qpsbar-'+i">
@@ -197,7 +200,7 @@ function dashboardApp() {
     dataLabels: { enabled: false },
   };
   return {
-    range: '24h',
+    range: '1h',
     analytics: { summary: {}, time_series: {}, user_clients: [], response_status: [], referers: [], vhosts: [] },
     protection: {},
     protectionRows: [],
@@ -211,9 +214,15 @@ function dashboardApp() {
     worldGeo: null,
     qpsRealtime: Array(30).fill(0),
     qpsTarget: 0,
+    qpsSmooth: 0,
+    qpsScale: 0,
     liveQps: 0,
 
     fmtNum(n) { return Number(n || 0).toLocaleString(); },
+    fmtRps(v) {
+      const n = Math.max(0, Number(v || 0));
+      return (n < 10 ? n.toFixed(2) : n.toFixed(1));
+    },
     pct(rate) { return ((Number(rate || 0) * 100).toFixed(2)) + '%'; },
     statusRatio(row) {
       const t = this.analytics.summary?.request_count || 0;
@@ -358,7 +367,7 @@ function dashboardApp() {
     qpsBarsDisplay() {
       const arr = this.qpsRealtime || [];
       if (!arr.length) return Array(30).fill(6);
-      const max = Math.max(0.08, ...arr, this.qpsTarget || 0);
+      const max = Math.max(0.08, this.qpsScale || 0, ...arr);
       return arr.map((v) => {
         const pct = (Number(v || 0) / max) * 100;
         return Math.max(8, Math.min(96, pct));
@@ -367,9 +376,14 @@ function dashboardApp() {
     startQpsTicker() {
       if (this._qpsTickTimer) clearInterval(this._qpsTickTimer);
       this._qpsTickTimer = setInterval(() => {
-        const next = Math.max(0, Number(this.qpsTarget || 0));
+        const target = Math.max(0, Number(this.qpsTarget || 0));
+        const prev = Math.max(0, Number(this.qpsSmooth || target));
+        const next = prev + (target - prev) * 0.35; // EMA smoothing
+        this.qpsSmooth = next;
         this.qpsRealtime.push(next);
         if (this.qpsRealtime.length > 30) this.qpsRealtime.shift();
+        const localMax = Math.max(0.2, ...this.qpsRealtime, next);
+        this.qpsScale = this.qpsScale > 0 ? (this.qpsScale*0.8 + localMax*0.2) : localMax;
         this.liveQps = next;
       }, 1000);
     },
@@ -380,7 +394,6 @@ function dashboardApp() {
         const payload = await r.json();
         const v = Math.max(0, Number(payload?.rps || 0));
         this.qpsTarget = v;
-        this.liveQps = v;
       } catch (_) {}
     },
     teardownCharts() {
@@ -513,6 +526,9 @@ function dashboardApp() {
     },
     async init() {
       this.rebuildTopCards();
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        this.$nextTick(() => window.lucide.createIcons());
+      }
       this.startQpsTicker();
       window.addEventListener('resize', () => this.drawGeoMap());
       await this.fetchProtection();

@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
-	"math/rand"
 	"net/http"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 
+	"flux-waf/internal/logs"
 	"flux-waf/internal/models"
 )
 
@@ -66,11 +68,22 @@ type attackMapPayload struct {
 var countryDisplay = map[string]string{
 	"CN": "China", "RU": "Russia", "GB": "United Kingdom", "US": "United States",
 	"DE": "Germany", "FR": "France", "JP": "Japan", "MX": "Mexico", "BR": "Brazil",
-	"SG": "Singapore", "IN": "India", "EG": "Egypt", "ID": "Indonesia",
+	"SG": "Singapore", "IN": "India", "EG": "Egypt", "ID": "Indonesia", "NL": "Netherlands",
+	"KR": "South Korea", "AU": "Australia", "CA": "Canada", "IT": "Italy", "ES": "Spain",
+	"TR": "Turkey", "UA": "Ukraine", "VN": "Vietnam", "TH": "Thailand", "MY": "Malaysia",
 }
 
-func fakeIPv4(rng *rand.Rand) string {
-	return fmt.Sprintf("%d.%d.%d.%d", 1+rng.Intn(223), rng.Intn(256), rng.Intn(256), 1+rng.Intn(254))
+var countryCentroid = map[string]struct {
+	lat float64
+	lon float64
+}{
+	"ID": {-2.5, 118.0},
+	"CN": {35.9, 104.2}, "RU": {61.5, 105.3}, "GB": {55.4, -3.4}, "US": {39.8, -98.6},
+	"DE": {51.1, 10.4}, "FR": {46.2, 2.2}, "JP": {36.2, 138.3}, "MX": {23.6, -102.5},
+	"BR": {-14.2, -51.9}, "SG": {1.3, 103.8}, "IN": {20.6, 78.9}, "EG": {26.8, 30.8},
+	"NL": {52.1, 5.3}, "KR": {36.5, 127.8}, "AU": {-25.3, 133.8}, "CA": {56.1, -106.3},
+	"IT": {41.9, 12.6}, "ES": {40.5, -3.7}, "TR": {39.1, 35.2}, "UA": {48.4, 31.2},
+	"VN": {14.1, 108.3}, "TH": {15.8, 100.9}, "MY": {4.2, 102.0},
 }
 
 func labelForCountry(code string) string {
@@ -80,58 +93,140 @@ func labelForCountry(code string) string {
 	return code
 }
 
-// buildSampleAttackMap returns demo geo points, category counts, and feed rows.
-func buildSampleAttackMap() attackMapPayload {
+func toStr(v any) string {
+	if v == nil {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		return strings.TrimSpace(s)
+	}
+	switch x := v.(type) {
+	case int:
+		return strconv.Itoa(x)
+	case int64:
+		return strconv.FormatInt(x, 10)
+	case float64:
+		return strconv.FormatFloat(x, 'f', -1, 64)
+	default:
+		return ""
+	}
+}
+
+func parseStatus(v any) int {
+	switch x := v.(type) {
+	case float64:
+		return int(x)
+	case int:
+		return x
+	case int64:
+		return int(x)
+	case string:
+		n, _ := strconv.Atoi(strings.TrimSpace(x))
+		return n
+	default:
+		return 0
+	}
+}
+
+func detectAttackCode(uri, method string, status int) string {
+	u := strings.ToLower(uri)
+	switch {
+	case strings.Contains(u, "../") || strings.Contains(u, "%2e%2e") || strings.Contains(u, "..%2f"):
+		return "LFI"
+	case strings.Contains(u, "<script") || strings.Contains(u, "%3cscript"):
+		return "XSS"
+	case strings.Contains(u, "union+select") || strings.Contains(u, "union%20select") || strings.Contains(u, "' or '1'='1"):
+		return "SQLI"
+	}
+	m := strings.ToUpper(method)
+	if m != "GET" && m != "POST" && m != "HEAD" && m != "PUT" && m != "PATCH" && m != "DELETE" && m != "OPTIONS" {
+		return "ME"
+	}
+	if status == 429 {
+		return "SCAN"
+	}
+	return "PE"
+}
+
+func buildLiveAttackMap(entries []map[string]any) attackMapPayload {
 	const tgtLat, tgtLon = -2.5, 118.0
 	targetCountry := "ID"
 	targetLabel := "Protected origin · Indonesia"
-
-	sources := []struct {
-		lat, lon float64
-		country  string
-		city     string
-	}{
-		{39.90, 116.41, "CN", "Beijing"},
-		{55.76, 37.62, "RU", "Moscow"},
-		{51.51, -0.13, "GB", "London"},
-		{37.39, -122.06, "US", "San Jose"},
-		{52.52, 13.41, "DE", "Berlin"},
-		{48.86, 2.35, "FR", "Paris"},
-		{35.68, 139.76, "JP", "Tokyo"},
-		{19.43, -99.13, "MX", "Mexico City"},
-		{-23.55, -46.63, "BR", "São Paulo"},
-		{1.35, 103.82, "SG", "Singapore"},
-		{28.61, 77.21, "IN", "New Delhi"},
-		{30.04, 31.24, "EG", "Cairo"},
-	}
-
-	codes := make([]string, 0, len(attackMapCategoryDefs))
-	for _, d := range attackMapCategoryDefs {
-		codes = append(codes, d.Code)
-	}
-
-	rng := rand.New(rand.NewSource(time.Now().UnixNano() / 3600))
-
-	points := make([]models.AttackMapPoint, 0, len(sources))
 	catCount := make(map[string]int)
 	for _, c := range attackMapCategoryDefs {
-		catCount[c.Code] = rng.Intn(8) // base noise
+		catCount[c.Code] = 0
 	}
 
-	for _, s := range sources {
-		code := codes[rng.Intn(len(codes))]
-		n := 15 + rng.Intn(140)
-		catCount[code] += n
+	type pointAgg struct {
+		country string
+		code    string
+		count   int
+	}
+	pointByCountryCode := map[string]*pointAgg{}
+	logRows := make([]attackMapLogEntry, 0, 128)
+
+	now := time.Now().UTC()
+	cutoff := now.Add(-24 * time.Hour)
+	for _, e := range entries {
+		ts, err := time.Parse(time.RFC3339, strings.TrimSpace(toStr(e["time"])))
+		if err != nil || ts.Before(cutoff) {
+			continue
+		}
+		status := parseStatus(e["status"])
+		if status < 400 {
+			continue
+		}
+
+		cc := strings.ToUpper(strings.TrimSpace(toStr(e["country"])))
+		if len(cc) != 2 {
+			cc = "ID"
+		}
+		method := strings.ToUpper(strings.TrimSpace(toStr(e["method"])))
+		uri := toStr(e["uri"])
+		code := detectAttackCode(uri, method, status)
+		catCount[code]++
+
+		key := cc + "|" + code
+		pa, ok := pointByCountryCode[key]
+		if !ok {
+			pa = &pointAgg{country: cc, code: code}
+			pointByCountryCode[key] = pa
+		}
+		pa.count++
+
+		logRows = append(logRows, attackMapLogEntry{
+			TS:         ts.Format(time.RFC3339),
+			Time:       ts.Format("15:04:05"),
+			TypeCode:   code,
+			SourceIP:   toStr(e["remote_addr"]),
+			Country:    labelForCountry(cc),
+			Source:     labelForCountry(cc) + " (" + cc + ")",
+			Target:     targetLabel,
+			AttackType: code,
+		})
+	}
+
+	sort.Slice(logRows, func(i, j int) bool { return logRows[i].TS > logRows[j].TS })
+	if len(logRows) > 200 {
+		logRows = logRows[:200]
+	}
+
+	points := make([]models.AttackMapPoint, 0, len(pointByCountryCode))
+	for _, p := range pointByCountryCode {
+		centroid, ok := countryCentroid[p.country]
+		if !ok {
+			continue
+		}
 		points = append(points, models.AttackMapPoint{
-			SourceLat:     s.lat,
-			SourceLon:     s.lon,
-			SourceCountry: s.country,
-			SourceCity:    s.city,
-			AttackType:    code,
+			SourceLat:     centroid.lat,
+			SourceLon:     centroid.lon,
+			SourceCountry: p.country,
+			SourceCity:    labelForCountry(p.country),
+			AttackType:    p.code,
 			TargetLat:     tgtLat,
 			TargetLon:     tgtLon,
 			TargetCountry: targetCountry,
-			Count:         n,
+			Count:         p.count,
 		})
 	}
 
@@ -147,44 +242,30 @@ func buildSampleAttackMap() attackMapPayload {
 		})
 	}
 
-	codeToLabel := make(map[string]string)
-	for _, d := range attackMapCategoryDefs {
-		codeToLabel[d.Code] = d.Label
-	}
-
-	now := time.Now().UTC()
-	logs := make([]attackMapLogEntry, 0, 64)
-	for i := 0; i < 64; i++ {
-		s := sources[rng.Intn(len(sources))]
-		code := codes[rng.Intn(len(codes))]
-		rule := fmt.Sprintf("%d", 941100+rng.Intn(800))
-		minutesAgo := rng.Intn(24 * 60)
-		ts := now.Add(-time.Duration(minutesAgo) * time.Minute)
-		logs = append(logs, attackMapLogEntry{
-			TS:         ts.Format(time.RFC3339),
-			Time:       ts.Format("15:04:05"),
-			TypeCode:   code,
-			SourceIP:   fakeIPv4(rng),
-			Country:    labelForCountry(s.country),
-			Source:     fmt.Sprintf("%s (%s)", s.city, s.country),
-			Target:     targetLabel,
-			AttackType: codeToLabel[code],
-			RuleID:     rule,
-		})
-	}
-
 	return attackMapPayload{
-		Demo:        true,
-		Label:       "Sample data — integrasi GeoIP + coraza_audit direncanakan di flux_waf_implementation_plan.md (§2.F)",
+		Demo:        false,
+		Label:       "Live data from access_json.log (status 4xx/5xx, last 24h)",
 		TotalToday:  total,
 		TargetLabel: targetLabel,
 		Points:      points,
 		Categories:  categories,
-		Logs24h:     logs,
+		Logs24h:     logRows,
 	}
 }
 
 func (app *App) APIAttackMapData(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(buildSampleAttackMap())
+	entries, err := logs.ReadAccessJSONRecent(logs.DefaultAccessJSONLog, 128<<20, 300000)
+	if err != nil {
+		_ = json.NewEncoder(w).Encode(attackMapPayload{
+			Demo:       false,
+			Label:      "Failed to read access_json.log: " + err.Error(),
+			TotalToday: 0,
+			Points:     []models.AttackMapPoint{},
+			Categories: []attackMapCategory{},
+			Logs24h:    []attackMapLogEntry{},
+		})
+		return
+	}
+	_ = json.NewEncoder(w).Encode(buildLiveAttackMap(entries))
 }

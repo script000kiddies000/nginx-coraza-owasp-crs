@@ -171,6 +171,22 @@ func BuildDashboardAnalytics(entries []map[string]any, windowStart, windowEnd ti
 func emptyTimeSeries(rangeKey string, windowStart, windowEnd time.Time) DashboardTimeSeries {
 	ts := DashboardTimeSeries{Labels: []string{}, Requests: []int{}, Blocked: []int{}, QPSBars: []float64{}}
 	switch rangeKey {
+	case "1h":
+		for i := 0; i < 60; i++ {
+			t := windowStart.Add(time.Duration(i) * time.Minute)
+			ts.Labels = append(ts.Labels, t.UTC().Format("15:04"))
+			ts.Requests = append(ts.Requests, 0)
+			ts.Blocked = append(ts.Blocked, 0)
+			ts.QPSBars = append(ts.QPSBars, 0)
+		}
+	case "6h":
+		for i := 0; i < 72; i++ { // 6h / 5m buckets
+			t := windowStart.Add(time.Duration(i*5) * time.Minute)
+			ts.Labels = append(ts.Labels, t.UTC().Format("15:04"))
+			ts.Requests = append(ts.Requests, 0)
+			ts.Blocked = append(ts.Blocked, 0)
+			ts.QPSBars = append(ts.QPSBars, 0)
+		}
 	case "7d":
 		for d := 0; d < 7; d++ {
 			t := windowStart.AddDate(0, 0, d)
@@ -207,6 +223,44 @@ func buildTimeSeries(filtered []map[string]any, rangeKey string, windowStart, wi
 	bucketBlk := make(map[string]int)
 
 	switch rangeKey {
+	case "1h":
+		for i := 0; i < 60; i++ {
+			key := fmt.Sprintf("%d", i)
+			bucketOrder = append(bucketOrder, key)
+			labels = append(labels, windowStart.Add(time.Duration(i)*time.Minute).UTC().Format("15:04"))
+		}
+		bucket = func(t time.Time) string {
+			if t.Before(windowStart) {
+				return "0"
+			}
+			idx := int(t.Sub(windowStart) / time.Minute)
+			if idx < 0 {
+				idx = 0
+			}
+			if idx > 59 {
+				idx = 59
+			}
+			return fmt.Sprintf("%d", idx)
+		}
+	case "6h":
+		for i := 0; i < 72; i++ {
+			key := fmt.Sprintf("%d", i)
+			bucketOrder = append(bucketOrder, key)
+			labels = append(labels, windowStart.Add(time.Duration(i*5)*time.Minute).UTC().Format("15:04"))
+		}
+		bucket = func(t time.Time) string {
+			if t.Before(windowStart) {
+				return "0"
+			}
+			idx := int(t.Sub(windowStart) / (5 * time.Minute))
+			if idx < 0 {
+				idx = 0
+			}
+			if idx > 71 {
+				idx = 71
+			}
+			return fmt.Sprintf("%d", idx)
+		}
 	case "7d":
 		for d := 0; d < 7; d++ {
 			day := windowStart.AddDate(0, 0, d).UTC().Format("2006-01-02")
@@ -283,7 +337,11 @@ func buildTimeSeries(filtered []map[string]any, rangeKey string, windowStart, wi
 	blk := make([]int, len(bucketOrder))
 	qps := make([]float64, len(bucketOrder))
 	secPer := 86400.0
-	if rangeKey == "24h" || rangeKey == "" {
+	if rangeKey == "1h" {
+		secPer = 60.0
+	} else if rangeKey == "6h" {
+		secPer = 300.0
+	} else if rangeKey == "24h" || rangeKey == "" {
 		secPer = 3600.0
 	}
 	for i, k := range bucketOrder {

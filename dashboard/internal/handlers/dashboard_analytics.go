@@ -22,17 +22,26 @@ func (app *App) APIDashboardAnalytics(w http.ResponseWriter, r *http.Request) {
 		rng = "24h"
 	}
 	var window time.Duration
-	maxLines := 15000
-	maxBytes := int64(16 << 20)
+	// Read a wider log window so counters don't plateau around small fixed caps.
+	maxLines := 100000
+	maxBytes := int64(128 << 20)
 	switch rng {
+	case "1h":
+		window = 1 * time.Hour
+		maxLines = 30000
+		maxBytes = 64 << 20
+	case "6h":
+		window = 6 * time.Hour
+		maxLines = 60000
+		maxBytes = 96 << 20
 	case "7d":
 		window = 7 * 24 * time.Hour
-		maxLines = 40000
-		maxBytes = 48 << 20
+		maxLines = 200000
+		maxBytes = 256 << 20
 	case "30d":
 		window = 30 * 24 * time.Hour
-		maxLines = 80000
-		maxBytes = 64 << 20
+		maxLines = 400000
+		maxBytes = 384 << 20
 	default:
 		rng = "24h"
 		window = 24 * time.Hour
