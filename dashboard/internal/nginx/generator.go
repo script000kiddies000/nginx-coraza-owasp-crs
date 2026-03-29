@@ -45,6 +45,16 @@ func sslKeyPath(p string) string {
 	return p
 }
 
+// tlsPEMFileOK returns true if path exists and is non-empty (PEM on disk).
+func tlsPEMFileOK(path string) bool {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return false
+	}
+	st, err := os.Stat(path)
+	return err == nil && st.Mode().IsRegular() && st.Size() > 0
+}
+
 // hostTemplate is the nginx server block template for a managed host.
 // It supports three modes: reverse_proxy, static, redirect.
 var hostTemplate = template.Must(template.New("host").Funcs(template.FuncMap{
@@ -217,6 +227,15 @@ func WriteHostConf(h models.HostConfig) error {
 			h.SSLEnabled = true
 			break
 		}
+	}
+
+	// Jika BoltDB menyimpan path cert kustom (cust_*.crt) tapi file hilang — misal git clone
+	// baru tanpa ./ssl_certs lama — pakai default localhost.* dari cont-init agar nginx -t lolos.
+	if h.SSLCert != "" && !tlsPEMFileOK(h.SSLCert) {
+		h.SSLCert = ""
+	}
+	if h.SSLKey != "" && !tlsPEMFileOK(h.SSLKey) {
+		h.SSLKey = ""
 	}
 
 	path := filepath.Join(confDir, h.Domain+".conf")
