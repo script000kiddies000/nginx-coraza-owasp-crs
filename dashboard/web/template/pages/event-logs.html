@@ -34,6 +34,7 @@
       </select>
       <select x-model.number="limit" @change="load()"
               class="text-xs bg-gray-900 border border-gray-700 rounded-md px-2 py-1.5 text-gray-200">
+        <option value="50">Last 50</option>
         <option value="100">Last 100</option>
         <option value="200">Last 200</option>
         <option value="500">Last 500</option>
@@ -48,13 +49,29 @@
 
       <input type="text" x-model="search" placeholder="Search..."
              class="min-w-[200px] flex-1 text-xs bg-gray-900 border border-gray-700 rounded-md px-2 py-1.5 text-gray-200 placeholder:text-gray-600" />
+      <button type="button" @click="search=''"
+              class="text-xs font-medium text-gray-300 bg-gray-800 border border-gray-700 hover:bg-gray-700 px-2.5 py-1.5 rounded-md transition-colors">
+        Clear
+      </button>
 
       <button type="button" @click="load()"
               class="ml-auto flex items-center gap-1.5 text-xs font-medium text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 hover:bg-emerald-500/20 px-3 py-1.5 rounded-md transition-colors">
         Refresh
       </button>
       <label class="inline-flex items-center gap-1.5 text-xs text-gray-400">
-        <input type="checkbox" x-model="auto" class="accent-emerald-500">
+        <input type="checkbox" x-model="autoRefresh" @change="restartTimer()" class="accent-emerald-500">
+        Auto-refresh
+      </label>
+      <select x-model.number="refreshMs" @change="restartTimer()"
+              class="text-xs bg-gray-900 border border-gray-700 rounded-md px-2 py-1.5 text-gray-200"
+              :disabled="!autoRefresh">
+        <option value="1000">1s</option>
+        <option value="2000">2s</option>
+        <option value="5000">5s</option>
+        <option value="10000">10s</option>
+      </select>
+      <label class="inline-flex items-center gap-1.5 text-xs text-gray-400">
+        <input type="checkbox" x-model="autoScroll" class="accent-emerald-500">
         Auto-scroll
       </label>
     </div>
@@ -76,7 +93,8 @@
 
     <div class="px-3 py-1.5 border-t border-gray-800 text-[11px] text-gray-600 flex items-center justify-between">
       <span x-text="(filteredLines().length + ' lines') + (path ? ' · source: ' + path : '')"></span>
-      <span class="text-gray-500">Copy all</span>
+      <button type="button" @click="copyShown()"
+              class="text-gray-400 hover:text-gray-200 transition-colors">Copy shown</button>
     </div>
   </div>
 </div>
@@ -93,7 +111,9 @@ function eventLogsApp() {
     levelFilter: 'all',
     search: '',
     lines: [],
-    auto: true,
+    autoRefresh: true,
+    autoScroll: true,
+    refreshMs: 2000,
     timer: null,
     sev: { emerg: 0, alert: 0, error: 0, warn: 0, notice: 0, info: 0 },
 
@@ -132,9 +152,16 @@ function eventLogsApp() {
       return rows.filter((l) => String(l.line || l.raw || '').toLowerCase().includes(q));
     },
     scrollBottom() {
-      if (!this.auto) return;
+      if (!this.autoScroll) return;
       const pane = document.getElementById('eventLogPane');
       if (pane) pane.scrollTop = pane.scrollHeight;
+    },
+    async copyShown() {
+      const rows = this.filteredLines().map((l) => l.line || l.raw || '');
+      if (!rows.length) return;
+      try {
+        await navigator.clipboard.writeText(rows.join('\n'));
+      } catch (_) {}
     },
     async load() {
       this.loading = true;
@@ -155,13 +182,14 @@ function eventLogsApp() {
         this.loading = false;
       }
     },
-    startTimer() {
+    restartTimer() {
       if (this.timer) clearInterval(this.timer);
-      this.timer = setInterval(() => this.load(), 2000);
+      if (!this.autoRefresh) return;
+      this.timer = setInterval(() => this.load(), this.refreshMs || 2000);
     },
     init() {
       this.load();
-      this.startTimer();
+      this.restartTimer();
       window.addEventListener('pagehide', () => {
         if (this.timer) clearInterval(this.timer);
       }, { once: true });

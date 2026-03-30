@@ -51,7 +51,24 @@ func FetchNginxStatus(client *http.Client) (models.NginxStatus, error) {
 	if resp.StatusCode != http.StatusOK {
 		return zero, fmt.Errorf("nginx status: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
-	return parseStubStatus(string(body))
+	s, err := parseStubStatus(string(body))
+	if err != nil {
+		return s, err
+	}
+
+	// Best-effort: process table + distribution (Linux via /proc).
+	entries, master, worker, cache, other := collectNginxProcessEntries()
+	s.Processes = entries
+	s.MasterProcesses = master
+	s.WorkerProcesses = worker
+	s.CacheProcesses = cache
+	s.OtherProcesses = other
+
+	// Best-effort: configuration and build modules.
+	s.Configuration = collectNginxConfiguration()
+	s.Modules = collectNginxModules()
+
+	return s, nil
 }
 
 func parseStubStatus(body string) (models.NginxStatus, error) {

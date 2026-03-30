@@ -40,6 +40,11 @@ type HostConfig struct {
 	UpstreamServers []string `json:"upstream_servers"`
 	LBAlgorithm     string   `json:"lb_algorithm"` // "round_robin" | "least_conn" | "ip_hash"
 
+	// Upstream TLS (when proxy_pass uses https:// — URLs must use https:// in upstream_servers)
+	// Same idea as Cloudflare Tunnel "No TLS verify" / "Origin server name".
+	ProxySSLVerifyOff bool   `json:"proxy_ssl_verify_off,omitempty"` // proxy_ssl_verify off;
+	ProxySSLName      string `json:"proxy_ssl_name,omitempty"`       // proxy_ssl_name (SNI expected on origin cert)
+
 	// Static files mode
 	StaticRoot string `json:"static_root,omitempty"`
 
@@ -247,6 +252,29 @@ type NginxStatus struct {
 	Reading           int `json:"reading"`
 	Writing           int `json:"writing"`
 	Waiting           int `json:"waiting"`
+
+	// Nginx process distribution (best-effort; depends on /proc availability).
+	MasterProcesses int `json:"master_processes"`
+	WorkerProcesses int `json:"worker_processes"`
+	CacheProcesses  int `json:"cache_processes"`
+	OtherProcesses  int `json:"other_processes"`
+
+	// Best-effort per-process breakdown for the process table UI.
+	Processes []NginxProcessEntry `json:"processes,omitempty"`
+
+	// Best-effort nginx config values.
+	Configuration map[string]string `json:"configuration,omitempty"`
+
+	// Best-effort list of nginx build modules/flags.
+	Modules []string `json:"modules,omitempty"`
+}
+
+type NginxProcessEntry struct {
+	PID         int     `json:"pid"`
+	Role        string  `json:"role"`
+	CPUPercent  float64 `json:"cpu_percent"`
+	RSSKB       int     `json:"rss_kb"`
+	Command     string  `json:"command"`
 }
 
 type ServerHealth struct {

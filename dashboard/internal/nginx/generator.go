@@ -2,6 +2,8 @@ package nginx
 
 import (
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,6 +57,72 @@ func tlsPEMFileOK(path string) bool {
 	return err == nil && st.Mode().IsRegular() && st.Size() > 0
 }
 
+// parseOneUpstream converts dashboard input (http(s)://host:port or bare host:port) to an nginx
+// upstream "server" line and whether TLS should be used to the backend.
+func parseOneUpstream(s string) (serverLine string, https bool, err error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", false, fmt.Errorf("empty upstream")
+	}
+	lower := strings.ToLower(s)
+	if strings.HasPrefix(lower, "https://") {
+		u, err := url.Parse(s)
+		if err != nil || u.Host == "" {
+			return "", false, fmt.Errorf("invalid upstream URL %q", s)
+		}
+		host := u.Hostname()
+		port := u.Port()
+		if port == "" {
+			port = "443"
+		}
+		return net.JoinHostPort(host, port), true, nil
+	}
+	if strings.HasPrefix(lower, "http://") {
+		u, err := url.Parse(s)
+		if err != nil || u.Host == "" {
+			return "", false, fmt.Errorf("invalid upstream URL %q", s)
+		}
+		host := u.Hostname()
+		port := u.Port()
+		if port == "" {
+			port = "80"
+		}
+		return net.JoinHostPort(host, port), false, nil
+	}
+	if strings.Contains(s, "://") {
+		return "", false, fmt.Errorf("unsupported upstream %q (use http:// or https://)", s)
+	}
+	// Legacy bare host / host:port / IPv4 — implied HTTP port 80 if no port (nginx default).
+	return s, false, nil
+}
+
+func normalizeUpstreamServers(raw []string) (lines []string, https bool, err error) {
+	if len(raw) == 0 {
+		return nil, false, fmt.Errorf("no upstream servers")
+	}
+	var wantHTTPS bool
+	for i, s := range raw {
+		line, isHTTPS, e := parseOneUpstream(s)
+		if e != nil {
+			return nil, false, e
+		}
+		if i == 0 {
+			wantHTTPS = isHTTPS
+		} else if isHTTPS != wantHTTPS {
+			return nil, false, fmt.Errorf("all upstream servers must use the same scheme (http or https)")
+		}
+		lines = append(lines, line)
+	}
+	return lines, wantHTTPS, nil
+}
+
+// hostRenderData is passed to the nginx template (upstream lines + https flag).
+type hostRenderData struct {
+	models.HostConfig
+	UpstreamLines []string
+	UpstreamHTTPS bool
+}
+
 // hostTemplate is the nginx server block template for a managed host.
 // It supports three modes: reverse_proxy, static, redirect.
 var hostTemplate = template.Must(template.New("host").Funcs(template.FuncMap{
@@ -86,7 +154,7 @@ upstream {{upstreamName .Domain}} {
 {{- else if eq .LBAlgorithm "ip_hash"}}
     ip_hash;
 {{- end}}
-{{- range .UpstreamServers}}
+{{- range .UpstreamLines}}
     server {{.}};
 {{- end}}
     keepalive 32;
@@ -161,13 +229,34 @@ server {
     }
 {{else}}
 {{- range .ExcludePaths}}
-    location {{.}} { coraza off; proxy_pass http://{{upstreamName $.Domain}}; }
+    location {{.}} {
+        coraza off;
+        proxy_pass {{if $.UpstreamHTTPS}}https{{else}}http{{end}}://{{upstreamName $.Domain}};
+{{- if $.UpstreamHTTPS}}
+        proxy_ssl_server_name on;
+{{- if $.ProxySSLName}}
+        proxy_ssl_name {{$.ProxySSLName}};
+{{- end}}
+{{- if $.ProxySSLVerifyOff}}
+        proxy_ssl_verify off;
+{{- end}}
+{{- end}}
+    }
 {{- end}}
 
     location / {
         proxy_intercept_errors on;
-        proxy_pass         http://{{upstreamName .Domain}};
+        proxy_pass         {{if .UpstreamHTTPS}}https{{else}}http{{end}}://{{upstreamName .Domain}};
         proxy_http_version 1.1;
+{{- if .UpstreamHTTPS}}
+        proxy_ssl_server_name on;
+{{- if .ProxySSLName}}
+        proxy_ssl_name {{.ProxySSLName}};
+{{- end}}
+{{- if .ProxySSLVerifyOff}}
+        proxy_ssl_verify off;
+{{- end}}
+{{- end}}
         proxy_set_header   Connection      "";
         proxy_set_header   Host              $http_host;
         proxy_set_header   X-Forwarded-Host  $http_host;
@@ -238,13 +327,25 @@ func WriteHostConf(h models.HostConfig) error {
 		h.SSLKey = ""
 	}
 
+	h.ProxySSLName = strings.TrimSpace(h.ProxySSLName)
+
+	data := hostRenderData{HostConfig: h}
+	if h.Mode == "" || h.Mode == "reverse_proxy" {
+		lines, upHTTPS, err := normalizeUpstreamServers(h.UpstreamServers)
+		if err != nil {
+			return fmt.Errorf("host %q: %w", h.Domain, err)
+		}
+		data.UpstreamLines = lines
+		data.UpstreamHTTPS = upHTTPS
+	}
+
 	path := filepath.Join(confDir, h.Domain+".conf")
 	f, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("create %s: %w", path, err)
 	}
 	defer f.Close()
-	return hostTemplate.Execute(f, h)
+	return hostTemplate.Execute(f, data)
 }
 
 // DeleteHostConf removes the nginx config file for the given domain.

@@ -210,7 +210,6 @@ function dashboardApp() {
     _charts: {},
     topCards: [],
     geoMode: 'requests',
-    geoUseDummy: true,
     worldGeo: null,
     qpsRealtime: Array(30).fill(0),
     qpsTarget: 0,
@@ -249,34 +248,10 @@ function dashboardApp() {
       return c;
     },
     geoRows() {
-      if (this.geoUseDummy) {
-        return this.geoMode === 'blocked' ? this.geoDummyBlocked() : this.geoDummyRequests();
-      }
       const rows = this.geoMode === 'blocked'
         ? (this.analytics.geo_blocked || [])
         : (this.analytics.geo_requests || []);
       return Array.isArray(rows) ? rows : [];
-    },
-    geoDummyRequests() {
-      return [
-        { label: 'ID', count: 46000, pct: 100 },
-        { label: 'AU', count: 1200, pct: 2.6 },
-        { label: 'US', count: 257, pct: 0.56 },
-        { label: 'MA', count: 19, pct: 0.04 },
-        { label: 'BG', count: 14, pct: 0.03 },
-        { label: 'MY', count: 7, pct: 0.02 },
-        { label: 'SG', count: 6, pct: 0.01 },
-      ];
-    },
-    geoDummyBlocked() {
-      return [
-        { label: 'ID', count: 980, pct: 100 },
-        { label: 'US', count: 184, pct: 18.8 },
-        { label: 'CN', count: 133, pct: 13.6 },
-        { label: 'RU', count: 101, pct: 10.3 },
-        { label: 'SG', count: 54, pct: 5.5 },
-        { label: 'AU', count: 42, pct: 4.3 },
-      ];
     },
     geoTopRows() {
       return this.geoRows().slice(0, 8);
