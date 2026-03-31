@@ -244,6 +244,24 @@ server {
     }
 {{- end}}
 
+    # Static assets: bypass WAF for performance + avoid connector edge cases
+    # (browser loads many assets in parallel; inspecting every JS/CSS/WOFF adds overhead).
+    location ~* \.(?:css|js|map|png|jpe?g|gif|svg|ico|woff2?|ttf|eot)$ {
+        include /etc/nginx/snippets/static-assets-bypass.conf;
+        proxy_intercept_errors on;
+        proxy_pass         {{if .UpstreamHTTPS}}https{{else}}http{{end}}://{{upstreamName .Domain}};
+{{- if .UpstreamHTTPS}}
+        proxy_ssl_server_name on;
+{{- if .ProxySSLName}}
+        proxy_ssl_name {{.ProxySSLName}};
+{{- end}}
+{{- if .ProxySSLVerifyOff}}
+        proxy_ssl_verify off;
+{{- end}}
+{{- end}}
+        proxy_set_header   X-Request-ID    $request_id;
+    }
+
     location / {
         proxy_intercept_errors on;
         proxy_pass         {{if .UpstreamHTTPS}}https{{else}}http{{end}}://{{upstreamName .Domain}};
