@@ -27,3 +27,8 @@ ssl_certs/*
 
 
 template/*
+config/conf.d/*.conf
+# Atau jika ingin spesifik:
+config/conf.d/test.local.conf
+config/conf.d/test2.local.conf
+config/conf.d/xxx.com.conf
