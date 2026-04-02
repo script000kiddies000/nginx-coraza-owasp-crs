@@ -86,6 +86,14 @@ type HostSecurityOverrides struct {
 	GeoIP           SecurityFeatureOverride `json:"geoip"`
 	DLP             SecurityFeatureOverride `json:"dlp"`
 	WordPress       SecurityFeatureOverride `json:"wordpress_security"`
+	RealIP          SecurityFeatureOverride `json:"real_ip"`
+}
+
+// RealIPConfig is global config for real IP extraction (ngx_http_realip_module).
+type RealIPConfig struct {
+	Enabled        bool     `json:"enabled"`
+	Header         string   `json:"header"` // e.g. X-Forwarded-For, CF-Connecting-IP, X-Real-IP
+	TrustedProxies []string `json:"trusted_proxies"`
 }
 
 // TLSCertificate — managed TLS cert (Let's Encrypt or custom PEM), stored in BoltDB; files under ssl_certs.
@@ -329,12 +337,13 @@ type FlashMsg struct {
 }
 
 type PageData struct {
-	Title      string
-	ActiveMenu string
-	Username   string
+	Title        string
+	ActiveMenu   string
+	Username     string
 	AssetVersion string
-	Flash      FlashMsg
-	Data       any
+	IsAdmin      bool // true when the authenticated user has role "admin"
+	Flash        FlashMsg
+	Data         any
 }
 
 // SecurityEvent — satu baris ringkas dari coraza_audit.log (disimpan di BoltDB).

@@ -121,6 +121,10 @@ type hostRenderData struct {
 	models.HostConfig
 	UpstreamLines []string
 	UpstreamHTTPS bool
+
+	RealIPEnabled        bool
+	RealIPHeader         string
+	RealIPTrustedProxies []string
 }
 
 // hostTemplate is the nginx server block template for a managed host.
@@ -174,6 +178,13 @@ server {
     ssl_certificate_key {{sslKeyPath .SSLKey}};
 {{- end}}
     server_name {{.Domain}};
+
+{{- if .RealIPEnabled}}
+    real_ip_header {{.RealIPHeader}};
+{{- range .RealIPTrustedProxies}}
+    set_real_ip_from {{.}};
+{{- end}}
+{{- end}}
 
     location ^~ /.well-known/acme-challenge/ {
         coraza off;
@@ -303,7 +314,7 @@ func effectivePorts(h models.HostConfig) []models.ListenPort {
 
 // WriteHostConf renders the nginx config for a HostConfig and writes it to
 // /etc/nginx/conf.d/<domain>.conf.
-func WriteHostConf(h models.HostConfig) error {
+func WriteHostConf(db *bolt.DB, h models.HostConfig) error {
 	// Fill effective ports
 	h.ListenPorts = effectivePorts(h)
 
@@ -347,7 +358,13 @@ func WriteHostConf(h models.HostConfig) error {
 
 	h.ProxySSLName = strings.TrimSpace(h.ProxySSLName)
 
-	data := hostRenderData{HostConfig: h}
+	enabled, header, trusted := effectiveRealIP(db, h)
+	data := hostRenderData{
+		HostConfig:           h,
+		RealIPEnabled:        enabled,
+		RealIPHeader:         header,
+		RealIPTrustedProxies: trusted,
+	}
 	if h.Mode == "" || h.Mode == "reverse_proxy" {
 		lines, upHTTPS, err := normalizeUpstreamServers(h.UpstreamServers)
 		if err != nil {
@@ -400,9 +417,71 @@ func SyncAllConfigs(db *bolt.DB) error {
 		if !h.Enabled {
 			continue
 		}
-		if err := WriteHostConf(h); err != nil {
+		if err := WriteHostConf(db, h); err != nil {
 			return fmt.Errorf("sync host %q: %w", h.Domain, err)
 		}
 	}
 	return nil
+}
+
+func effectiveRealIP(db *bolt.DB, h models.HostConfig) (enabled bool, header string, trusted []string) {
+	global := store.GetRealIPConfig(db)
+
+	// Default: inherit global.
+	mode := h.SecurityOverrides.RealIP.Mode
+	switch models.SecurityOverrideMode(mode) {
+	case models.SecurityModeDisabled:
+		return false, "", nil
+	case models.SecurityModeOverride:
+		// Apply custom overrides if present.
+		header = strings.TrimSpace(getStringFromCustom(h.SecurityOverrides.RealIP.Custom, "header"))
+		// UI custom mode: header set to "__custom__" and actual value in header_custom.
+		if strings.EqualFold(header, "__custom__") {
+			header = strings.TrimSpace(getStringFromCustom(h.SecurityOverrides.RealIP.Custom, "header_custom"))
+		}
+		trusted = parseTrustedProxies(getStringFromCustom(h.SecurityOverrides.RealIP.Custom, "trusted_proxies"))
+		if header == "" {
+			header = global.Header
+		}
+		if len(trusted) == 0 {
+			trusted = global.TrustedProxies
+		}
+		enabled = true
+		return enabled, header, trusted
+	default:
+		return global.Enabled, global.Header, global.TrustedProxies
+	}
+}
+
+func getStringFromCustom(m map[string]any, key string) string {
+	if m == nil {
+		return ""
+	}
+	v, ok := m[key]
+	if !ok || v == nil {
+		return ""
+	}
+	switch t := v.(type) {
+	case string:
+		return t
+	default:
+		return ""
+	}
+}
+
+func parseTrustedProxies(csv string) []string {
+	csv = strings.TrimSpace(csv)
+	if csv == "" {
+		return nil
+	}
+	parts := strings.Split(csv, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
 }

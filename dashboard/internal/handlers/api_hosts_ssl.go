@@ -172,7 +172,7 @@ func (app *App) APISaveHost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.Enabled {
-		if err := nginx.WriteHostConf(h); err != nil {
+		if err := nginx.WriteHostConf(app.DB, h); err != nil {
 			jsonError(w, "nginx conf: "+err.Error(), http.StatusInternalServerError)
 			return
 		}

@@ -121,18 +121,18 @@ func (app *App) PageServerMonitoring(w http.ResponseWriter, r *http.Request) {
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 func (app *App) PageSettings(w http.ResponseWriter, r *http.Request) {
+	isAdmin := false
+	if u, err := store.GetUser(app.DB, usernameFromCtx(r)); err == nil {
+		isAdmin = u.Role == "admin"
+	}
 	app.render(w, r, "settings", models.PageData{
 		Title:      "Settings",
 		ActiveMenu: "settings",
+		IsAdmin:    isAdmin,
 	})
 }
 
-func (app *App) PageSettingsUsers(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "settings-users", models.PageData{
-		Title:      "User Management",
-		ActiveMenu: "users",
-	})
-}
+
 
 func (app *App) PageThreatIntel(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, "threat-intel", models.PageData{

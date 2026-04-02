@@ -31,7 +31,7 @@ type App struct {
 
 // NewApp initialises the App and pre-parses the master layout template.
 func NewApp(db *bolt.DB) (*App, error) {
-	base, err := template.New("").ParseFS(web.FS, "template/layout.html")
+	base, err := template.New("").ParseFS(web.FS, "template/layout.html", "template/sidebar.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse layout template: %w", err)
 	}

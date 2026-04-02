@@ -1,0 +1,119 @@
+{{define "sidebar"}}
+<aside :class="sidebarOpen ? 'sidebar' : 'sidebar collapsed'"
+       class="fixed inset-y-0 left-0 z-40 flex flex-col overflow-hidden">
+
+  <!-- Brand -->
+  <div class="relative flex items-center h-14" style="border-bottom: 1px solid var(--sb-border);"
+       :class="sidebarOpen ? 'px-3 gap-2.5' : 'px-2 justify-center'">
+    <div class="flex-shrink-0 rounded-lg flex items-center justify-center"
+         :class="sidebarOpen ? 'w-8 h-8' : 'w-7 h-7'"
+         style="background:linear-gradient(135deg,#10b981,#0d9488);box-shadow:0 0 14px rgba(16,185,129,.35);">
+      <i data-lucide="shield-check" class="w-4 h-4 text-white"></i>
+    </div>
+    <div x-show="sidebarOpen" x-cloak class="flex flex-col min-w-0">
+      <span class="font-bold text-sm leading-none" style="color:var(--shell-text)">Flux WAF</span>
+      <span class="text-[9px] font-semibold tracking-widest text-emerald-400">NGINX · CORAZA</span>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="sidebar-nav flex-1 overflow-y-auto px-2 py-2">
+    <a href="/" data-tip="Dashboard" class="nav-item {{if eq .ActiveMenu "dashboard"}}active{{end}}">
+      <span class="nav-icon-wrap"><i data-lucide="layout-dashboard"></i></span><span class="nav-label">Dashboard</span>
+    </a>
+    <a href="/attack-map" data-tip="Attack Map" class="nav-item {{if eq .ActiveMenu "attackmap"}}active{{end}}">
+      <span class="nav-icon-wrap"><i data-lucide="radar"></i></span><span class="nav-label">Attack Map</span>
+    </a>
+
+    <div class="nav-section" x-show="sidebarOpen" x-cloak><span>Edge Network</span></div>
+    <div class="nav-group-label" x-show="sidebarOpen" x-cloak :class="navG.edge ? 'open' : ''" @click="toggleG('edge')">
+      <span class="nav-icon-wrap"><i data-lucide="network"></i></span><span class="nav-label">Edge Network</span><i data-lucide="chevron-right" class="nav-group-arrow"></i>
+    </div>
+    <div class="nav-group-children" x-show="!sidebarOpen || navG.edge">
+      <a href="/hosts" class="nav-sub-item {{if eq .ActiveMenu "hosts"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="server"></i></span><span class="nav-label">Hosts &amp; Upstreams</span></a>
+      <a href="/ssl" class="nav-sub-item {{if eq .ActiveMenu "ssl"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="lock"></i></span><span class="nav-label">SSL / TLS</span></a>
+    </div>
+
+    <div class="nav-section" x-show="sidebarOpen" x-cloak><span>WAF</span></div>
+    <div class="nav-group-label" x-show="sidebarOpen" x-cloak :class="navG.waf ? 'open' : ''" @click="toggleG('waf')">
+      <span class="nav-icon-wrap"><i data-lucide="shield"></i></span><span class="nav-label">WAF</span><i data-lucide="chevron-right" class="nav-group-arrow"></i>
+    </div>
+    <div class="nav-group-children" x-show="!sidebarOpen || navG.waf">
+      <a href="/waf/settings" class="nav-sub-item {{if eq .ActiveMenu "wafsettings"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="shield"></i></span><span class="nav-label">WAF Settings</span></a>
+      <a href="/rules" class="nav-sub-item {{if eq .ActiveMenu "rules"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="code-2"></i></span><span class="nav-label">Custom Rules</span></a>
+    </div>
+
+    <div class="nav-section" x-show="sidebarOpen" x-cloak><span>Security Engines</span></div>
+    <div class="nav-group-label" x-show="sidebarOpen" x-cloak :class="navG.engines ? 'open' : ''" @click="toggleG('engines')">
+      <span class="nav-icon-wrap"><i data-lucide="shield-check"></i></span><span class="nav-label">Security Engines</span><i data-lucide="chevron-right" class="nav-group-arrow"></i>
+    </div>
+    <div class="nav-group-children" x-show="!sidebarOpen || navG.engines">
+      <a href="/virtual-patching" class="nav-sub-item {{if eq .ActiveMenu "vpatch"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="bandage"></i></span><span class="nav-label">Virtual Patching</span></a>
+      <a href="/bot-management" class="nav-sub-item {{if eq .ActiveMenu "botmgmt"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="bot"></i></span><span class="nav-label">Bot Threshold</span></a>
+      <a href="/ja3-management" class="nav-sub-item {{if eq .ActiveMenu "ja3"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="fingerprint"></i></span><span class="nav-label">JA3 Fingerprint</span></a>
+      <a href="/threat-intel" class="nav-sub-item {{if eq .ActiveMenu "threatintel"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="flame"></i></span><span class="nav-label">Threat Intel</span></a>
+      <a href="/ip-reputations" class="nav-sub-item {{if eq .ActiveMenu "iprep"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="globe-2"></i></span><span class="nav-label">IP Reputations</span></a>
+      <a href="/geo-blocking" class="nav-sub-item {{if eq .ActiveMenu "geoblock"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="map-pin"></i></span><span class="nav-label">Geo IP Blocking</span></a>
+      <a href="/data-guard" class="nav-sub-item {{if eq .ActiveMenu "dlp"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="database-zap"></i></span><span class="nav-label">Data Guard (DLP)</span></a>
+      <a href="/wordpress-security" class="nav-sub-item {{if eq .ActiveMenu "wpsec"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="shield-half"></i></span><span class="nav-label">WordPress Security</span></a>
+    </div>
+
+    <div class="nav-section" x-show="sidebarOpen" x-cloak><span>Reports</span></div>
+    <div class="nav-group-label" x-show="sidebarOpen" x-cloak :class="navG.rep ? 'open' : ''" @click="toggleG('rep')">
+      <span class="nav-icon-wrap"><i data-lucide="file-text"></i></span><span class="nav-label">Reports</span><i data-lucide="chevron-right" class="nav-group-arrow"></i>
+    </div>
+    <div class="nav-group-children" x-show="!sidebarOpen || navG.rep">
+      <a href="/security-report" class="nav-sub-item {{if eq .ActiveMenu "secreport"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="file-bar-chart-2"></i></span><span class="nav-label">Security Report</span></a>
+      <a href="/attack-report" class="nav-sub-item {{if eq .ActiveMenu "atkreport"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="zap"></i></span><span class="nav-label">Attack Report</span></a>
+    </div>
+
+    <div class="nav-section" x-show="sidebarOpen" x-cloak><span>Logs &amp; Analytics</span></div>
+    <div class="nav-group-label" x-show="sidebarOpen" x-cloak :class="navG.logs ? 'open' : ''" @click="toggleG('logs')">
+      <span class="nav-icon-wrap"><i data-lucide="line-chart"></i></span><span class="nav-label">Logs &amp; Analytics</span><i data-lucide="chevron-right" class="nav-group-arrow"></i>
+    </div>
+    <div class="nav-group-children" x-show="!sidebarOpen || navG.logs">
+      <a href="/security-logs" class="nav-sub-item {{if eq .ActiveMenu "seclogs"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="shield-alert"></i></span><span class="nav-label">Security Events</span></a>
+      <a href="/logs" class="nav-sub-item {{if eq .ActiveMenu "logs"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="scroll-text"></i></span><span class="nav-label">Access Logs</span></a>
+      <a href="/event-logs" class="nav-sub-item {{if eq .ActiveMenu "eventlogs"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="activity"></i></span><span class="nav-label">Event Logs</span></a>
+    </div>
+
+    <div class="nav-section" x-show="sidebarOpen" x-cloak><span>Monitoring</span></div>
+    <div class="nav-group-label" x-show="sidebarOpen" x-cloak :class="navG.mon ? 'open' : ''" @click="toggleG('mon')">
+      <span class="nav-icon-wrap"><i data-lucide="activity"></i></span><span class="nav-label">Monitoring</span><i data-lucide="chevron-right" class="nav-group-arrow"></i>
+    </div>
+    <div class="nav-group-children" x-show="!sidebarOpen || navG.mon">
+      <a href="/monitoring/nginx" class="nav-sub-item {{if eq .ActiveMenu "nginx-mon"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="monitor-dot"></i></span><span class="nav-label">Nginx Status</span></a>
+      <a href="/monitoring/server" class="nav-sub-item {{if eq .ActiveMenu "srv-mon"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="cpu"></i></span><span class="nav-label">Server Health</span></a>
+    </div>
+
+    <div class="nav-section" x-show="sidebarOpen" x-cloak><span>System</span></div>
+    <div class="nav-group-label" x-show="sidebarOpen" x-cloak :class="navG.sys ? 'open' : ''" @click="toggleG('sys')">
+      <span class="nav-icon-wrap"><i data-lucide="settings-2"></i></span><span class="nav-label">System</span><i data-lucide="chevron-right" class="nav-group-arrow"></i>
+    </div>
+    <div class="nav-group-children" x-show="!sidebarOpen || navG.sys">
+      <a href="/settings" class="nav-sub-item {{if eq .ActiveMenu "settings"}}active{{end}}"><span class="nav-icon-wrap"><i data-lucide="settings-2"></i></span><span class="nav-label">Settings</span></a>
+    </div>
+  </nav>
+
+  <!-- User + Logout -->
+  <div class="p-2" style="border-top: 1px solid var(--sb-border);">
+    <div x-show="sidebarOpen" x-cloak class="user-card flex items-center gap-2 px-2 py-1.5 mb-1 rounded-lg">
+      <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white bg-gradient-to-br from-indigo-400 to-sky-400">
+        {{printf "%.1s" .Username}}
+      </div>
+      <div class="min-w-0 flex-1">
+        <p class="text-xs font-semibold truncate" style="color:var(--shell-text)">{{if .Username}}{{.Username}}{{else}}admin{{end}}</p>
+        <p class="text-xs" style="color:var(--shell-text-muted)">Administrator</p>
+      </div>
+    </div>
+    <form action="/api/logout" method="POST">
+      <button type="submit"
+              :class="sidebarOpen ? 'justify-start px-3 gap-2' : 'justify-center px-0'"
+              class="w-full h-9 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-sm flex items-center transition-colors">
+        <i data-lucide="log-out" class="w-4 h-4"></i>
+        <span x-show="sidebarOpen" x-cloak class="font-medium">Logout</span>
+      </button>
+    </form>
+  </div>
+</aside>
+{{end}}

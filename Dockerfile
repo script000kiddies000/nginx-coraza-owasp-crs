@@ -165,8 +165,13 @@ FROM golang:1.25-bookworm AS builder-dashboard
 
 WORKDIR /build
 COPY dashboard/ .
+# Use alternative proxy to avoid proxy.golang.org DNS timeout in some environments.
+# Can override: --build-arg GOPROXY=https://proxy.golang.org,direct
+ARG GOPROXY=https://goproxy.io,direct
+RUN go env -w GOPROXY=$GOPROXY
 # go mod tidy: download deps + buat go.sum jika belum ada
 RUN go mod tidy
+RUN go mod download
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /flux-waf ./cmd/flux-waf/
 
 # ==============================================================================

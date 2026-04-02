@@ -7,9 +7,20 @@
   <title>Login — Flux WAF</title>
   <script src="/public/js/tailwindcss.min.js"></script>
   <link rel="stylesheet" href="/public/css/fonts.css">
-  <style>body { font-family: 'Inter', sans-serif; }</style>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    html.light body { background-color: #f1f5f9 !important; }
+  </style>
+  <link href="/public/css/light-mode.css" rel="stylesheet">
+  <script>
+    /* Apply saved theme before page renders */
+    (function() {
+      if (localStorage.getItem('flux_dark_mode') === '0') document.documentElement.classList.add('light');
+    })();
+  </script>
 </head>
 <body class="h-full bg-gray-950 flex items-center justify-center">
+
 
   <!-- Background decoration -->
   <div class="absolute inset-0 overflow-hidden pointer-events-none">

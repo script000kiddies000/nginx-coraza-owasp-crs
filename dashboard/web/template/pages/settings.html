@@ -1,31 +1,421 @@
 {{define "content"}}
-<div class="w-full min-h-[calc(100vh-6.5rem)] flex flex-col space-y-6">
-  <p class="text-gray-400 text-sm">
-    Pengaturan sistem: kelola pengguna dashboard, atau buka penyetelan WAF/CRS di menu <span class="text-gray-300">WAF → WAF Settings</span>.
-  </p>
+<div class="w-full min-h-[calc(100vh-6.5rem)] flex flex-col space-y-6"
+     x-data="settingsPageApp()"
+     x-init="init()">
 
-  <div class="grid sm:grid-cols-2 gap-4">
-    <a href="/waf/settings"
-       class="group rounded-xl border border-gray-800 bg-gray-900/60 p-5 hover:border-emerald-500/30 hover:bg-gray-900 transition-colors">
-      <div class="flex items-center gap-3 mb-2">
-        <span class="text-emerald-400 text-lg">🛡</span>
-        <h2 class="text-sm font-semibold text-white group-hover:text-emerald-300">WAF Settings</h2>
-      </div>
-      <p class="text-xs text-gray-500 leading-relaxed">Mode Coraza, paranoia CRS, threshold anomaly — sama dengan halaman di grup WAF.</p>
-    </a>
-
-    <a href="/settings/users"
-       class="group rounded-xl border border-gray-800 bg-gray-900/60 p-5 hover:border-emerald-500/30 hover:bg-gray-900 transition-colors">
-      <div class="flex items-center gap-3 mb-2">
-        <span class="text-sky-400 text-lg">👤</span>
-        <h2 class="text-sm font-semibold text-white group-hover:text-emerald-300">Manajemen pengguna</h2>
-      </div>
-      <p class="text-xs text-gray-500 leading-relaxed">Tambah, hapus, dan reset password akun dashboard (perlu role admin).</p>
-    </a>
+  <!-- Tab navigation: Users tab only rendered for admin (server-side gate) -->
+  <div class="flex gap-1 border-b border-gray-800 pb-0">
+    <button type="button"
+            @click="activeTab = 'general'"
+            :class="activeTab === 'general'
+              ? 'border-b-2 border-emerald-500 text-emerald-400'
+              : 'text-gray-500 hover:text-gray-300'"
+            class="flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors">
+      <i data-lucide="settings-2" class="w-4 h-4"></i> Pengaturan Umum
+    </button>
+    {{if .IsAdmin}}
+    <button type="button"
+            @click="activeTab = 'users'; loadUsers()"
+            :class="activeTab === 'users'
+              ? 'border-b-2 border-emerald-500 text-emerald-400'
+              : 'text-gray-500 hover:text-gray-300'"
+            class="flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors">
+      <i data-lucide="users" class="w-4 h-4"></i> Manajemen Pengguna
+    </button>
+    {{end}}
   </div>
 
-  <div class="rounded-xl border border-gray-800 bg-gray-950/40 p-4 text-xs text-gray-600">
-    <p>Volume data: <span class="font-mono text-gray-500">flux-data/data.db</span> · Password admin awal dari env <span class="font-mono">FLUX_ADMIN_PASSWORD</span>.</p>
+  <!-- ═══════════════════════════════════════════════════════ TAB: GENERAL -->
+  <div x-show="activeTab === 'general'" class="flex flex-col space-y-6">
+
+    <p class="text-gray-400 text-sm">
+      Pengaturan sistem: kelola pengguna dashboard, atau buka penyetelan WAF/CRS di menu <span class="text-gray-300">WAF → WAF Settings</span>.
+    </p>
+
+    <div class="grid sm:grid-cols-2 gap-4">
+      <a href="/waf/settings"
+         class="group rounded-xl border border-gray-800 bg-gray-900/60 p-5 hover:border-emerald-500/30 hover:bg-gray-900 transition-colors">
+        <div class="flex items-center gap-3 mb-2">
+          <span class="text-emerald-400"><i data-lucide="shield" class="w-5 h-5"></i></span>
+          <h2 class="text-sm font-semibold text-white group-hover:text-emerald-300">WAF Settings</h2>
+        </div>
+        <p class="text-xs text-gray-500 leading-relaxed">Mode Coraza, paranoia CRS, threshold anomaly — sama dengan halaman di grup WAF.</p>
+      </a>
+
+      <!-- Real IP -->
+      <div class="group rounded-xl border border-gray-800 bg-gray-900/60 p-5">
+        <div class="flex items-center gap-3 mb-2">
+          <span class="text-emerald-400"><i data-lucide="radar" class="w-5 h-5"></i></span>
+          <h2 class="text-sm font-semibold text-white group-hover:text-emerald-300">Real IP Extraction</h2>
+        </div>
+        <p class="text-xs text-gray-500 leading-relaxed mb-3">
+          Memilih header yang berisi IP asli pengunjung saat trafik lewat reverse-proxy / gateway.
+        </p>
+
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-400 mb-1">real_ip_header</label>
+            <select
+              x-model="headerChoice"
+              class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2">
+              <option value="X-Forwarded-For">X-Forwarded-For</option>
+              <option value="CF-Connecting-IP">CF-Connecting-IP</option>
+              <option value="X-Real-IP">X-Real-IP</option>
+              <option value="__custom__">Custom</option>
+            </select>
+          </div>
+
+          <template x-if="headerChoice === '__custom__'">
+            <div>
+              <label class="block text-xs font-medium text-gray-400 mb-1">Custom header token</label>
+              <input
+                x-model="headerCustom"
+                type="text"
+                placeholder="mis. My-Real-IP"
+                class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 font-mono"/>
+            </div>
+          </template>
+
+          <div class="flex items-center justify-between gap-3 pt-1">
+            <p class="text-[11px] text-gray-500" x-text="statusText"></p>
+            <button
+              type="button"
+              @click="saveRealIP()"
+              :disabled="saving"
+              class="bg-emerald-600/90 hover:bg-emerald-500 disabled:opacity-60 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
+              <span x-show="!saving">Save</span>
+              <span x-show="saving">Saving…</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rounded-xl border border-gray-800 bg-gray-950/40 p-4 text-xs text-gray-600">
+      <p>Volume data: <span class="font-mono text-gray-500">flux-data/data.db</span> · Password admin awal dari env <span class="font-mono">FLUX_ADMIN_PASSWORD</span>.</p>
+    </div>
+
   </div>
+  <!-- end TAB: GENERAL -->
+
+
+  {{if .IsAdmin}}
+  <!-- ════════════════════════════════════════════════════════ TAB: USERS -->
+  <!-- This entire section is only rendered by the server when role == admin -->
+  <div x-show="activeTab === 'users'" x-cloak class="flex flex-col space-y-6">
+
+    <div class="rounded-2xl border border-gray-800 bg-gray-900/50 p-5">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 class="text-white font-semibold flex items-center gap-2">
+            <i data-lucide="users" class="w-4 h-4 text-emerald-400"></i>
+            User Management
+          </h2>
+          <p class="text-gray-400 text-sm mt-1">Akun login dashboard (BoltDB). Tidak bisa menghapus akun sendiri atau admin terakhir.</p>
+        </div>
+        <button type="button"
+                @click="showAdd = !showAdd"
+                class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors">
+          <i data-lucide="user-plus" class="w-4 h-4"></i>
+          <span x-text="showAdd ? 'Tutup Form' : 'Tambah Pengguna'"></span>
+        </button>
+      </div>
+    </div>
+
+    <div x-show="msgOk" x-cloak class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-200 text-sm px-4 py-3" x-text="msgOk"></div>
+    <div x-show="msgErr" x-cloak class="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-200 text-sm px-4 py-3" x-text="msgErr"></div>
+
+    <div x-show="showAdd" x-cloak class="rounded-2xl border border-gray-800 bg-gray-900/60 p-4">
+      <div class="grid sm:grid-cols-4 gap-3">
+        <div class="sm:col-span-1">
+          <label class="block text-[11px] text-gray-500 mb-1">Username</label>
+          <input x-model="newUser.username" placeholder="username"
+                 class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono">
+        </div>
+        <div class="sm:col-span-1">
+          <label class="block text-[11px] text-gray-500 mb-1">Password</label>
+          <input x-model="newUser.password" type="password" placeholder="password"
+                 class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white">
+        </div>
+        <div class="sm:col-span-1">
+          <label class="block text-[11px] text-gray-500 mb-1">Role</label>
+          <select x-model="newUser.role"
+                  class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white">
+            <option value="admin">admin</option>
+            <option value="operator">operator</option>
+          </select>
+        </div>
+        <div class="sm:col-span-1 flex items-end">
+          <button @click="createUser()"
+                  class="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg py-2">
+            <i data-lucide="save" class="w-4 h-4"></i>
+            Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-800 flex justify-between items-center">
+        <h3 class="text-sm font-semibold text-white">Daftar pengguna</h3>
+        <span class="text-xs text-gray-500" x-text="users.length + ' users'"></span>
+      </div>
+
+      <div x-show="usersLoading" x-cloak class="py-10 text-center text-sm text-gray-500">
+        <div class="inline-flex items-center gap-2">
+          <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
+          Memuat data pengguna...
+        </div>
+      </div>
+
+      <div x-show="!usersLoading && users.length === 0" x-cloak class="py-14 text-center text-gray-500">
+        <i data-lucide="user-x" class="w-6 h-6 mx-auto mb-2 text-gray-600"></i>
+        <p class="text-sm">Belum ada user selain default.</p>
+      </div>
+
+      <div x-show="!usersLoading && users.length > 0" x-cloak>
+      <table class="w-full text-sm">
+        <thead class="text-xs text-gray-500 uppercase border-b border-gray-800 bg-gray-950/50">
+          <tr>
+            <th class="text-left px-4 py-2.5">User</th>
+            <th class="text-left px-4 py-2.5">Role</th>
+            <th class="text-right px-4 py-2.5">Aksi</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-800">
+          <template x-for="u in users" :key="u.username">
+            <tr class="hover:bg-gray-800/30 transition-colors">
+              <td class="px-4 py-3.5">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="user-circle-2" class="w-4 h-4 text-gray-500"></i>
+                  <span class="font-mono text-gray-200" x-text="u.username"></span>
+                </div>
+              </td>
+              <td class="px-4 py-3.5">
+                <span class="text-xs px-2 py-0.5 rounded border font-semibold"
+                      :class="u.role === 'admin' ? 'text-amber-400 border-amber-500/30 bg-amber-500/10' : 'text-sky-300 border-sky-500/30 bg-sky-500/10'"
+                      x-text="u.role"></span>
+              </td>
+              <td class="px-4 py-3.5">
+                <div class="flex items-center justify-end gap-2">
+                  <button type="button" @click="openPw(u.username)"
+                          class="inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 px-2 py-1 rounded hover:bg-sky-500/10">
+                    <i data-lucide="key-round" class="w-3.5 h-3.5"></i>Password
+                  </button>
+                  <button type="button" @click="removeUser(u.username)"
+                          class="inline-flex items-center gap-1 text-xs text-rose-400 hover:text-rose-300 px-2 py-1 rounded hover:bg-rose-500/10">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Hapus
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+      </div>
+      </div>
+    </div>
+
+    <!-- Modal: reset password -->
+    <div x-show="pwUser" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" @click.self="pwUser = null">
+      <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5 max-w-sm w-full shadow-xl">
+        <h3 class="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+          <i data-lucide="lock-keyhole" class="w-4 h-4 text-emerald-400"></i>
+          Password baru — <span class="font-mono text-emerald-400" x-text="pwUser"></span>
+        </h3>
+        <input type="password" x-model="pwNew" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white mb-3" placeholder="New password">
+        <div class="flex gap-2 justify-end">
+          <button type="button" @click="pwUser = null" class="text-sm text-gray-500 hover:text-gray-300 px-3 py-2">Batal</button>
+          <button type="button" @click="savePw()" class="text-sm bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg">Simpan</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <!-- end TAB: USERS -->
+  {{end}}
+
 </div>
+
+<script>
+function settingsPageApp() {
+  return {
+    // ── Tab state ──────────────────────────────────────────────────────────
+    activeTab: 'general',
+
+    // ── Real IP ───────────────────────────────────────────────────────────
+    saving: false,
+    statusText: '',
+    headerChoice: 'X-Forwarded-For',
+    headerCustom: '',
+    cfgTrusted: [],
+    knownHeaders: ['X-Forwarded-For','CF-Connecting-IP','X-Real-IP'],
+
+    // ── Users (only executed when server rendered the admin section) ───────
+    usersLoaded: false,
+    usersLoading: false,
+    users: [],
+    showAdd: false,
+    newUser: { username: '', password: '', role: 'operator' },
+    msgOk: '',
+    msgErr: '',
+    pwUser: null,
+    pwNew: '',
+
+    async init() {
+      // Load Real IP settings
+      this.statusText = 'Loading…';
+      try {
+        const r = await fetch('/api/realip/settings');
+        const d = await r.json();
+        const header = (d.header || '').trim();
+        const trusted = Array.isArray(d.trusted_proxies) ? d.trusted_proxies : [];
+        this.cfgTrusted = trusted;
+        if (this.knownHeaders.includes(header)) {
+          this.headerChoice = header;
+          this.headerCustom = '';
+        } else if (header) {
+          this.headerChoice = '__custom__';
+          this.headerCustom = header;
+        } else {
+          this.headerChoice = 'X-Forwarded-For';
+          this.headerCustom = '';
+        }
+        this.statusText = '';
+      } catch (e) {
+        this.statusText = 'Failed to load';
+      }
+
+      // Auto-switch to users tab if URL hash requests it
+      if (window.location.hash === '#users') {
+        this.activeTab = 'users';
+        await this.loadUsers();
+      }
+    },
+
+    computedHeader() {
+      if (this.headerChoice === '__custom__') {
+        return (this.headerCustom || '').trim();
+      }
+      return this.headerChoice;
+    },
+
+    async saveRealIP() {
+      const header = this.computedHeader();
+      if (!header) {
+        this.statusText = 'Header is required';
+        return;
+      }
+      this.saving = true;
+      this.statusText = 'Saving…';
+      try {
+        const body = {
+          enabled: true,
+          header,
+          trusted_proxies: this.cfgTrusted && this.cfgTrusted.length ? this.cfgTrusted : ['127.0.0.1','::1'],
+        };
+        const r = await fetch('/api/realip/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d?.error || 'Save failed');
+        this.statusText = 'Saved';
+      } catch (e) {
+        this.statusText = e.message || 'Save failed';
+      } finally {
+        this.saving = false;
+        setTimeout(() => { this.statusText = ''; }, 1600);
+      }
+    },
+
+    // ── User management (server already verified admin; no /api/me needed) ──
+    async loadUsers() {
+      if (this.usersLoaded) return;
+      this.msgErr = '';
+      this.usersLoading = true;
+      const r = await fetch('/api/users');
+      if (!r.ok) {
+        this.msgErr = await r.text();
+        this.usersLoading = false;
+        return;
+      }
+      this.users = await r.json();
+      this.usersLoaded = true;
+      this.usersLoading = false;
+    },
+
+    async createUser() {
+      this.msgOk = '';
+      this.msgErr = '';
+      const r = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.newUser)
+      });
+      const t = await r.text();
+      let j = {};
+      try { j = JSON.parse(t); } catch (_) {}
+      if (!r.ok) {
+        this.msgErr = j.error || t;
+        return;
+      }
+      this.msgOk = 'Pengguna dibuat.';
+      this.newUser = { username: '', password: '', role: 'operator' };
+      this.showAdd = false;
+      await this._reloadUsers();
+    },
+
+    async removeUser(name) {
+      if (!confirm('Hapus pengguna ' + name + '?')) return;
+      this.msgOk = '';
+      this.msgErr = '';
+      const r = await fetch('/api/users/' + encodeURIComponent(name), { method: 'DELETE' });
+      const t = await r.text();
+      let j = {};
+      try { j = JSON.parse(t); } catch (_) {}
+      if (!r.ok) {
+        this.msgErr = j.error || t;
+        return;
+      }
+      this.msgOk = 'Pengguna dihapus.';
+      await this._reloadUsers();
+    },
+
+    openPw(name) {
+      this.pwUser = name;
+      this.pwNew = '';
+    },
+
+    async savePw() {
+      const r = await fetch('/api/users/' + encodeURIComponent(this.pwUser) + '/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: this.pwNew })
+      });
+      const t = await r.text();
+      let j = {};
+      try { j = JSON.parse(t); } catch (_) {}
+      if (!r.ok) {
+        this.msgErr = j.error || t;
+        return;
+      }
+      this.msgOk = 'Password diperbarui.';
+      this.pwUser = null;
+    },
+
+    async _reloadUsers() {
+      this.usersLoading = true;
+      const r = await fetch('/api/users');
+      if (!r.ok) {
+        this.usersLoading = false;
+        return;
+      }
+      this.users = await r.json();
+      this.usersLoading = false;
+    },
+  };
+}
+</script>
 {{end}}

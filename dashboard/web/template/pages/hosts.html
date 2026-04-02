@@ -156,6 +156,7 @@
                 <template x-for="b in [
                   {k:'virtual_patching', t:'VP'},
                   {k:'bot_threshold', t:'BOT'},
+                  {k:'real_ip', t:'RI'},
                   {k:'geoip', t:'GEO'},
                   {k:'dlp', t:'DLP'},
                   {k:'wordpress_security', t:'WP'},
@@ -373,39 +374,16 @@
               </div>
             </template>
 
-            <!-- Advanced: tombol buka/tutup; panel ke bawah -->
+            <!-- Advanced: TLS & Real IP (moved to tab) -->
             <div class="mt-4">
-              <button type="button" @click="form.show_advanced_upstream_tls = !form.show_advanced_upstream_tls; refreshIcons()"
+              <button type="button" @click="modalTab = 'tls_realip'"
                 class="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-gray-700 bg-gray-800/40 text-left text-sm font-medium text-gray-200 hover:border-emerald-500/30 hover:bg-gray-800/70 transition-colors">
                 <span>
-                  <span class="text-white">Advanced options</span>
-                  <span class="block text-[11px] font-normal text-gray-500 mt-0.5">Upstream HTTPS — No TLS verify &amp; origin SNI</span>
+                  <span class="text-white">Advanced</span>
+                  <span class="block text-[11px] font-normal text-gray-500 mt-0.5">Upstream TLS — No TLS verify &amp; origin SNI + Real IP Extraction</span>
                 </span>
-                <i data-lucide="chevron-down" class="w-5 h-5 shrink-0 text-gray-400 transition-transform duration-200 pointer-events-none"
-                  :class="form.show_advanced_upstream_tls ? 'rotate-180' : ''"></i>
+                <i data-lucide="chevron-right" class="w-5 h-5 shrink-0 text-gray-400 pointer-events-none"></i>
               </button>
-
-              <div x-show="form.show_advanced_upstream_tls" x-transition:enter="transition ease-out duration-150"
-                x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
-                x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0" class="mt-3 rounded-xl border border-gray-700/80 bg-gray-900/40 p-3 space-y-3">
-                <p class="text-xs font-semibold text-gray-300">Upstream TLS <span class="text-gray-500 font-normal">(upstream harus <code class="text-emerald-500/90">https://</code>)</span></p>
-                <label class="flex items-start gap-3 cursor-pointer group">
-                  <input type="checkbox" x-model="form.proxy_ssl_verify_off"
-                    class="mt-0.5 rounded border-gray-600 bg-gray-800 text-emerald-500 focus:ring-emerald-500/40">
-                  <span>
-                    <span class="text-sm text-white group-hover:text-emerald-100 transition-colors">No TLS verify</span>
-                    <span class="block text-[11px] text-gray-500 mt-0.5 leading-relaxed">Terima sertifikat apa pun dari origin (self-signed / hostname salah). Setara Cloudflare Tunnel — hanya jika Anda percaya jaringan ke origin.</span>
-                  </span>
-                </label>
-                <div>
-                  <label class="block text-xs font-medium text-gray-400 mb-1">Origin server name (SNI)</label>
-                  <input x-model="form.proxy_ssl_name" type="text" placeholder="mis. nextcloud.lan — kosongkan untuk default"
-                    class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3.5 py-2.5
-                                placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors font-mono">
-                  <p class="text-[11px] text-gray-500 mt-1">Hostname yang diharapkan pada sertifikat TLS upstream (berguna saat proxy ke IP padahal cert untuk nama DNS).</p>
-                </div>
-              </div>
             </div>
           </div>
         </template>
@@ -470,6 +448,85 @@
                         placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors">
         </div>
 
+        </div>
+
+        <!-- TLS & Real IP -->
+        <div x-show="modalTab === 'tls_realip'" class="space-y-4">
+          <div class="rounded-xl border border-gray-800 bg-gray-950/30 p-4">
+            <h4 class="text-sm font-semibold text-white mb-3">Upstream TLS</h4>
+            <template x-if="form.mode !== 'reverse_proxy'">
+              <p class="text-xs text-gray-500">Real IP & TLS override hanya untuk mode <span class="text-gray-300 font-semibold">Reverse Proxy</span>.</p>
+            </template>
+            <template x-if="form.mode === 'reverse_proxy'">
+              <label class="flex items-start gap-3 cursor-pointer group">
+                <input type="checkbox" x-model="form.proxy_ssl_verify_off"
+                  class="mt-0.5 rounded border-gray-600 bg-gray-800 text-emerald-500 focus:ring-emerald-500/40">
+                <span>
+                  <span class="text-sm text-white group-hover:text-emerald-100 transition-colors">No TLS verify</span>
+                  <span class="block text-[11px] text-gray-500 mt-0.5 leading-relaxed">
+                    Terima sertifikat apa pun dari origin (self-signed / hostname salah). Setara Cloudflare Tunnel — hanya jika Anda percaya jaringan ke origin.
+                  </span>
+                </span>
+              </label>
+
+              <div class="mt-3">
+                <label class="block text-xs font-medium text-gray-400 mb-1">Origin server name (SNI)</label>
+                <input x-model="form.proxy_ssl_name" type="text" placeholder="mis. nextcloud.lan — kosongkan untuk default"
+                  class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3.5 py-2.5
+                          placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors font-mono">
+                <p class="text-[11px] text-gray-500 mt-1">Hostname diharapkan pada sertifikat TLS upstream.</p>
+              </div>
+            </template>
+          </div>
+
+          <div class="rounded-xl border border-gray-800 bg-gray-950/30 p-4">
+            <h4 class="text-sm font-semibold text-white mb-3">Real IP Extraction</h4>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="m in securityModes" :key="'ri-' + m.id">
+                <button type="button"
+                  @click="setSecurityMode('real_ip', m.id)"
+                  :class="form.security_overrides.real_ip.mode === m.id ? m.activeClass : 'border-gray-700 bg-gray-800/60 text-gray-400 hover:text-gray-200'"
+                  class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors"
+                  x-text="m.label"></button>
+              </template>
+            </div>
+
+            <template x-if="form.security_overrides.real_ip.mode === 'override'">
+              <div class="mt-4 space-y-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-400 mb-1">real_ip_header</label>
+                  <select x-model="form.security_overrides.real_ip.custom.header"
+                    class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2">
+                    <option value="X-Forwarded-For">X-Forwarded-For</option>
+                    <option value="CF-Connecting-IP">CF-Connecting-IP</option>
+                    <option value="X-Real-IP">X-Real-IP</option>
+                    <option value="__custom__">Custom</option>
+                  </select>
+                </div>
+
+                <template x-if="form.security_overrides.real_ip.custom.header === '__custom__'">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Custom header token</label>
+                    <input x-model="form.security_overrides.real_ip.custom.header_custom"
+                      type="text" placeholder="mis. My-Proxy-Real-IP"
+                      class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 font-mono" />
+                  </div>
+                </template>
+
+                <div>
+                  <label class="block text-xs font-medium text-gray-400 mb-1">
+                    Trusted proxies (CIDR/IP, comma separated)
+                    <span class="text-gray-500 font-normal">(optional)</span>
+                  </label>
+                  <input x-model="form.security_overrides.real_ip.custom.trusted_proxies"
+                    type="text" placeholder="127.0.0.1,::1"
+                    class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 font-mono" />
+                </div>
+              </div>
+            </template>
+
+            <p class="text-xs text-gray-500 mt-3">Inherit = pakai global · Disabled = biarkan $remote_addr apa adanya untuk host ini.</p>
+          </div>
         </div>
 
         <!-- Virtual Patching -->
@@ -834,6 +891,7 @@
       detailHost: {},
       modalTabs: [
         { id: 'general', label: 'General' },
+        { id: 'tls_realip', label: 'TLS & Real IP' },
         { id: 'virtual_patching', label: 'Virtual Patching' },
         { id: 'bot_threshold', label: 'Bot Threshold' },
         { id: 'geoip', label: 'GeoIP' },
@@ -874,6 +932,7 @@
             geoip: { mode: 'inherit', custom: { blocked_countries: '' } },
             dlp: { mode: 'inherit', custom: { inspect_request_body: true, inspect_response_body: false } },
             wordpress_security: { mode: 'inherit', custom: { profile: 'balanced', login_path: '/wp-login.php' } },
+            real_ip: { mode: 'inherit', custom: { header: 'X-Forwarded-For', header_custom: '', trusted_proxies: '' } },
           }
         };
       },
@@ -905,6 +964,16 @@
           wordpress_security: {
             mode: this.normalizeOverrideMode(o?.wordpress_security?.mode),
             custom: (o?.wordpress_security?.custom && typeof o.wordpress_security.custom === 'object') ? o.wordpress_security.custom : { profile: 'balanced', login_path: '/wp-login.php' }
+          },
+          real_ip: {
+            mode: this.normalizeOverrideMode(o?.real_ip?.mode),
+            custom: (o?.real_ip?.custom && typeof o.real_ip.custom === 'object')
+              ? {
+                  header: o.real_ip.custom.header ?? 'X-Forwarded-For',
+                  header_custom: o.real_ip.custom.header_custom ?? '',
+                  trusted_proxies: o.real_ip.custom.trusted_proxies ?? '',
+                }
+              : { header: 'X-Forwarded-For', header_custom: '', trusted_proxies: '' }
           },
         };
       },
@@ -1149,7 +1218,14 @@
         if ((this.form.proxy_ssl_verify_off || (this.form.proxy_ssl_name || '').trim()) && this.form.mode === 'reverse_proxy') {
           this.form.show_advanced_upstream_tls = true;
         }
-        this.modalTab = 'general';
+
+        const realIPMode = this.form?.security_overrides?.real_ip?.mode || 'inherit';
+        const needsTLSRealIP = (this.form.mode === 'reverse_proxy') && (
+          this.form.proxy_ssl_verify_off ||
+          (this.form.proxy_ssl_name || '').trim() ||
+          (realIPMode !== 'inherit')
+        );
+        this.modalTab = needsTLSRealIP ? 'tls_realip' : 'general';
         this.isEdit = true;
         this.error = '';
         this.showModal = true;

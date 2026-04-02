@@ -10,6 +10,8 @@ old code/
 # Blueprints / research notes
 blueprint*
 
+templatewafx/
+
 config/coraza/crs/.git/
 
 # Local feature notes / benchmark results (not for public repo)
@@ -27,7 +29,7 @@ ssl_certs/*
 
 
 template/*
-config/conf.d/*.conf
+config/conf.d/
 # Atau jika ingin spesifik:
 config/conf.d/test.local.conf
 config/conf.d/test2.local.conf

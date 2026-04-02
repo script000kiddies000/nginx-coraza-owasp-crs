@@ -54,7 +54,10 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	mux.HandleFunc("GET /monitoring/nginx", app.RequireAuth(app.PageNginxMonitoring))
 	mux.HandleFunc("GET /monitoring/server", app.RequireAuth(app.PageServerMonitoring))
 	mux.HandleFunc("GET /settings", app.RequireAuth(app.PageSettings))
-	mux.HandleFunc("GET /settings/users", app.RequireAuth(app.PageSettingsUsers))
+	// /settings/users is now embedded in /settings (tab #users); redirect old links.
+	mux.HandleFunc("GET /settings/users", app.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/settings#users", http.StatusMovedPermanently)
+	}))
 
 	// ── JSON API ──────────────────────────────────────────────────────────
 	mux.HandleFunc("GET /api/me", app.RequireAuth(app.APIMe))
@@ -131,6 +134,10 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	mux.HandleFunc("GET /api/system/server-health", app.RequireAuth(app.APIServerHealth))
 	mux.HandleFunc("GET /api/security/geo-block", app.RequireAuth(app.APIGetGeoBlock))
 	mux.HandleFunc("POST /api/security/geo-block", app.RequireAuth(app.APIPostGeoBlock))
+
+	// Real IP Settings
+	mux.HandleFunc("GET /api/realip/settings", app.RequireAuth(app.APIGetRealIPSettings))
+	mux.HandleFunc("POST /api/realip/settings", app.RequireAuth(app.APIPostRealIPSettings))
 
 	mux.HandleFunc("GET /api/reports/security/download", app.RequireAuth(app.APIDownloadSecurityReport))
 	mux.HandleFunc("GET /api/reports/attack/download", app.RequireAuth(app.APIDownloadAttackReport))

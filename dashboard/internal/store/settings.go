@@ -13,6 +13,7 @@ const (
 	keyJA3      = "ja3"
 	keyDLP      = "dlp"
 	keyThreatIntel = "threat_intel"
+	keyRealIP   = "realip"
 	keyACME        = "acme_account"
 )
 
@@ -226,6 +227,63 @@ func GetThreatIntelConfig(db *bolt.DB) models.ThreatIntelConfig {
 
 func SaveThreatIntelConfig(db *bolt.DB, c models.ThreatIntelConfig) error {
 	return put(db, BucketSettings, keyThreatIntel, c)
+}
+
+// ── Real IP Settings ─────────────────────────────────────────────────────
+
+func defaultRealIPConfig() models.RealIPConfig {
+	return models.RealIPConfig{
+		Enabled: true,
+		Header:  "X-Forwarded-For",
+		TrustedProxies: []string{
+			"127.0.0.1",
+			"::1",
+		},
+	}
+}
+
+func GetRealIPConfig(db *bolt.DB) models.RealIPConfig {
+	var c models.RealIPConfig
+	err := get(db, BucketSettings, keyRealIP, &c)
+	if err == ErrNotFound {
+		c = defaultRealIPConfig()
+		_ = put(db, BucketSettings, keyRealIP, c)
+		return c
+	}
+	if err != nil {
+		return defaultRealIPConfig()
+	}
+	// Backfill missing fields for older DB.
+	if !c.Enabled && c.Header == "" {
+		// keep disabled if explicitly stored
+	}
+	if strings.TrimSpace(c.Header) == "" {
+		c.Header = defaultRealIPConfig().Header
+	}
+	if len(c.TrustedProxies) == 0 {
+		c.TrustedProxies = defaultRealIPConfig().TrustedProxies
+	}
+	return c
+}
+
+func SaveRealIPConfig(db *bolt.DB, c models.RealIPConfig) error {
+	if strings.TrimSpace(c.Header) == "" {
+		c.Header = defaultRealIPConfig().Header
+	}
+	// Normalize trusted proxies: trim spaces and drop empty.
+	var cleaned []string
+	for _, p := range c.TrustedProxies {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		cleaned = append(cleaned, p)
+	}
+	if len(cleaned) == 0 {
+		cleaned = defaultRealIPConfig().TrustedProxies
+	}
+	c.TrustedProxies = cleaned
+	return put(db, BucketSettings, keyRealIP, c)
 }
 
 // ── ACME (Let's Encrypt account key) ─────────────────────────────────────────
