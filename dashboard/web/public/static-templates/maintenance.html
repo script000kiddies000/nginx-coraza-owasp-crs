@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pemeliharaan</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background:
+        radial-gradient(ellipse 100% 55% at 50% 0%, rgba(245, 158, 11, 0.1), transparent 50%),
+        linear-gradient(180deg, #0c0a09 0%, #1c1917 45%, #0f172a 100%);
+      color: #e7e5e4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .wrap {
+      width: 100%;
+      max-width: 26rem;
+      text-align: center;
+    }
+    .icon {
+      width: 4.25rem;
+      height: 4.25rem;
+      margin: 0 auto 1.35rem;
+      border-radius: 1rem;
+      background: linear-gradient(155deg, rgba(245, 158, 11, 0.22), rgba(245, 158, 11, 0.06));
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fbbf24;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    }
+    .icon svg {
+      width: 2.1rem;
+      height: 2.1rem;
+      stroke-width: 2;
+    }
+    h1 {
+      margin: 0 0 0.65rem;
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: #fafaf9;
+    }
+    p {
+      margin: 0;
+      font-size: 0.95rem;
+      line-height: 1.65;
+      color: #a8a29e;
+    }
+    .hint {
+      margin-top: 1.6rem;
+      padding: 0.85rem 1.1rem;
+      border-radius: 0.65rem;
+      background: rgba(28, 25, 23, 0.85);
+      border: 1px solid rgba(120, 113, 108, 0.4);
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: #78716c;
+      display: inline-flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      text-align: left;
+      max-width: 100%;
+    }
+    .hint svg {
+      width: 1rem;
+      height: 1rem;
+      stroke-width: 2;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+      color: #a8a29e;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="icon" role="img" aria-label="Pemeliharaan"><i data-lucide="construction"></i></div>
+    <h1>Sedang pemeliharaan</h1>
+    <p>Kami sedang memperbarui layanan. Mohon kembali beberapa saat lagi.</p>
+    <div class="hint"><i data-lucide="info"></i><span>Terima kasih atas kesabaran Anda.</span></div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+    });
+  </script>
+</body>
+</html>

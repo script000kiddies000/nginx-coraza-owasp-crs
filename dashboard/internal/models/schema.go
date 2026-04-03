@@ -46,7 +46,8 @@ type HostConfig struct {
 	ProxySSLName      string `json:"proxy_ssl_name,omitempty"`       // proxy_ssl_name (SNI expected on origin cert)
 
 	// Static files mode
-	StaticRoot string `json:"static_root,omitempty"`
+	StaticRoot   string `json:"static_root,omitempty"`
+	StaticSource string `json:"static_source,omitempty"` // "manual" | "dashboard" — dashboard uses /var/www/html/<sanitized-domain>/
 
 	// Redirect mode
 	RedirectURL  string `json:"redirect_url,omitempty"`

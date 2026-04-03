@@ -256,10 +256,11 @@ RUN mkdir -p \
     /etc/nginx/ssl_certs \
     /var/cache/nginx \
     /var/lib/flux-waf \
+    /var/www/html \
     /run
 
 # Permissions
-RUN chown -R www-data:www-data /var/log/nginx /var/cache/nginx /run /etc/nginx/certs /etc/nginx/ssl_certs
+RUN chown -R www-data:www-data /var/log/nginx /var/cache/nginx /run /etc/nginx/certs /etc/nginx/ssl_certs /var/www/html
 RUN chmod -R u+rwX,g+rwX /etc/nginx/coraza/custom /etc/nginx/snippets /etc/nginx/certs /etc/nginx/ssl_certs
 
 # ── Flux WAF Dashboard binary ─────────────────────────────────────────────────

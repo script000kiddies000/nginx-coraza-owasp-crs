@@ -79,6 +79,8 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	mux.HandleFunc("GET /api/hosts", app.RequireAuth(app.APIGetHosts))
 	mux.HandleFunc("POST /api/hosts", app.RequireAuth(app.APISaveHost))
 	mux.HandleFunc("DELETE /api/hosts/{domain}", app.RequireAuth(app.APIDeleteHost))
+	mux.HandleFunc("GET /api/hosts/{domain}/static-page", app.RequireAuth(app.APIGetStaticPage))
+	mux.HandleFunc("POST /api/hosts/{domain}/static-page", app.RequireAuth(app.APIPostStaticPage))
 	mux.HandleFunc("GET /api/ssl", app.RequireAuth(app.APIGetSSL))
 	mux.HandleFunc("POST /api/ssl/upload", app.RequireAuth(app.APIUploadSSL))
 	mux.HandleFunc("GET /api/tls/certificates", app.RequireAuth(app.APITLSList))

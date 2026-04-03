@@ -101,10 +101,17 @@ func (app *App) APISaveHost(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case "static":
-		h.StaticRoot = strings.TrimSpace(h.StaticRoot)
-		if h.StaticRoot == "" {
-			jsonError(w, "static_root is required for static mode", http.StatusBadRequest)
-			return
+		src := strings.ToLower(strings.TrimSpace(h.StaticSource))
+		if src == "dashboard" {
+			h.StaticSource = "dashboard"
+			h.StaticRoot = nginx.DashboardStaticRoot(h.Domain)
+		} else {
+			h.StaticSource = "manual"
+			h.StaticRoot = strings.TrimSpace(h.StaticRoot)
+			if h.StaticRoot == "" {
+				jsonError(w, "static_root is required for manual static mode (or set static_source to dashboard)", http.StatusBadRequest)
+				return
+			}
 		}
 		h.UpstreamServers = nil
 

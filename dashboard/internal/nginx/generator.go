@@ -382,8 +382,16 @@ func WriteHostConf(db *bolt.DB, h models.HostConfig) error {
 			return fmt.Errorf("host %q has no upstream servers", h.Domain)
 		}
 	case "static":
-		if h.StaticRoot == "" {
-			return fmt.Errorf("host %q: static mode requires static_root", h.Domain)
+		src := strings.ToLower(strings.TrimSpace(h.StaticSource))
+		if src == "dashboard" {
+			h.StaticRoot = DashboardStaticRoot(h.Domain)
+			h.StaticSource = "dashboard"
+		} else {
+			h.StaticRoot = strings.TrimSpace(h.StaticRoot)
+			if h.StaticRoot == "" {
+				return fmt.Errorf("host %q: static mode requires static_root (manual) or static_source=dashboard", h.Domain)
+			}
+			h.StaticSource = "manual"
 		}
 	case "redirect":
 		if h.RedirectURL == "" {

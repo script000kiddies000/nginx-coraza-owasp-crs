@@ -1,5 +1,5 @@
 {{define "content"}}
-<div x-data="hostsApp()" x-init="init()">
+<div x-data="hostsApp()" x-init="init()" data-asset-version="{{.AssetVersion}}">
 
   <!-- Page header -->
   <div class="flex items-center justify-between mb-6">
@@ -229,7 +229,7 @@
         <div class="border-b border-gray-800 pb-1">
           <div class="flex flex-wrap gap-x-1 gap-y-1 -mb-px">
             <template x-for="t in modalTabs" :key="t.id">
-              <button type="button" @click="modalTab = t.id"
+              <button type="button" @click="modalTab = t.id; $nextTick(() => window.lucide && lucide.createIcons())"
                 class="relative px-2.5 py-2 text-left text-xs sm:text-sm font-semibold rounded-t-lg transition-colors max-w-[11rem] sm:max-w-none leading-snug"
                 :class="modalTab === t.id ? 'text-cyan-300 bg-gray-800/80' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/40'">
                 <span x-text="t.label" class="line-clamp-2 sm:line-clamp-none"></span>
@@ -316,7 +316,7 @@
             <template
               x-for="m in [{id:'reverse_proxy',label:'Reverse Proxy',icon:'🔀'},{id:'static',label:'Static Files',icon:'📁'},{id:'redirect',label:'Redirect',icon:'↪'}]"
               :key="m.id">
-              <button type="button" @click="form.mode = m.id; if (m.id !== 'reverse_proxy') form.show_advanced_upstream_tls = false" :class="form.mode === m.id
+              <button type="button" @click="setHostMode(m)" :class="form.mode === m.id
                         ? 'border-emerald-500 bg-emerald-500/10 text-white'
                         : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600 hover:text-gray-300'"
                 class="flex flex-col items-center gap-1 border rounded-xl py-3 px-2 text-xs font-semibold transition-colors cursor-pointer">
@@ -388,14 +388,108 @@
           </div>
         </template>
 
-        <!-- ── Static Files root ── -->
+        <!-- ── Static Files: manual path vs dashboard editor ── -->
         <template x-if="form.mode === 'static'">
-          <div>
-            <label class="block text-xs font-medium text-gray-400 mb-1.5">Document Root <span
-                class="text-rose-400">*</span></label>
-            <input x-model="form.static_root" type="text" placeholder="/var/www/html"
-              class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3.5 py-2.5
-                          placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors font-mono">
+          <div class="rounded-xl border border-gray-800 bg-gray-950/25 p-4 space-y-4">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 shrink-0">
+                <i data-lucide="folder-open" class="w-4 h-4 text-emerald-400 pointer-events-none"></i>
+              </span>
+              <div>
+                <p class="text-xs font-medium text-gray-300">Static site</p>
+                <p class="text-[11px] text-gray-500 mt-0.5">Pilih sumber root, lalu simpan host. Editor HTML hanya untuk mode <span class="text-gray-400 font-semibold">Dashboard</span>.</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" @click="setStaticSource('manual')"
+                :class="(form.static_source || 'manual') === 'manual'
+                  ? 'border-emerald-500 bg-emerald-500/10 text-white'
+                  : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'"
+                class="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors">
+                <i data-lucide="folder" class="w-4 h-4 text-sky-400 shrink-0 pointer-events-none"></i>
+                <span class="text-xs font-semibold">Path manual</span>
+              </button>
+              <button type="button" @click="setStaticSource('dashboard')"
+                :class="form.static_source === 'dashboard'
+                  ? 'border-emerald-500 bg-emerald-500/10 text-white'
+                  : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'"
+                class="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors">
+                <i data-lucide="file-code" class="w-4 h-4 text-violet-400 shrink-0 pointer-events-none"></i>
+                <span class="text-xs font-semibold">Dari dashboard</span>
+              </button>
+            </div>
+
+            <template x-if="(form.static_source || 'manual') === 'manual'">
+              <div>
+                <label class="block text-xs font-medium text-gray-400 mb-1.5">Document root <span class="text-rose-400">*</span></label>
+                <input x-model="form.static_root" type="text" placeholder="/var/www/html/example.com"
+                  class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3.5 py-2.5
+                    placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors font-mono">
+                <p class="text-[11px] text-gray-500 mt-1.5 flex items-start gap-1.5">
+                  <i data-lucide="info" class="w-3.5 h-3.5 text-gray-600 shrink-0 mt-0.5 pointer-events-none"></i>
+                  File diserving oleh Nginx dari path ini (mis. isi <span class="font-mono">index.html</span> lewat SSH/rsync).
+                </p>
+              </div>
+            </template>
+
+            <template x-if="form.static_source === 'dashboard'">
+              <div class="space-y-3">
+                <div class="rounded-lg border border-gray-700 bg-gray-900/50 px-3 py-2 flex items-start gap-2">
+                  <i data-lucide="folder-tree" class="w-4 h-4 text-emerald-400/90 shrink-0 mt-0.5 pointer-events-none"></i>
+                  <div class="min-w-0">
+                    <p class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Root otomatis</p>
+                    <p class="text-xs font-mono text-emerald-200/90 break-all" x-text="dashboardStaticRoot()"></p>
+                    <p class="text-[11px] text-gray-500 mt-1">File halaman: <span class="font-mono">index.html</span> di bawah path di atas.</p>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mr-1">Template</span>
+                  <button type="button" @click="applyStaticTemplate('minimal')"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-800/70 text-[11px] font-medium text-gray-300 hover:border-emerald-500/40 hover:text-white transition-colors">
+                    <i data-lucide="file-plus" class="w-3.5 h-3.5 pointer-events-none"></i> Minimal
+                  </button>
+                  <button type="button" @click="applyStaticTemplate('maintenance')"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-800/70 text-[11px] font-medium text-gray-300 hover:border-amber-500/40 hover:text-white transition-colors">
+                    <i data-lucide="wrench" class="w-3.5 h-3.5 pointer-events-none"></i> Maintenance
+                  </button>
+                  <button type="button" @click="applyStaticTemplate('landing')"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-800/70 text-[11px] font-medium text-gray-300 hover:border-sky-500/40 hover:text-white transition-colors">
+                    <i data-lucide="layout-template" class="w-3.5 h-3.5 pointer-events-none"></i> Landing
+                  </button>
+                  <button type="button" @click="loadStaticPage()"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-800/70 text-[11px] font-medium text-gray-300 hover:border-cyan-500/40 hover:text-white transition-colors">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 pointer-events-none"></i> Muat ulang
+                  </button>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-gray-400 mb-1.5">Editor HTML</label>
+                  <textarea x-model="form.static_page_html" rows="14" spellcheck="false"
+                    class="w-full bg-gray-900 border border-gray-700 text-gray-100 text-xs rounded-lg px-3 py-2.5 font-mono leading-relaxed
+                      focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60 resize-y min-h-[200px]"
+                    placeholder="&lt;!DOCTYPE html&gt;…"></textarea>
+                </div>
+
+                <p x-show="form.static_page_error" x-cloak class="text-[11px] text-rose-400" x-text="form.static_page_error"></p>
+                <p x-show="form.static_page_msg" x-cloak class="text-[11px] text-emerald-400/90" x-text="form.static_page_msg"></p>
+
+                <div class="flex flex-wrap justify-end gap-2">
+                  <button type="button" @click="saveStaticPage()"
+                    :disabled="form.static_page_saving || !(form.domain || '').trim()"
+                    :class="(form.static_page_saving || !(form.domain || '').trim()) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-500'"
+                    class="inline-flex items-center gap-2 bg-emerald-600 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
+                    <i data-lucide="save" class="w-3.5 h-3.5 pointer-events-none"></i>
+                    <span x-text="form.static_page_saving ? 'Menyimpan…' : 'Simpan index.html'"></span>
+                  </button>
+                </div>
+                <p class="text-[11px] text-gray-500 flex items-start gap-1.5">
+                  <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-amber-500/80 shrink-0 mt-0.5 pointer-events-none"></i>
+                  Simpan host terlebih dahulu (tombol di bawah) agar domain ada di sistem; baru «Simpan index.html» bisa ditulis ke disk.
+                </p>
+              </div>
+            </template>
           </div>
         </template>
 
@@ -529,13 +623,23 @@
           </div>
 
           <div class="rounded-xl border border-gray-800 bg-gray-950/30 p-4 space-y-3">
-            <h4 class="text-sm font-semibold text-white mb-2">Advanced Transport & Compression</h4>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-cyan-500/25 bg-cyan-500/10 shrink-0">
+                <i data-lucide="gauge" class="w-4 h-4 text-cyan-400 pointer-events-none"></i>
+              </span>
+              <h4 class="text-sm font-semibold text-white">Advanced Transport & Compression</h4>
+            </div>
 
             <!-- Listen IPv6 -->
             <div class="flex items-center justify-between gap-4">
-              <div>
+              <div class="flex items-start gap-3 min-w-0">
+                <span class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-700 bg-gray-800/60">
+                  <i data-lucide="globe-2" class="w-4 h-4 text-sky-400 pointer-events-none"></i>
+                </span>
+                <div class="min-w-0">
                 <p class="text-xs font-medium text-gray-200">Listen IPv6</p>
                 <p class="text-[11px] text-gray-500">Tambahkan `listen [::]:port` untuk setiap port HTTP/HTTPS.</p>
+                </div>
               </div>
               <button type="button"
                 @click="form.listen_ipv6 = !form.listen_ipv6"
@@ -549,9 +653,14 @@
 
             <!-- Redirect HTTP to HTTPS -->
             <div class="flex items-center justify-between gap-4">
-              <div>
+              <div class="flex items-start gap-3 min-w-0">
+                <span class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-700 bg-gray-800/60">
+                  <i data-lucide="arrow-right-left" class="w-4 h-4 text-violet-400 pointer-events-none"></i>
+                </span>
+                <div class="min-w-0">
                 <p class="text-xs font-medium text-gray-200">Redirect HTTP to HTTPS</p>
                 <p class="text-[11px] text-gray-500">Paksa trafik port 80 dialihkan ke HTTPS (port 443).</p>
+                </div>
               </div>
               <button type="button"
                 @click="form.redirect_http_to_https = !form.redirect_http_to_https"
@@ -565,9 +674,14 @@
 
             <!-- HSTS -->
             <div class="flex items-center justify-between gap-4">
-              <div>
+              <div class="flex items-start gap-3 min-w-0">
+                <span class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-700 bg-gray-800/60">
+                  <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400 pointer-events-none"></i>
+                </span>
+                <div class="min-w-0">
                 <p class="text-xs font-medium text-gray-200">Enable HSTS</p>
-                <p class="text-[11px] text-gray-500">Kirim header Strict-Transport-Security di port 443.</p>
+                <p class="text-[11px] text-gray-500">Kirim header Strict-Transport-Security untuk memaksa HTTPS di browser.</p>
+                </div>
               </div>
               <button type="button"
                 @click="form.hsts_enabled = !form.hsts_enabled"
@@ -581,9 +695,14 @@
 
             <!-- Gzip -->
             <div class="flex items-center justify-between gap-4">
-              <div>
+              <div class="flex items-start gap-3 min-w-0">
+                <span class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-700 bg-gray-800/60">
+                  <i data-lucide="archive" class="w-4 h-4 text-amber-400/90 pointer-events-none"></i>
+                </span>
+                <div class="min-w-0">
                 <p class="text-xs font-medium text-gray-200">Gzip Compression</p>
                 <p class="text-[11px] text-gray-500">Kompresi respons teks/JSON/JS/CSS untuk mempercepat loading.</p>
+                </div>
               </div>
               <button type="button"
                 @click="form.gzip_enabled = !form.gzip_enabled"
@@ -597,9 +716,14 @@
 
             <!-- Brotli -->
             <div class="flex items-center justify-between gap-4">
-              <div>
+              <div class="flex items-start gap-3 min-w-0">
+                <span class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-700 bg-gray-800/60">
+                  <i data-lucide="layers" class="w-4 h-4 text-fuchsia-400 pointer-events-none"></i>
+                </span>
+                <div class="min-w-0">
                 <p class="text-xs font-medium text-gray-200">Brotli Compression</p>
                 <p class="text-[11px] text-gray-500">Kompresi modern berbasis Brotli (butuh browser & client mendukung).</p>
+                </div>
               </div>
               <button type="button"
                 @click="form.brotli_enabled = !form.brotli_enabled"
@@ -961,6 +1085,7 @@
     return {
       hosts: [],
       tlsCerts: [],
+      assetVersion: '',
       loading: true,
       showModal: false,
       modalTab: 'general',
@@ -992,6 +1117,8 @@
         { id: 'override', label: 'Override (Custom)', activeClass: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' },
         { id: 'disabled', label: 'Disabled', activeClass: 'border-gray-500/40 bg-gray-500/10 text-gray-300' },
       ],
+
+      /* Template HTML statis: /public/static-templates/{minimal,maintenance,landing}.html (dimuat on-demand) */
 
       get activeTlsCerts() {
         return (this.tlsCerts || []).filter(c => (c.status || '').toLowerCase() === 'active');
@@ -1152,6 +1279,10 @@
           upstream_servers: upstream_servers.length ? upstream_servers : [''],
           lb_algorithm: h.lb_algorithm ?? h.LBAlgorithm ?? h.lbAlgorithm ?? 'round_robin',
           static_root: h.static_root ?? h.StaticRoot ?? h.staticRoot ?? '',
+          static_source: (() => {
+            const s = String(h.static_source ?? h.StaticSource ?? '').trim().toLowerCase();
+            return s === 'dashboard' ? 'dashboard' : 'manual';
+          })(),
           redirect_url: h.redirect_url ?? h.RedirectURL ?? h.redirectUrl ?? '',
           redirect_code: Number(h.redirect_code ?? h.RedirectCode ?? h.redirectCode ?? 301),
           waf_mode: h.waf_mode ?? h.WAFMode ?? h.wafMode ?? 'On',
@@ -1228,6 +1359,120 @@
         this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
       },
 
+      setHostMode(m) {
+        this.form.mode = m.id;
+        if (m.id !== 'reverse_proxy') this.form.show_advanced_upstream_tls = false;
+        this.$nextTick(async () => {
+          if (window.lucide) lucide.createIcons();
+          if (this.form.mode === 'static') await this.loadStaticPage();
+        });
+      },
+
+      sanitizeDomainDir(domain) {
+        const d = (domain || '').toLowerCase().trim();
+        let out = '';
+        for (let i = 0; i < d.length; i++) {
+          const ch = d[i];
+          if (/[a-z0-9.-]/.test(ch)) out += ch;
+          else out += '_';
+        }
+        return out || 'host';
+      },
+
+      dashboardStaticRoot() {
+        return '/var/www/html/' + this.sanitizeDomainDir(this.form.domain);
+      },
+
+      setStaticSource(v) {
+        this.form.static_source = v;
+        if (v === 'dashboard') {
+          this.form.static_root = this.dashboardStaticRoot();
+        }
+        this.form.static_page_msg = '';
+        this.form.static_page_error = '';
+        this.$nextTick(async () => {
+          if (window.lucide) lucide.createIcons();
+          if (this.form.mode === 'static') await this.loadStaticPage();
+        });
+      },
+
+      async loadStaticPage() {
+        this.form.static_page_error = '';
+        if (this.form.mode !== 'static') return;
+        const dom = (this.form.domain || '').trim();
+        if (!dom) {
+          this.form.static_page_html = '';
+          return;
+        }
+        try {
+          const r = await fetch('/api/hosts/' + encodeURIComponent(dom) + '/static-page');
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) {
+            this.form.static_page_html = '';
+            if (r.status === 404 && !this.isEdit) {
+              this.form.static_page_error = '';
+              return;
+            }
+            this.form.static_page_error = d.error || ('HTTP ' + r.status);
+            return;
+          }
+          this.form.static_page_html = d.html != null ? d.html : '';
+        } catch (e) {
+          this.form.static_page_error = 'Gagal memuat index.html';
+        }
+        this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+      },
+
+      async saveStaticPage() {
+        this.form.static_page_error = '';
+        this.form.static_page_msg = '';
+        const dom = (this.form.domain || '').trim();
+        if (!dom) {
+          this.form.static_page_error = 'Domain wajib diisi.';
+          return;
+        }
+        if ((this.form.static_source || 'manual') !== 'dashboard') return;
+        this.form.static_page_saving = true;
+        try {
+          const r = await fetch('/api/hosts/' + encodeURIComponent(dom) + '/static-page', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ html: this.form.static_page_html != null ? this.form.static_page_html : '' }),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok || !d.ok) {
+            this.form.static_page_error = d.error || ('HTTP ' + r.status);
+            this.form.static_page_saving = false;
+            return;
+          }
+          this.form.static_page_msg = 'index.html tersimpan.';
+        } catch (e) {
+          this.form.static_page_error = 'Gagal menyimpan.';
+        }
+        this.form.static_page_saving = false;
+        this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+      },
+
+      async applyStaticTemplate(key) {
+        const allowed = ['minimal', 'maintenance', 'landing'];
+        if (!allowed.includes(key)) return;
+        this.form.static_page_msg = '';
+        this.form.static_page_error = '';
+        const q = this.assetVersion ? ('?v=' + encodeURIComponent(this.assetVersion)) : '';
+        const url = '/public/static-templates/' + key + '.html' + q;
+        try {
+          const r = await fetch(url);
+          if (!r.ok) {
+            this.form.static_page_error = 'Gagal memuat template.';
+            return;
+          }
+          this.form.static_page_html = await r.text();
+        } catch (e) {
+          this.form.static_page_error = 'Gagal memuat template.';
+        }
+        this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+      },
+
       addPort() {
         this.form.listen_ports.push({
           port: '',
@@ -1257,6 +1502,7 @@
       },
 
       async init() {
+        this.assetVersion = (this.$el && this.$el.dataset && this.$el.dataset.assetVersion) ? String(this.$el.dataset.assetVersion) : '';
         await Promise.all([this.fetchHosts(), this.fetchTls()]);
       },
 
@@ -1298,7 +1544,10 @@
           this.isEdit = true;
           this.error = 'Invalid host data: domain missing.';
           this.showModal = true;
-          this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+          this.$nextTick(async () => {
+            if (window.lucide) lucide.createIcons();
+            if (this.form.mode === 'static') await this.loadStaticPage();
+          });
           return;
         }
         this.form = {
@@ -1314,6 +1563,10 @@
           ssl_cert_id: nh.ssl_cert_id || '',
           redirect_code: nh.redirect_code || 301,
           security_overrides: this.normalizeSecurityOverrides(nh.security_overrides || {}),
+          static_page_html: '',
+          static_page_error: '',
+          static_page_msg: '',
+          static_page_saving: false,
         };
         if ((this.form.proxy_ssl_verify_off || (this.form.proxy_ssl_name || '').trim()) && this.form.mode === 'reverse_proxy') {
           this.form.show_advanced_upstream_tls = true;
@@ -1329,7 +1582,10 @@
         this.isEdit = true;
         this.error = '';
         this.showModal = true;
-        this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+        this.$nextTick(async () => {
+          if (window.lucide) lucide.createIcons();
+          if (this.form.mode === 'static') await this.loadStaticPage();
+        });
       },
 
       async save() {
@@ -1377,14 +1633,28 @@
           const servers = this.form.upstream_servers.map(s => s.trim()).filter(s => s);
           if (servers.length === 0) { this.error = 'At least one upstream server is required.'; return; }
         } else if (this.form.mode === 'static') {
-          if (!this.form.static_root.trim()) { this.error = 'Document root is required.'; return; }
+          const ss = (this.form.static_source || 'manual').toLowerCase();
+          if (ss === 'dashboard') {
+            this.form.static_root = this.dashboardStaticRoot();
+          } else if (!this.form.static_root.trim()) {
+            this.error = 'Document root is required for manual static mode.';
+            return;
+          }
         } else if (this.form.mode === 'redirect') {
           if (!this.form.redirect_url.trim()) { this.error = 'Redirect URL is required.'; return; }
         }
 
         const dom = this.form.domain.trim();
         const orig = (this.form.original_domain || '').toString().trim();
-        const { original_domain, show_advanced_upstream_tls, ...rest } = this.form;
+        const {
+          original_domain,
+          show_advanced_upstream_tls,
+          static_page_html,
+          static_page_error,
+          static_page_msg,
+          static_page_saving,
+          ...rest
+        } = this.form;
         const payload = {
           ...rest,
           domain: dom,
