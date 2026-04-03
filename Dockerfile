@@ -57,7 +57,7 @@ ARG CRS_VERSION=v4.24.1
 #   libxslt-dev   → XSLT filter module
 #   libxml2-dev   → dependency xslt
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    build-essential libpcre3-dev zlib1g-dev libssl-dev git wget patch \
+    build-essential libpcre3-dev zlib1g-dev libssl-dev git wget patch cmake \
     libmaxminddb-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -99,6 +99,16 @@ RUN git clone --branch "${CORAZA_NGINX_VERSION}" --depth 1 https://github.com/co
 RUN git clone --branch "${CRS_VERSION}" --depth 1 \
     https://github.com/coreruleset/coreruleset.git /build/crs
 
+#
+# ngx_brotli: Brotli compression modules (static compile).
+# Needed so "brotli on;" directives don't crash at runtime.
+#
+RUN git clone --recurse-submodules -j8 https://github.com/google/ngx_brotli.git
+RUN cd /build/ngx_brotli/deps/brotli && \
+    mkdir -p out && cd out && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./installed .. && \
+    cmake --build . --config Release --target brotlienc
+
 WORKDIR /build/nginx-${NGINX_VERSION}
 
 # Configure flags aktif:
@@ -138,6 +148,7 @@ RUN ./configure \
       --with-stream \
       --with-stream_ssl_module \
       --add-module=../nginx-ssl-fingerprint \
+      --add-module=../ngx_brotli \
       --add-dynamic-module=../ngx_http_geoip2_module \
       --add-dynamic-module=../coraza-nginx && \
     make -j$(nproc) && \

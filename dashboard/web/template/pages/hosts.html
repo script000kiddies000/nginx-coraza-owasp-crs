@@ -527,6 +527,95 @@
 
             <p class="text-xs text-gray-500 mt-3">Inherit = pakai global · Disabled = biarkan $remote_addr apa adanya untuk host ini.</p>
           </div>
+
+          <div class="rounded-xl border border-gray-800 bg-gray-950/30 p-4 space-y-3">
+            <h4 class="text-sm font-semibold text-white mb-2">Advanced Transport & Compression</h4>
+
+            <!-- Listen IPv6 -->
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <p class="text-xs font-medium text-gray-200">Listen IPv6</p>
+                <p class="text-[11px] text-gray-500">Tambahkan `listen [::]:port` untuk setiap port HTTP/HTTPS.</p>
+              </div>
+              <button type="button"
+                @click="form.listen_ipv6 = !form.listen_ipv6"
+                :class="form.listen_ipv6
+                  ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300'
+                  : 'bg-gray-800/60 border-gray-700 text-gray-400 hover:text-gray-200'"
+                class="px-3 py-1.5 rounded-full border text-[11px] font-semibold transition-colors whitespace-nowrap">
+                <span x-text="form.listen_ipv6 ? 'Enabled' : 'Disabled'"></span>
+              </button>
+            </div>
+
+            <!-- Redirect HTTP to HTTPS -->
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <p class="text-xs font-medium text-gray-200">Redirect HTTP to HTTPS</p>
+                <p class="text-[11px] text-gray-500">Paksa trafik port 80 dialihkan ke HTTPS (port 443).</p>
+              </div>
+              <button type="button"
+                @click="form.redirect_http_to_https = !form.redirect_http_to_https"
+                :class="form.redirect_http_to_https
+                  ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300'
+                  : 'bg-gray-800/60 border-gray-700 text-gray-400 hover:text-gray-200'"
+                class="px-3 py-1.5 rounded-full border text-[11px] font-semibold transition-colors whitespace-nowrap">
+                <span x-text="form.redirect_http_to_https ? 'Enabled' : 'Disabled'"></span>
+              </button>
+            </div>
+
+            <!-- HSTS -->
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <p class="text-xs font-medium text-gray-200">Enable HSTS</p>
+                <p class="text-[11px] text-gray-500">Kirim header Strict-Transport-Security di port 443.</p>
+              </div>
+              <button type="button"
+                @click="form.hsts_enabled = !form.hsts_enabled"
+                :class="form.hsts_enabled
+                  ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300'
+                  : 'bg-gray-800/60 border-gray-700 text-gray-400 hover:text-gray-200'"
+                class="px-3 py-1.5 rounded-full border text-[11px] font-semibold transition-colors whitespace-nowrap">
+                <span x-text="form.hsts_enabled ? 'Enabled' : 'Disabled'"></span>
+              </button>
+            </div>
+
+            <!-- Gzip -->
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <p class="text-xs font-medium text-gray-200">Gzip Compression</p>
+                <p class="text-[11px] text-gray-500">Kompresi respons teks/JSON/JS/CSS untuk mempercepat loading.</p>
+              </div>
+              <button type="button"
+                @click="form.gzip_enabled = !form.gzip_enabled"
+                :class="form.gzip_enabled
+                  ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300'
+                  : 'bg-gray-800/60 border-gray-700 text-gray-400 hover:text-gray-200'"
+                class="px-3 py-1.5 rounded-full border text-[11px] font-semibold transition-colors whitespace-nowrap">
+                <span x-text="form.gzip_enabled ? 'Enabled' : 'Disabled'"></span>
+              </button>
+            </div>
+
+            <!-- Brotli -->
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <p class="text-xs font-medium text-gray-200">Brotli Compression</p>
+                <p class="text-[11px] text-gray-500">Kompresi modern berbasis Brotli (butuh browser & client mendukung).</p>
+              </div>
+              <button type="button"
+                @click="form.brotli_enabled = !form.brotli_enabled"
+                :class="form.brotli_enabled
+                  ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300'
+                  : 'bg-gray-800/60 border-gray-700 text-gray-400 hover:text-gray-200'"
+                class="px-3 py-1.5 rounded-full border text-[11px] font-semibold transition-colors whitespace-nowrap">
+                <span x-text="form.brotli_enabled ? 'Enabled' : 'Disabled'"></span>
+              </button>
+            </div>
+
+            <p class="text-[11px] text-gray-500 pt-1 border-t border-gray-800 mt-2">
+              Default <span class="font-semibold">OFF</span>. Jika <span class="text-gray-300 font-semibold">Redirect HTTP to HTTPS</span> atau <span class="text-gray-300 font-semibold">HSTS</span> aktif,
+              Flux WAF akan memastikan port <span class="font-mono">80</span> &amp; <span class="font-mono">443</span> ikut di-listen.
+            </p>
+          </div>
         </div>
 
         <!-- Virtual Patching -->
@@ -891,7 +980,7 @@
       detailHost: {},
       modalTabs: [
         { id: 'general', label: 'General' },
-        { id: 'tls_realip', label: 'TLS & Real IP' },
+        { id: 'tls_realip', label: 'Advanced' },
         { id: 'virtual_patching', label: 'Virtual Patching' },
         { id: 'bot_threshold', label: 'Bot Threshold' },
         { id: 'geoip', label: 'GeoIP' },
@@ -925,6 +1014,12 @@
           ssl_cert_id: '',
           proxy_ssl_verify_off: false,
           proxy_ssl_name: '',
+          // Advanced server transport / performance toggles (default off)
+          listen_ipv6: false,
+          redirect_http_to_https: false,
+          hsts_enabled: false,
+          gzip_enabled: false,
+          brotli_enabled: false,
           enabled: true,
           security_overrides: {
             virtual_patching: { mode: 'inherit', custom: { profile: 'balanced', notes: '' } },
@@ -1064,6 +1159,11 @@
           ssl_enabled: !!(h.ssl_enabled ?? h.SSLEnabled ?? h.sslEnabled ?? false),
           proxy_ssl_verify_off: !!(h.proxy_ssl_verify_off ?? h.ProxySSLVerifyOff ?? false),
           proxy_ssl_name: String(h.proxy_ssl_name ?? h.ProxySSLName ?? '').trim(),
+          listen_ipv6: !!(h.listen_ipv6 ?? h.ListenIPv6 ?? h.listenIpv6 ?? false),
+          redirect_http_to_https: !!(h.redirect_http_to_https ?? h.RedirectHTTPToHTTPS ?? h.redirectHttpToHttps ?? false),
+          hsts_enabled: !!(h.hsts_enabled ?? h.HSTSEnabled ?? h.hstsEnabled ?? false),
+          gzip_enabled: !!(h.gzip_enabled ?? h.GzipEnabled ?? h.gzipEnabled ?? false),
+          brotli_enabled: !!(h.brotli_enabled ?? h.BrotliEnabled ?? h.brotliEnabled ?? false),
           security_overrides: this.normalizeSecurityOverrides(h.security_overrides ?? h.SecurityOverrides ?? {}),
         };
       },
@@ -1236,6 +1336,34 @@
         this.error = '';
 
         if (!this.form.domain.trim()) { this.error = 'Domain is required.'; return; }
+
+        // Transport rules: Redirect/HSTS require both ports 80 and 443.
+        if (this.form.redirect_http_to_https || this.form.hsts_enabled) {
+          if (!Array.isArray(this.form.listen_ports)) this.form.listen_ports = [];
+
+          const has80 = this.form.listen_ports.some(p => Number(p.port) === 80 && !p.https);
+          if (!has80) {
+            this.form.listen_ports.push({
+              port: 80,
+              https: false,
+              _key: 'lp-force-80-' + Date.now(),
+            });
+          }
+
+          const has443 = this.form.listen_ports.some(p => Number(p.port) === 443 && !!p.https);
+          if (!has443) {
+            this.form.listen_ports.push({
+              port: 443,
+              https: true,
+              _key: 'lp-force-443-' + Date.now(),
+            });
+          }
+
+          // If HTTPS is enabled via port 443 but no cert chosen, try to auto-pick one.
+          if (!(this.form.ssl_cert_id || '').trim() && this.activeTlsCerts && this.activeTlsCerts.length > 0) {
+            this.form.ssl_cert_id = this.activeTlsCerts[0].id;
+          }
+        }
 
         const ports = (this.form.listen_ports || []).filter(p => p.port);
         if (ports.length === 0) { this.error = 'At least one listening port is required.'; return; }

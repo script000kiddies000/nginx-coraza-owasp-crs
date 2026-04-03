@@ -168,8 +168,14 @@ server {
 {{- range .ListenPorts}}
 {{- if .HTTPS}}
     listen {{.Port}} ssl;
+{{- if $.ListenIPv6}}
+    listen [::]:{{.Port}} ssl;
+{{- end}}
 {{- else}}
     listen {{.Port}};
+{{- if $.ListenIPv6}}
+    listen [::]:{{.Port}};
+{{- end}}
 {{- end}}
 {{- end}}
 {{- if hasHTTPS .ListenPorts}}
@@ -178,6 +184,30 @@ server {
     ssl_certificate_key {{sslKeyPath .SSLKey}};
 {{- end}}
     server_name {{.Domain}};
+
+{{- if and .RedirectHTTPToHTTPS (ne .Mode "redirect")}}
+    # Force HTTPS: redirect HTTP (port 80) to HTTPS.
+    if ($server_port = 80) { return 301 https://$host$request_uri; }
+{{- end}}
+{{- if .HSTSEnabled}}
+    # HSTS (Strict-Transport-Security). Nginx tidak mengizinkan add_header di dalam if{},
+    # jadi kita set header ini langsung di server context.
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+{{- end}}
+
+{{- if .GzipEnabled}}
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss image/svg+xml;
+{{- end}}
+
+{{- if .BrotliEnabled}}
+    brotli on;
+    brotli_comp_level 6;
+    brotli_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss image/svg+xml;
+{{- end}}
 
 {{- if .RealIPEnabled}}
     real_ip_header {{.RealIPHeader}};
@@ -321,6 +351,28 @@ func WriteHostConf(db *bolt.DB, h models.HostConfig) error {
 	// Default mode
 	if h.Mode == "" {
 		h.Mode = "reverse_proxy"
+	}
+
+	// Force HTTPS transport rules (redirect + HSTS)
+	// Requirement: both 80 and 443 must be listened when enabled.
+	if h.RedirectHTTPToHTTPS || h.HSTSEnabled {
+		seen := map[string]bool{}
+		ports := make([]models.ListenPort, 0, len(h.ListenPorts)+2)
+		for _, lp := range h.ListenPorts {
+			key := fmt.Sprintf("%d-%t", lp.Port, lp.HTTPS)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			ports = append(ports, lp)
+		}
+		if !seen["80-false"] {
+			ports = append(ports, models.ListenPort{Port: 80, HTTPS: false})
+		}
+		if !seen["443-true"] {
+			ports = append(ports, models.ListenPort{Port: 443, HTTPS: true})
+		}
+		h.ListenPorts = ports
 	}
 
 	// Validate mode-specific requirements

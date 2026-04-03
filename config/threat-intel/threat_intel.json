@@ -11,7 +11,7 @@
       "type": "spamhaus_drop",
       "url": "https://www.spamhaus.org/drop/drop.txt",
       "enabled": true,
-      "last_sync": "2026-04-02 17:00:00 UTC",
+      "last_sync": "2026-04-03 17:00:00 UTC",
       "ip_count": 1603
     },
     {
@@ -19,22 +19,22 @@
       "type": "spamhaus_drop",
       "url": "https://www.spamhaus.org/drop/edrop.txt",
       "enabled": true,
-      "last_sync": "2026-04-02 17:00:00 UTC"
+      "last_sync": "2026-04-03 17:00:00 UTC"
     },
     {
       "name": "Emerging Threats",
       "type": "emerging_threats",
       "url": "https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt",
       "enabled": true,
-      "last_sync": "2026-04-02 17:00:00 UTC",
-      "ip_count": 1617
+      "last_sync": "2026-04-03 17:00:00 UTC",
+      "ip_count": 1624
     },
     {
       "name": "AbuseIPDB",
       "type": "abuseipdb",
       "url": "https://api.abuseipdb.com/api/v2/blacklist",
       "enabled": true,
-      "last_sync": "error (2026-04-02 17:00:00 UTC)"
+      "last_sync": "error (2026-04-03 17:00:00 UTC)"
     }
   ]
 }

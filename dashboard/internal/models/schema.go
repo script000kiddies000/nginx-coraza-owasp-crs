@@ -63,6 +63,13 @@ type HostConfig struct {
 	SSLKey      string `json:"ssl_key"`   // resolved path to .key
 	HTTP2Enabled bool  `json:"http2_enabled"`
 
+	// Per-host server transport / security headers / compression
+	ListenIPv6            bool `json:"listen_ipv6,omitempty"` // add IPv6 listen [::]:<port>
+	RedirectHTTPToHTTPS   bool `json:"redirect_http_to_https,omitempty"` // force browser to https
+	HSTSEnabled           bool `json:"hsts_enabled,omitempty"` // Strict-Transport-Security header (https only)
+	GzipEnabled           bool `json:"gzip_enabled,omitempty"`
+	BrotliEnabled         bool `json:"brotli_enabled,omitempty"`
+
 	// Optional per-host security engines override state.
 	SecurityOverrides HostSecurityOverrides `json:"security_overrides,omitempty"`
 }
