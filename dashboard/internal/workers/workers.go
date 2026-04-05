@@ -24,10 +24,13 @@ const (
 )
 
 var (
-	reAuditID     = regexp.MustCompile(`\[id "([^"]+)"\]`)
-	reAuditMsg    = regexp.MustCompile(`\[msg "([^"]*)"\]`)
-	reAuditClient = regexp.MustCompile(`\[client ([^\]]+)\]`)
-	reAuditURI    = regexp.MustCompile(`\[uri "([^"]*)"\]`)
+	reAuditID        = regexp.MustCompile(`\[id "([^"]+)"\]`)
+	reAuditMsg       = regexp.MustCompile(`\[msg "([^"]*)"\]`)
+	reAuditClient    = regexp.MustCompile(`\[client ([^\]]+)\]`)
+	reAuditURI       = regexp.MustCompile(`\[uri "([^"]*)"\]`)
+	reAuditHost      = regexp.MustCompile(`(?i)\bHost:\s*([^\s\r\n;,\]]+)`)
+	reAuditSectionA  = regexp.MustCompile(`^--[A-Za-z0-9]+-A--\s*$`) // awal entri audit multipart (ModSecurity/Coraza)
+	reAuditHostLine  = regexp.MustCompile(`(?i)^\s*host:\s*(.+?)\s*$`)
 )
 
 // Start launches all background goroutines. Called once from main().
@@ -102,6 +105,8 @@ func logTailer(db *bolt.DB) {
 // compact events in BoltDB for the Security Events UI.
 func auditTailer(db *bolt.DB) {
 	var offset int64
+	// Header Host di audit multipart (section B) biasanya baris terpisah dari [id "..."] (section H).
+	var pendingHost string
 
 	for range time.Tick(time.Second) {
 		f, err := os.Open(corazaAuditLog)
@@ -117,6 +122,7 @@ func auditTailer(db *bolt.DB) {
 
 		if info.Size() < offset {
 			offset = 0
+			pendingHost = ""
 		}
 		if info.Size() == offset {
 			f.Close()
@@ -134,7 +140,28 @@ func auditTailer(db *bolt.DB) {
 
 		for scanner.Scan() {
 			line := scanner.Text()
+			trimmed := strings.TrimSpace(line)
+
+			if strings.HasPrefix(trimmed, "{") {
+				pendingHost = ""
+			} else if reAuditSectionA.MatchString(trimmed) {
+				pendingHost = ""
+			}
+
+			if m := reAuditHostLine.FindStringSubmatch(line); len(m) > 1 {
+				v := strings.TrimSpace(m[1])
+				if v != "" {
+					pendingHost = v
+				}
+				continue
+			}
+
 			if ev, ok := parseAuditLine(line); ok {
+				if ev.Host == "" && pendingHost != "" {
+					ev.Host = pendingHost
+				}
+				pendingHost = ""
+
 				if err := store.AppendSecurityEvent(db, ev); err != nil {
 					log.Printf("[workers] append security event: %v", err)
 				}
@@ -171,6 +198,12 @@ func parseAuditLine(line string) (models.SecurityEvent, bool) {
 		if err := json.Unmarshal([]byte(line), &m); err != nil {
 			return models.SecurityEvent{}, false
 		}
+		// Coraza SecAuditLogFormat JSON: {"transaction":{...},"messages":[...]}
+		if _, ok := m["transaction"]; ok {
+			if ev, ok := securityEventFromCorazaTransactionJSON(m); ok {
+				return ev, true
+			}
+		}
 		ev := models.SecurityEvent{Time: now}
 		if v, ok := m["timestamp"].(string); ok && v != "" {
 			ev.Time = v
@@ -180,6 +213,8 @@ func parseAuditLine(line string) (models.SecurityEvent, bool) {
 		ev.Message = stringField(m, "message", "msg")
 		ev.Action = stringField(m, "action", "disruptive_action")
 		ev.URI = stringField(m, "uri", "request_uri", "url")
+		ev.Severity = stringField(m, "severity", "severity_level", "severitylevel")
+		ev.Host = hostFromAuditMap(m)
 		if ev.RuleID != "" || ev.Message != "" {
 			return ev, true
 		}
@@ -204,6 +239,9 @@ func parseAuditLine(line string) (models.SecurityEvent, bool) {
 	}
 	if m := reAuditURI.FindStringSubmatch(line); len(m) > 1 {
 		ev.URI = m[1]
+	}
+	if m := reAuditHost.FindStringSubmatch(line); len(m) > 1 {
+		ev.Host = strings.TrimSpace(m[1])
 	}
 	if strings.Contains(strings.ToLower(line), "denied") || strings.Contains(strings.ToLower(line), "blocked") {
 		ev.Action = "blocked"

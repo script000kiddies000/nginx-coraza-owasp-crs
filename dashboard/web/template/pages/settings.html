@@ -91,6 +91,35 @@
       </div>
     </div>
 
+    <div class="rounded-xl border border-gray-800 bg-gray-900/60 p-5">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="text-emerald-400"><i data-lucide="braces" class="w-5 h-5"></i></span>
+        <h2 class="text-sm font-semibold text-white">Format audit Coraza</h2>
+      </div>
+      <p class="text-xs text-gray-500 leading-relaxed mb-3">
+        File <span class="font-mono text-gray-600">coraza_audit.log</span> — pilih <strong class="text-gray-400">JSON</strong> agar setiap event satu baris (mudah diparse dashboard: Host, URI, rule).
+        Format <strong class="text-gray-400">Native</strong> adalah multipart ModSecurity klasik (dashboard tetap mendukung + Host dari baris <span class="font-mono">host:</span>).
+      </p>
+      <div class="flex flex-wrap items-end gap-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-400 mb-1">SecAuditLogFormat</label>
+          <select x-model="auditLogFormat"
+                  class="bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 min-w-[12rem]">
+            <option value="json">JSON (disarankan)</option>
+            <option value="native">Native (multipart)</option>
+          </select>
+        </div>
+        <button type="button"
+                @click="saveAuditLogFormat()"
+                :disabled="auditLogSaving"
+                class="bg-emerald-600/90 hover:bg-emerald-500 disabled:opacity-60 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
+          <span x-show="!auditLogSaving">Simpan &amp; reload nginx</span>
+          <span x-show="auditLogSaving">Menyimpan…</span>
+        </button>
+      </div>
+      <p class="text-[11px] text-gray-600 mt-2 font-mono" x-text="auditLogStatus"></p>
+    </div>
+
     <div class="rounded-xl border border-gray-800 bg-gray-950/40 p-4 text-xs text-gray-600">
       <p>Volume data: <span class="font-mono text-gray-500">flux-data/data.db</span> · Password admin awal dari env <span class="font-mono">FLUX_ADMIN_PASSWORD</span>.</p>
     </div>
@@ -251,6 +280,10 @@ function settingsPageApp() {
     cfgTrusted: [],
     knownHeaders: ['X-Forwarded-For','CF-Connecting-IP','X-Real-IP'],
 
+    auditLogFormat: 'json',
+    auditLogSaving: false,
+    auditLogStatus: '',
+
     // ── Users (only executed when server rendered the admin section) ───────
     usersLoaded: false,
     usersLoading: false,
@@ -285,6 +318,17 @@ function settingsPageApp() {
       } catch (e) {
         this.statusText = 'Failed to load';
       }
+
+      try {
+        const ar = await fetch('/api/settings/audit-log-format');
+        if (ar.ok) {
+          const ad = await ar.json();
+          if (ad.format === 'native' || ad.format === 'json') {
+            this.auditLogFormat = ad.format;
+          }
+        }
+        this.auditLogStatus = '';
+      } catch (_) {}
 
       // Auto-switch to users tab if URL hash requests it
       if (window.location.hash === '#users') {
@@ -327,6 +371,28 @@ function settingsPageApp() {
       } finally {
         this.saving = false;
         setTimeout(() => { this.statusText = ''; }, 1600);
+      }
+    },
+
+    async saveAuditLogFormat() {
+      this.auditLogSaving = true;
+      this.auditLogStatus = 'Menyimpan…';
+      try {
+        const r = await fetch('/api/settings/audit-log-format', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ format: this.auditLogFormat }),
+        });
+        const t = await r.text();
+        let j = {};
+        try { j = JSON.parse(t); } catch (_) {}
+        if (!r.ok) throw new Error(j.error || t || 'Gagal simpan');
+        this.auditLogStatus = 'Tersimpan. Nginx di-reload; event baru memakai format ini.';
+      } catch (e) {
+        this.auditLogStatus = e.message || 'Gagal';
+      } finally {
+        this.auditLogSaving = false;
+        setTimeout(() => { if (this.auditLogStatus.startsWith('Tersimpan')) this.auditLogStatus = ''; }, 5000);
       }
     },
 

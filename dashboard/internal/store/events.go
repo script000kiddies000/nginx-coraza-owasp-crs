@@ -18,7 +18,7 @@ func AppendSecurityEvent(db *bolt.DB, ev models.SecurityEvent) error {
 		return err
 	}
 	list = append([]models.SecurityEvent{ev}, list...)
-	const maxRecentSecurityEvents = 500
+	const maxRecentSecurityEvents = 2000
 	if len(list) > maxRecentSecurityEvents {
 		list = list[:maxRecentSecurityEvents]
 	}

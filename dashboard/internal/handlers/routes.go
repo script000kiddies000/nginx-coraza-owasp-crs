@@ -71,6 +71,7 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	mux.HandleFunc("GET /api/dashboard/rps", app.RequireAuth(app.APIDashboardRPS))
 	mux.HandleFunc("GET /api/traffic", app.RequireAuth(app.APITraffic))
 	mux.HandleFunc("GET /api/security-events", app.RequireAuth(app.APISecurityEvents))
+	mux.HandleFunc("GET /api/security-events/groups", app.RequireAuth(app.APISecurityEventGroups))
 	mux.HandleFunc("GET /api/attack-report", app.RequireAuth(app.APIAttackReport))
 	mux.HandleFunc("GET /api/logs/access", app.RequireAuth(app.APIGetAccessLogs))
 	mux.HandleFunc("GET /api/logs/events", app.RequireAuth(app.APIGetEventLogs))
@@ -140,6 +141,8 @@ func NewRouter(db *bolt.DB) (http.Handler, error) {
 	// Real IP Settings
 	mux.HandleFunc("GET /api/realip/settings", app.RequireAuth(app.APIGetRealIPSettings))
 	mux.HandleFunc("POST /api/realip/settings", app.RequireAuth(app.APIPostRealIPSettings))
+	mux.HandleFunc("GET /api/settings/audit-log-format", app.RequireAuth(app.APIGetAuditLogFormat))
+	mux.HandleFunc("POST /api/settings/audit-log-format", app.RequireAuth(app.APIPostAuditLogFormat))
 
 	mux.HandleFunc("GET /api/reports/security/download", app.RequireAuth(app.APIDownloadSecurityReport))
 	mux.HandleFunc("GET /api/reports/attack/download", app.RequireAuth(app.APIDownloadAttackReport))

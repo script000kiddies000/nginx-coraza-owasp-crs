@@ -13,8 +13,9 @@ const (
 	keyJA3      = "ja3"
 	keyDLP      = "dlp"
 	keyThreatIntel = "threat_intel"
-	keyRealIP   = "realip"
-	keyACME        = "acme_account"
+	keyRealIP        = "realip"
+	keyACME          = "acme_account"
+	keyAuditLogFormat = "audit_log_format"
 )
 
 // ── WAF Settings ──────────────────────────────────────────────────────────────
@@ -284,6 +285,37 @@ func SaveRealIPConfig(db *bolt.DB, c models.RealIPConfig) error {
 	}
 	c.TrustedProxies = cleaned
 	return put(db, BucketSettings, keyRealIP, c)
+}
+
+// ── Coraza audit log format (flux_audit_log_format.conf) ─────────────────────
+
+func defaultAuditLogFormatConfig() models.AuditLogFormatConfig {
+	return models.AuditLogFormatConfig{Format: "json"}
+}
+
+// GetAuditLogFormatConfig returns persisted format; default json.
+func GetAuditLogFormatConfig(db *bolt.DB) models.AuditLogFormatConfig {
+	var c models.AuditLogFormatConfig
+	err := get(db, BucketSettings, keyAuditLogFormat, &c)
+	if err == ErrNotFound {
+		c = defaultAuditLogFormatConfig()
+		_ = put(db, BucketSettings, keyAuditLogFormat, c)
+		return c
+	}
+	if err != nil {
+		return defaultAuditLogFormatConfig()
+	}
+	if c.Format != "native" && c.Format != "json" {
+		c.Format = "json"
+	}
+	return c
+}
+
+func SaveAuditLogFormatConfig(db *bolt.DB, c models.AuditLogFormatConfig) error {
+	if c.Format != "native" {
+		c.Format = "json"
+	}
+	return put(db, BucketSettings, keyAuditLogFormat, c)
 }
 
 // ── ACME (Let's Encrypt account key) ─────────────────────────────────────────

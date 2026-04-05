@@ -104,6 +104,11 @@ type RealIPConfig struct {
 	TrustedProxies []string `json:"trusted_proxies"`
 }
 
+// AuditLogFormatConfig controls SecAuditLogFormat for coraza_audit.log (Security Events UI).
+type AuditLogFormatConfig struct {
+	Format string `json:"format"` // "json" | "native"
+}
+
 // TLSCertificate — managed TLS cert (Let's Encrypt or custom PEM), stored in BoltDB; files under ssl_certs.
 type TLSCertificate struct {
 	ID        string `json:"id"`
@@ -358,8 +363,10 @@ type PageData struct {
 type SecurityEvent struct {
 	Time     string `json:"time"`
 	ClientIP string `json:"client_ip"`
+	Host     string `json:"host,omitempty"` // Host header / hostname aplikasi (jika ada di audit)
 	RuleID   string `json:"rule_id"`
 	Message  string `json:"message"`
 	Action   string `json:"action"`
 	URI      string `json:"uri"`
+	Severity string `json:"severity,omitempty"` // dari audit JSON atau diisi worker; kosong = infer di API
 }

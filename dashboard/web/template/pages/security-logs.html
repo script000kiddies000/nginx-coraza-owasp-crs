@@ -1,80 +1,285 @@
 {{define "content"}}
-<div x-data="securityLogsApp()" x-init="load()">
+<div x-data="securityLogsPage()" x-init="init()">
 
-  <div class="flex items-center justify-between mb-6 gap-4 flex-wrap">
-    <p class="text-gray-400 text-sm max-w-2xl">
-      Ringkasan event dari <span class="font-mono text-gray-500">coraza_audit.log</span> (Serial / JSON). Data disimpan di dashboard untuk tampilan cepat.
+  <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
+    <div class="flex gap-1 border-b border-gray-800">
+      <button type="button"
+              @click="tab = 'events'; history.replaceState(null, '', '#events'); $nextTick(() => window.lucide && lucide.createIcons())"
+              class="px-4 py-2.5 text-sm font-semibold tracking-wide transition-colors border-b-2 -mb-px"
+              :class="tab === 'events' ? 'text-emerald-400 border-emerald-400' : 'text-gray-500 border-transparent hover:text-gray-300'">
+        <span class="inline-flex items-center gap-2">
+          <i data-lucide="layers" class="w-4 h-4"></i>
+          EVENTS
+        </span>
+      </button>
+      <button type="button"
+              @click="tab = 'logs'; history.replaceState(null, '', '#logs'); $nextTick(() => window.lucide && lucide.createIcons())"
+              class="px-4 py-2.5 text-sm font-semibold tracking-wide transition-colors border-b-2 -mb-px"
+              :class="tab === 'logs' ? 'text-emerald-400 border-emerald-400' : 'text-gray-500 border-transparent hover:text-gray-300'">
+        <span class="inline-flex items-center gap-2">
+          <i data-lucide="scroll-text" class="w-4 h-4"></i>
+          LOGS
+        </span>
+      </button>
+    </div>
+    <p class="text-gray-500 text-sm max-w-xl" x-show="tab === 'events'" x-cloak>
+      Ringkasan per IP penyerang dan domain tujuan. Badge merah / kuning = jumlah event menurut tingkat severity.
     </p>
-    <button type="button" @click="load()"
-            class="flex items-center gap-2 text-sm font-medium text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/10 px-3 py-2 rounded-lg transition-colors">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-        <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.925 4.5A5.5 5.5 0 0 1 5.5 4.25a5.5 5.5 0 0 1 4.607 2.5h-1.334A4.25 4.25 0 0 0 5.5 5.75c-2.35 0-4.25 1.9-4.25 4.25s1.9 4.25 4.25 4.25 4.25-1.9 4.25-4.25a4.23 4.23 0 0 0-.408-1.812h1.47a5.502 5.502 0 0 1-4.377 8.562 5.5 5.5 0 0 1 8.562-4.377v1.47c.64-.993 1.008-2.17 1.008-3.437a5.5 5.5 0 0 0-1.188-3.437h1.334Z" clip-rule="evenodd"/>
-      </svg>
-      Refresh
-    </button>
+    <p class="text-gray-500 text-sm max-w-xl" x-show="tab === 'logs'" x-cloak>
+      Daftar lengkap dari <span class="font-mono text-gray-600">coraza_audit.log</span> (Serial / JSON).
+    </p>
   </div>
 
-  <template x-if="loading">
-    <div class="flex items-center justify-center py-20 text-gray-600 text-sm">
-      <svg class="animate-spin w-6 h-6 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"></path>
-      </svg>
-      Loading events…
+  <!-- ── Events tab ───────────────────────────────────────── -->
+  <div x-show="tab === 'events'" x-cloak class="space-y-4">
+    <div class="flex flex-wrap items-end gap-3 p-4 rounded-xl border border-gray-800 bg-gray-900/40">
+      <label class="flex flex-col gap-1 text-xs text-gray-500">
+        <span class="uppercase tracking-wide">IP</span>
+        <input type="text" x-model="filters.ip" placeholder="192.168…"
+               class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 w-40 focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/40">
+      </label>
+      <label class="flex flex-col gap-1 text-xs text-gray-500">
+        <span class="uppercase tracking-wide">Domain</span>
+        <input type="text" x-model="filters.domain" placeholder="example.com"
+               class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 w-44 focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/40">
+      </label>
+      <label class="flex flex-col gap-1 text-xs text-gray-500">
+        <span class="uppercase tracking-wide">Port</span>
+        <input type="text" x-model="filters.port" placeholder="443"
+               class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 w-20 focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/40">
+      </label>
+      <label class="flex flex-col gap-1 text-xs text-gray-500">
+        <span class="inline-flex items-center gap-1 uppercase tracking-wide"><i data-lucide="calendar" class="w-3.5 h-3.5"></i> Mulai</span>
+        <input type="datetime-local" x-model="filters.start"
+               class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/40">
+      </label>
+      <label class="flex flex-col gap-1 text-xs text-gray-500">
+        <span class="inline-flex items-center gap-1 uppercase tracking-wide"><i data-lucide="calendar-days" class="w-3.5 h-3.5"></i> Akhir</span>
+        <input type="datetime-local" x-model="filters.end"
+               class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/40">
+      </label>
+      <button type="button" @click="loadGroups()"
+              class="inline-flex items-center gap-2 text-sm font-medium text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/10 px-4 py-2 rounded-lg transition-colors ml-auto">
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        Refresh
+      </button>
     </div>
-  </template>
 
-  <template x-if="!loading && error">
-    <div class="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-200 text-sm px-4 py-3" x-text="error"></div>
-  </template>
+    <template x-if="gLoading">
+      <div class="flex items-center justify-center py-20 text-gray-600 text-sm">
+        <i data-lucide="loader-2" class="w-6 h-6 mr-3 animate-spin"></i>
+        Memuat agregasi…
+      </div>
+    </template>
 
-  <template x-if="!loading && !error && events.length === 0">
-    <div class="rounded-xl border border-gray-800 bg-gray-900/50 text-gray-500 text-sm px-6 py-12 text-center">
-      Belum ada event tercatat. Trigger request yang diintervensi WAF atau tunggu worker membaca log audit.
-    </div>
-  </template>
+    <template x-if="!gLoading && gError">
+      <div class="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-200 text-sm px-4 py-3" x-text="gError"></div>
+    </template>
 
-  <template x-if="!loading && !error && events.length > 0">
-    <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden overflow-x-auto">
-      <table class="w-full text-sm min-w-[720px]">
-        <thead class="border-b border-gray-800">
-          <tr class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            <th class="text-left px-4 py-3">Time</th>
-            <th class="text-left px-4 py-3">Client</th>
-            <th class="text-left px-4 py-3">Rule</th>
-            <th class="text-left px-4 py-3">Action</th>
-            <th class="text-left px-4 py-3">Message / URI</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-800">
-          <template x-for="(ev, idx) in events" :key="idx">
-            <tr class="hover:bg-gray-800/40 align-top">
-              <td class="px-4 py-3 text-gray-500 font-mono text-xs whitespace-nowrap" x-text="ev.time || '—'"></td>
-              <td class="px-4 py-3 text-gray-300 font-mono text-xs" x-text="ev.client_ip || '—'"></td>
-              <td class="px-4 py-3 text-amber-400/90 font-mono text-xs" x-text="ev.rule_id || '—'"></td>
-              <td class="px-4 py-3">
-                <span class="text-xs font-medium px-2 py-0.5 rounded border"
-                      :class="ev.action === 'blocked' ? 'text-rose-300 border-rose-500/30 bg-rose-500/10' : 'text-gray-400 border-gray-700 bg-gray-800'"
-                      x-text="ev.action || '—'"></span>
-              </td>
-              <td class="px-4 py-3 text-gray-400 text-xs max-w-md">
-                <p class="text-gray-300" x-text="ev.message || '—'"></p>
-                <p class="font-mono text-gray-600 truncate mt-1" x-text="ev.uri || ''" x-show="ev.uri"></p>
-              </td>
+    <template x-if="!gLoading && !gError && groups.length === 0">
+      <div class="rounded-xl border border-gray-800 bg-gray-900/50 text-gray-500 text-sm px-6 py-12 text-center">
+        Tidak ada kelompok event untuk filter ini. Sesuaikan rentang waktu atau tunggu traffic WAF.
+      </div>
+    </template>
+
+    <template x-if="!gLoading && !gError && groups.length > 0">
+      <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden overflow-x-auto">
+        <table class="w-full text-sm min-w-[880px]">
+          <thead class="border-b border-gray-800 bg-gray-950/50">
+            <tr class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <th class="text-left px-4 py-3">IP Addr</th>
+              <th class="text-left px-4 py-3">
+                <span class="inline-flex items-center gap-1.5"><i data-lucide="globe-2" class="w-3.5 h-3.5 opacity-70"></i> Domain</span>
+              </th>
+              <th class="text-left px-4 py-3">Attack count</th>
+              <th class="text-left px-4 py-3">Duration</th>
+              <th class="text-left px-4 py-3">Start At</th>
             </tr>
-          </template>
-        </tbody>
-      </table>
+          </thead>
+          <tbody class="divide-y divide-gray-800">
+            <template x-for="(row, idx) in groups" :key="idx">
+              <tr class="hover:bg-gray-800/40 align-top">
+                <td class="px-4 py-3">
+                  <div class="font-mono text-sm font-semibold text-gray-100" x-text="row.client_ip"></div>
+                  <div class="text-xs text-gray-500 mt-0.5" x-text="row.country || '—'"></div>
+                </td>
+                <td class="px-4 py-3 font-mono text-xs text-sky-200/90 break-all max-w-xs" :title="row.application" x-text="row.application"></td>
+                <td class="px-4 py-3">
+                  <div class="flex flex-wrap gap-1.5 items-center">
+                    <span title="Severity tinggi"
+                          x-show="row.count_high > 0"
+                          class="inline-flex items-center justify-center min-w-[1.75rem] px-2 py-0.5 rounded-md text-xs font-semibold border bg-rose-500/15 text-rose-200 border-rose-500/40"
+                          x-text="row.count_high"></span>
+                    <span title="Severity sedang"
+                          x-show="row.count_medium > 0"
+                          class="inline-flex items-center justify-center min-w-[1.75rem] px-2 py-0.5 rounded-md text-xs font-semibold border bg-amber-500/15 text-amber-200 border-amber-500/40"
+                          x-text="row.count_medium"></span>
+                    <span title="Severity rendah"
+                          x-show="row.count_low > 0"
+                          class="inline-flex items-center justify-center min-w-[1.75rem] px-2 py-0.5 rounded-md text-xs font-semibold border bg-slate-600/30 text-slate-300 border-slate-500/35"
+                          x-text="row.count_low"></span>
+                    <span x-show="!row.count_high && !row.count_medium && !row.count_low" class="text-gray-600">—</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-gray-400 whitespace-nowrap" x-text="formatDuration(row.duration_minutes)"></td>
+                <td class="px-4 py-3 text-gray-400">
+                  <div x-show="row.start_at">
+                    <div class="text-xs font-mono" x-text="formatDatePart(row.start_at)"></div>
+                    <div class="text-xs font-mono text-gray-500" x-text="formatTimePart(row.start_at)"></div>
+                  </div>
+                  <span x-show="!row.start_at">—</span>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </template>
+
+    <div class="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-500" x-show="!gLoading && gTotal > 0" x-cloak>
+      <div class="flex items-center gap-2">
+        <span>Per halaman</span>
+        <select x-model.number="gPerPage" @change="gPage = 1; loadGroups()"
+                class="bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-gray-200 text-sm">
+          <option value="10">10</option>
+          <option value="20">20</option>
+          <option value="50">50</option>
+        </select>
+        <span class="text-gray-600">· total <span class="text-gray-400 font-mono" x-text="gTotal"></span></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" @click="gPage = Math.max(1, gPage - 1); loadGroups()"
+                :disabled="gPage <= 1"
+                class="p-2 rounded-lg border border-gray-700 hover:bg-gray-800 disabled:opacity-40 disabled:pointer-events-none">
+          <i data-lucide="chevron-left" class="w-4 h-4"></i>
+        </button>
+        <span class="font-mono text-gray-400">Hal <span x-text="gPage"></span> / <span x-text="gTotalPages"></span></span>
+        <button type="button" @click="gPage = Math.min(gTotalPages, gPage + 1); loadGroups()"
+                :disabled="gPage >= gTotalPages"
+                class="p-2 rounded-lg border border-gray-700 hover:bg-gray-800 disabled:opacity-40 disabled:pointer-events-none">
+          <i data-lucide="chevron-right" class="w-4 h-4"></i>
+        </button>
+      </div>
     </div>
-  </template>
+  </div>
+
+  <!-- ── Logs tab (existing list) ─────────────────────────── -->
+  <div x-show="tab === 'logs'" x-cloak class="space-y-4">
+    <div class="flex items-center justify-between mb-2 gap-4 flex-wrap">
+      <p class="text-gray-400 text-sm max-w-2xl">
+        Data disimpan di dashboard untuk tampilan cepat.
+      </p>
+      <button type="button" @click="load()"
+              class="flex items-center gap-2 text-sm font-medium text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/10 px-3 py-2 rounded-lg transition-colors">
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        Refresh
+      </button>
+    </div>
+
+    <template x-if="loading">
+      <div class="flex items-center justify-center py-20 text-gray-600 text-sm">
+        <i data-lucide="loader-2" class="w-6 h-6 mr-3 animate-spin"></i>
+        Loading events…
+      </div>
+    </template>
+
+    <template x-if="!loading && error">
+      <div class="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-200 text-sm px-4 py-3" x-text="error"></div>
+    </template>
+
+    <template x-if="!loading && !error && events.length === 0">
+      <div class="rounded-xl border border-gray-800 bg-gray-900/50 text-gray-500 text-sm px-6 py-12 text-center">
+        Belum ada event tercatat. Trigger request yang diintervensi WAF atau tunggu worker membaca log audit.
+      </div>
+    </template>
+
+    <template x-if="!loading && !error && events.length > 0">
+      <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden overflow-x-auto">
+        <table class="w-full text-sm min-w-[820px]">
+          <thead class="border-b border-gray-800">
+            <tr class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <th class="text-left px-4 py-3">Time</th>
+              <th class="text-left px-4 py-3">Client</th>
+              <th class="text-left px-4 py-3">
+                <span class="inline-flex items-center gap-1.5"><i data-lucide="globe" class="w-3.5 h-3.5 opacity-70"></i> Host</span>
+              </th>
+              <th class="text-left px-4 py-3">Rule</th>
+              <th class="text-left px-4 py-3">Action</th>
+              <th class="text-left px-4 py-3">Message / URI</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-800">
+            <template x-for="(ev, idx) in events" :key="idx">
+              <tr class="hover:bg-gray-800/40 align-top">
+                <td class="px-4 py-3 text-gray-500 font-mono text-xs whitespace-nowrap" x-text="ev.time || '—'"></td>
+                <td class="px-4 py-3 text-gray-300 font-mono text-xs" x-text="ev.client_ip || '—'"></td>
+                <td class="px-4 py-3 text-sky-300/90 font-mono text-xs max-w-[14rem] truncate" :title="ev.host || ''" x-text="ev.host || '—'"></td>
+                <td class="px-4 py-3 text-amber-400/90 font-mono text-xs" x-text="ev.rule_id || '—'"></td>
+                <td class="px-4 py-3">
+                  <span class="text-xs font-medium px-2 py-0.5 rounded border"
+                        :class="ev.action === 'blocked' ? 'text-rose-300 border-rose-500/30 bg-rose-500/10' : 'text-gray-400 border-gray-700 bg-gray-800'"
+                        x-text="ev.action || '—'"></span>
+                </td>
+                <td class="px-4 py-3 text-gray-400 text-xs max-w-md">
+                  <p class="text-gray-300" x-text="ev.message || '—'"></p>
+                  <p class="font-mono text-gray-600 truncate mt-1" x-text="ev.uri || ''" x-show="ev.uri"></p>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </template>
+  </div>
 </div>
 
 <script>
-function securityLogsApp() {
+function securityLogsPage() {
   return {
+    tab: 'events',
     loading: true,
     error: '',
     events: [],
+    gLoading: true,
+    gError: '',
+    groups: [],
+    gTotal: 0,
+    gPage: 1,
+    gTotalPages: 1,
+    gPerPage: 20,
+    filters: { ip: '', domain: '', port: '', start: '', end: '' },
+
+    init() {
+      const h = (window.location.hash || '').toLowerCase();
+      if (h === '#logs') this.tab = 'logs';
+      else if (h === '#events') this.tab = 'events';
+      this.load();
+      this.loadGroups();
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+
+    formatDuration(min) {
+      const n = Number(min);
+      if (Number.isNaN(n) || n < 0) return '—';
+      if (n === 0) return '0 menit';
+      if (n === 1) return '1 menit';
+      return n + ' menit';
+    },
+
+    formatDatePart(iso) {
+      try {
+        const d = new Date(iso);
+        return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' });
+      } catch (_) { return iso; }
+    },
+
+    formatTimePart(iso) {
+      try {
+        const d = new Date(iso);
+        return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      } catch (_) { return ''; }
+    },
+
     async load() {
       this.loading = true;
       this.error = '';
@@ -87,6 +292,45 @@ function securityLogsApp() {
         this.events = [];
       } finally {
         this.loading = false;
+        this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+      }
+    },
+
+    buildGroupQuery() {
+      const p = new URLSearchParams();
+      p.set('page', String(this.gPage));
+      p.set('per_page', String(this.gPerPage));
+      if (this.filters.ip) p.set('ip', this.filters.ip);
+      if (this.filters.domain) p.set('domain', this.filters.domain);
+      if (this.filters.port) p.set('port', this.filters.port);
+      if (this.filters.start) {
+        const t = new Date(this.filters.start);
+        if (!Number.isNaN(t.getTime())) p.set('start', t.toISOString());
+      }
+      if (this.filters.end) {
+        const t = new Date(this.filters.end);
+        if (!Number.isNaN(t.getTime())) p.set('end', t.toISOString());
+      }
+      return p.toString();
+    },
+
+    async loadGroups() {
+      this.gLoading = true;
+      this.gError = '';
+      try {
+        const r = await fetch('/api/security-events/groups?' + this.buildGroupQuery());
+        if (!r.ok) throw new Error(await r.text() || r.statusText);
+        const data = await r.json();
+        this.groups = data.rows || [];
+        this.gTotal = data.total || 0;
+        this.gPage = data.page || 1;
+        this.gTotalPages = data.total_pages || 1;
+      } catch (e) {
+        this.gError = e.message || String(e);
+        this.groups = [];
+      } finally {
+        this.gLoading = false;
+        this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
       }
     }
   };

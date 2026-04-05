@@ -14,6 +14,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 
 	"flux-waf/internal/models"
+	"flux-waf/internal/nginx"
 	"flux-waf/internal/store"
 	"flux-waf/web"
 )
@@ -38,6 +39,9 @@ func NewApp(db *bolt.DB) (*App, error) {
 	assetVersion := os.Getenv("FLUX_ASSET_VERSION")
 	if assetVersion == "" {
 		assetVersion = strconv.FormatInt(time.Now().Unix(), 36)
+	}
+	if err := nginx.WriteAuditLogFormat(store.GetAuditLogFormatConfig(db).Format); err != nil {
+		log.Printf("[app] audit log format conf: %v", err)
 	}
 	return &App{DB: db, base: base, assetVersion: assetVersion}, nil
 }
