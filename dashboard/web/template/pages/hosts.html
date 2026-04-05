@@ -156,7 +156,6 @@
                 <template x-for="b in [
                   {k:'virtual_patching', t:'VP'},
                   {k:'bot_threshold', t:'BOT'},
-                  {k:'real_ip', t:'RI'},
                   {k:'geoip', t:'GEO'},
                   {k:'dlp', t:'DLP'},
                   {k:'wordpress_security', t:'WP'},
@@ -388,7 +387,7 @@
           </div>
         </template>
 
-        <!-- ── Static Files: manual path vs dashboard editor ── -->
+        <!-- ── Static Files (dashboard: root otomatis + editor index.html) ── -->
         <template x-if="form.mode === 'static'">
           <div class="rounded-xl border border-gray-800 bg-gray-950/25 p-4 space-y-4">
             <div class="flex items-center gap-2">
@@ -397,99 +396,73 @@
               </span>
               <div>
                 <p class="text-xs font-medium text-gray-300">Static site</p>
-                <p class="text-[11px] text-gray-500 mt-0.5">Pilih sumber root, lalu simpan host. Editor HTML hanya untuk mode <span class="text-gray-400 font-semibold">Dashboard</span>.</p>
+                <p class="text-[11px] text-gray-500 mt-0.5">Nginx memakai path di bawah. Sunting <span class="font-mono text-gray-400">index.html</span> di sini setelah host tersimpan di sistem.</p>
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-2">
-              <button type="button" @click="setStaticSource('manual')"
-                :class="(form.static_source || 'manual') === 'manual'
-                  ? 'border-emerald-500 bg-emerald-500/10 text-white'
-                  : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'"
-                class="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors">
-                <i data-lucide="folder" class="w-4 h-4 text-sky-400 shrink-0 pointer-events-none"></i>
-                <span class="text-xs font-semibold">Path manual</span>
-              </button>
-              <button type="button" @click="setStaticSource('dashboard')"
-                :class="form.static_source === 'dashboard'
-                  ? 'border-emerald-500 bg-emerald-500/10 text-white'
-                  : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'"
-                class="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors">
-                <i data-lucide="file-code" class="w-4 h-4 text-violet-400 shrink-0 pointer-events-none"></i>
-                <span class="text-xs font-semibold">Dari dashboard</span>
-              </button>
-            </div>
+            <div class="space-y-3">
+              <div class="rounded-lg border border-gray-700 bg-gray-900/50 px-3 py-2 flex items-start gap-2">
+                <i data-lucide="folder-tree" class="w-4 h-4 text-emerald-400/90 shrink-0 mt-0.5 pointer-events-none"></i>
+                <div class="min-w-0">
+                  <p class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Document root</p>
+                  <p class="text-xs font-mono text-emerald-200/90 break-all" x-text="dashboardStaticRoot()"></p>
+                  <p class="text-[11px] text-gray-500 mt-1">Berkas yang dilayani: <span class="font-mono">index.html</span> di path ini.</p>
+                </div>
+              </div>
 
-            <template x-if="(form.static_source || 'manual') === 'manual'">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mr-1">Template</span>
+                <button type="button" @click="applyStaticTemplate('minimal')"
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-800/70 text-[11px] font-medium text-gray-300 hover:border-emerald-500/40 hover:text-white transition-colors">
+                  <i data-lucide="file-plus" class="w-3.5 h-3.5 pointer-events-none"></i> Minimal
+                </button>
+                <button type="button" @click="applyStaticTemplate('maintenance')"
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-800/70 text-[11px] font-medium text-gray-300 hover:border-amber-500/40 hover:text-white transition-colors">
+                  <i data-lucide="wrench" class="w-3.5 h-3.5 pointer-events-none"></i> Maintenance
+                </button>
+                <button type="button" @click="applyStaticTemplate('landing')"
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-800/70 text-[11px] font-medium text-gray-300 hover:border-sky-500/40 hover:text-white transition-colors">
+                  <i data-lucide="layout-template" class="w-3.5 h-3.5 pointer-events-none"></i> Landing
+                </button>
+                <button type="button" @click="loadStaticPage()"
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-800/70 text-[11px] font-medium text-gray-300 hover:border-cyan-500/40 hover:text-white transition-colors">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5 pointer-events-none"></i> Muat ulang
+                </button>
+              </div>
+
               <div>
-                <label class="block text-xs font-medium text-gray-400 mb-1.5">Document root <span class="text-rose-400">*</span></label>
-                <input x-model="form.static_root" type="text" placeholder="/var/www/html/example.com"
-                  class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3.5 py-2.5
-                    placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors font-mono">
-                <p class="text-[11px] text-gray-500 mt-1.5 flex items-start gap-1.5">
-                  <i data-lucide="info" class="w-3.5 h-3.5 text-gray-600 shrink-0 mt-0.5 pointer-events-none"></i>
-                  File diserving oleh Nginx dari path ini (mis. isi <span class="font-mono">index.html</span> lewat SSH/rsync).
-                </p>
+                <label class="block text-xs font-medium text-gray-400 mb-1.5">Editor HTML</label>
+                <textarea x-model="form.static_page_html" rows="14" spellcheck="false"
+                  class="w-full bg-gray-900 border border-gray-700 text-gray-100 text-xs rounded-lg px-3 py-2.5 font-mono leading-relaxed
+                    focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60 resize-y min-h-[200px]"
+                  placeholder="&lt;!DOCTYPE html&gt;…"></textarea>
               </div>
-            </template>
 
-            <template x-if="form.static_source === 'dashboard'">
-              <div class="space-y-3">
-                <div class="rounded-lg border border-gray-700 bg-gray-900/50 px-3 py-2 flex items-start gap-2">
-                  <i data-lucide="folder-tree" class="w-4 h-4 text-emerald-400/90 shrink-0 mt-0.5 pointer-events-none"></i>
-                  <div class="min-w-0">
-                    <p class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Root otomatis</p>
-                    <p class="text-xs font-mono text-emerald-200/90 break-all" x-text="dashboardStaticRoot()"></p>
-                    <p class="text-[11px] text-gray-500 mt-1">File halaman: <span class="font-mono">index.html</span> di bawah path di atas.</p>
-                  </div>
-                </div>
+              <p x-show="form.static_page_error" x-cloak class="text-[11px] text-rose-400" x-text="form.static_page_error"></p>
+              <p x-show="form.static_page_msg" x-cloak class="text-[11px] text-emerald-400/90" x-text="form.static_page_msg"></p>
+              <p x-show="form.static_legacy_manual && isEdit" x-cloak class="text-[11px] text-amber-400/90 flex items-start gap-1.5">
+                <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0 mt-0.5 pointer-events-none"></i>
+                Host ini masih memakai document root manual di penyimpanan. Klik «Save Changes» sekali untuk mengalihkan ke path dashboard, lalu «Simpan index.html» akan berfungsi.
+              </p>
 
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mr-1">Template</span>
-                  <button type="button" @click="applyStaticTemplate('minimal')"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-800/70 text-[11px] font-medium text-gray-300 hover:border-emerald-500/40 hover:text-white transition-colors">
-                    <i data-lucide="file-plus" class="w-3.5 h-3.5 pointer-events-none"></i> Minimal
-                  </button>
-                  <button type="button" @click="applyStaticTemplate('maintenance')"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-800/70 text-[11px] font-medium text-gray-300 hover:border-amber-500/40 hover:text-white transition-colors">
-                    <i data-lucide="wrench" class="w-3.5 h-3.5 pointer-events-none"></i> Maintenance
-                  </button>
-                  <button type="button" @click="applyStaticTemplate('landing')"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-800/70 text-[11px] font-medium text-gray-300 hover:border-sky-500/40 hover:text-white transition-colors">
-                    <i data-lucide="layout-template" class="w-3.5 h-3.5 pointer-events-none"></i> Landing
-                  </button>
-                  <button type="button" @click="loadStaticPage()"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-800/70 text-[11px] font-medium text-gray-300 hover:border-cyan-500/40 hover:text-white transition-colors">
-                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 pointer-events-none"></i> Muat ulang
-                  </button>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-medium text-gray-400 mb-1.5">Editor HTML</label>
-                  <textarea x-model="form.static_page_html" rows="14" spellcheck="false"
-                    class="w-full bg-gray-900 border border-gray-700 text-gray-100 text-xs rounded-lg px-3 py-2.5 font-mono leading-relaxed
-                      focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60 resize-y min-h-[200px]"
-                    placeholder="&lt;!DOCTYPE html&gt;…"></textarea>
-                </div>
-
-                <p x-show="form.static_page_error" x-cloak class="text-[11px] text-rose-400" x-text="form.static_page_error"></p>
-                <p x-show="form.static_page_msg" x-cloak class="text-[11px] text-emerald-400/90" x-text="form.static_page_msg"></p>
-
-                <div class="flex flex-wrap justify-end gap-2">
-                  <button type="button" @click="saveStaticPage()"
-                    :disabled="form.static_page_saving || !(form.domain || '').trim()"
-                    :class="(form.static_page_saving || !(form.domain || '').trim()) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-500'"
-                    class="inline-flex items-center gap-2 bg-emerald-600 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
-                    <i data-lucide="save" class="w-3.5 h-3.5 pointer-events-none"></i>
-                    <span x-text="form.static_page_saving ? 'Menyimpan…' : 'Simpan index.html'"></span>
-                  </button>
-                </div>
-                <p class="text-[11px] text-gray-500 flex items-start gap-1.5">
-                  <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-amber-500/80 shrink-0 mt-0.5 pointer-events-none"></i>
-                  Simpan host terlebih dahulu (tombol di bawah) agar domain ada di sistem; baru «Simpan index.html» bisa ditulis ke disk.
-                </p>
+              <div class="flex flex-wrap justify-end gap-2">
+                <button type="button" @click="saveStaticPage()"
+                  :disabled="form.static_page_saving || !(form.domain || '').trim()"
+                  :class="(form.static_page_saving || !(form.domain || '').trim()) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-500'"
+                  class="inline-flex items-center gap-2 bg-emerald-600 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
+                  <i data-lucide="save" class="w-3.5 h-3.5 pointer-events-none"></i>
+                  <span x-text="form.static_page_saving ? 'Menyimpan…' : 'Simpan index.html'"></span>
+                </button>
               </div>
-            </template>
+              <p class="text-[11px] text-gray-500 flex items-start gap-1.5" x-show="!isEdit">
+                <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-amber-500/80 shrink-0 mt-0.5 pointer-events-none"></i>
+                Host baru: simpan dulu dengan tombol «Add Application» di bawah — modal tetap terbuka, lalu «Simpan index.html» menulis ke disk.
+              </p>
+              <p class="text-[11px] text-emerald-500/80 flex items-start gap-1.5" x-show="isEdit" x-cloak>
+                <i data-lucide="check" class="w-3.5 h-3.5 shrink-0 mt-0.5 pointer-events-none"></i>
+                Host sudah tersimpan; Anda bisa menyimpan <span class="font-mono">index.html</span> kapan saja.
+              </p>
+            </div>
           </div>
         </template>
 
@@ -609,12 +582,14 @@
 
                 <div>
                   <label class="block text-xs font-medium text-gray-400 mb-1">
-                    Trusted proxies (CIDR/IP, comma separated)
-                    <span class="text-gray-500 font-normal">(optional)</span>
+                    trusted_proxies <span class="text-gray-600 font-normal">(set_real_ip_from)</span>
                   </label>
                   <input x-model="form.security_overrides.real_ip.custom.trusted_proxies"
-                    type="text" placeholder="127.0.0.1,::1"
+                    type="text" placeholder="127.0.0.1, ::1, 192.168.0.10"
                     class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 font-mono" />
+                  <p class="text-[10px] text-gray-600 mt-1 leading-snug">
+                    Wajib diisi jika pakai header di atas: IP subnet <em>sumber koneksi ke nginx</em> (mis. mesin cloudflared), bukan IP pengunjung. Kosong = pakai pengaturan global Settings.
+                  </p>
                 </div>
               </div>
             </template>
@@ -1080,654 +1055,5 @@
 
 </div>
 
-<script>
-  function hostsApp() {
-    return {
-      hosts: [],
-      tlsCerts: [],
-      assetVersion: '',
-      loading: true,
-      showModal: false,
-      modalTab: 'general',
-      isEdit: false,
-      saving: false,
-      error: '',
-      form: {},
-
-      // Delete modal state
-      showDeleteModal: false,
-      deleteTarget: '',
-      deleteError: '',
-      deleting: false,
-
-      // Detail modal state
-      showDetailModal: false,
-      detailHost: {},
-      modalTabs: [
-        { id: 'general', label: 'General' },
-        { id: 'tls_realip', label: 'Advanced' },
-        { id: 'virtual_patching', label: 'Virtual Patching' },
-        { id: 'bot_threshold', label: 'Bot Threshold' },
-        { id: 'geoip', label: 'GeoIP' },
-        { id: 'dlp', label: 'DLP' },
-        { id: 'wordpress_security', label: 'WordPress' },
-      ],
-      securityModes: [
-        { id: 'inherit', label: 'Inherit Global', activeClass: 'border-sky-500/40 bg-sky-500/10 text-sky-300' },
-        { id: 'override', label: 'Override (Custom)', activeClass: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' },
-        { id: 'disabled', label: 'Disabled', activeClass: 'border-gray-500/40 bg-gray-500/10 text-gray-300' },
-      ],
-
-      /* Template HTML statis: /public/static-templates/{minimal,maintenance,landing}.html (dimuat on-demand) */
-
-      get activeTlsCerts() {
-        return (this.tlsCerts || []).filter(c => (c.status || '').toLowerCase() === 'active');
-      },
-
-      blank() {
-        return {
-          domain: '',
-          original_domain: '',
-          name: '',
-          mode: 'reverse_proxy',
-          listen_ports: [{ port: 80, https: false, _key: 'lp-new-80' }],
-          show_advanced_upstream_tls: false,
-          upstream_servers: [''],
-          lb_algorithm: 'round_robin',
-          static_root: '',
-          redirect_url: '',
-          redirect_code: 301,
-          waf_mode: 'On',
-          ssl_cert_id: '',
-          proxy_ssl_verify_off: false,
-          proxy_ssl_name: '',
-          // Advanced server transport / performance toggles (default off)
-          listen_ipv6: false,
-          redirect_http_to_https: false,
-          hsts_enabled: false,
-          gzip_enabled: false,
-          brotli_enabled: false,
-          enabled: true,
-          security_overrides: {
-            virtual_patching: { mode: 'inherit', custom: { profile: 'balanced', notes: '' } },
-            bot_threshold: { mode: 'inherit', custom: { threshold: 0, login_rpm: 0 } },
-            geoip: { mode: 'inherit', custom: { blocked_countries: '' } },
-            dlp: { mode: 'inherit', custom: { inspect_request_body: true, inspect_response_body: false } },
-            wordpress_security: { mode: 'inherit', custom: { profile: 'balanced', login_path: '/wp-login.php' } },
-            real_ip: { mode: 'inherit', custom: { header: 'X-Forwarded-For', header_custom: '', trusted_proxies: '' } },
-          }
-        };
-      },
-
-      normalizeOverrideMode(v) {
-        const m = String(v || '').trim().toLowerCase();
-        return (m === 'override' || m === 'disabled') ? m : 'inherit';
-      },
-
-      normalizeSecurityOverrides(raw) {
-        const o = raw || {};
-        return {
-          virtual_patching: {
-            mode: this.normalizeOverrideMode(o?.virtual_patching?.mode),
-            custom: (o?.virtual_patching?.custom && typeof o.virtual_patching.custom === 'object') ? o.virtual_patching.custom : { profile: 'balanced', notes: '' }
-          },
-          bot_threshold: {
-            mode: this.normalizeOverrideMode(o?.bot_threshold?.mode),
-            custom: (o?.bot_threshold?.custom && typeof o.bot_threshold.custom === 'object') ? o.bot_threshold.custom : { threshold: 0, login_rpm: 0 }
-          },
-          geoip: {
-            mode: this.normalizeOverrideMode(o?.geoip?.mode),
-            custom: (o?.geoip?.custom && typeof o.geoip.custom === 'object') ? o.geoip.custom : { blocked_countries: '' }
-          },
-          dlp: {
-            mode: this.normalizeOverrideMode(o?.dlp?.mode),
-            custom: (o?.dlp?.custom && typeof o.dlp.custom === 'object') ? o.dlp.custom : { inspect_request_body: true, inspect_response_body: false }
-          },
-          wordpress_security: {
-            mode: this.normalizeOverrideMode(o?.wordpress_security?.mode),
-            custom: (o?.wordpress_security?.custom && typeof o.wordpress_security.custom === 'object') ? o.wordpress_security.custom : { profile: 'balanced', login_path: '/wp-login.php' }
-          },
-          real_ip: {
-            mode: this.normalizeOverrideMode(o?.real_ip?.mode),
-            custom: (o?.real_ip?.custom && typeof o.real_ip.custom === 'object')
-              ? {
-                  header: o.real_ip.custom.header ?? 'X-Forwarded-For',
-                  header_custom: o.real_ip.custom.header_custom ?? '',
-                  trusted_proxies: o.real_ip.custom.trusted_proxies ?? '',
-                }
-              : { header: 'X-Forwarded-For', header_custom: '', trusted_proxies: '' }
-          },
-        };
-      },
-
-      securityModeOf(tabId) {
-        if (tabId === 'virtual_patching') return this.form?.security_overrides?.virtual_patching?.mode || 'inherit';
-        if (tabId === 'bot_threshold') return this.form?.security_overrides?.bot_threshold?.mode || 'inherit';
-        if (tabId === 'geoip') return this.form?.security_overrides?.geoip?.mode || 'inherit';
-        if (tabId === 'dlp') return this.form?.security_overrides?.dlp?.mode || 'inherit';
-        if (tabId === 'wordpress_security') return this.form?.security_overrides?.wordpress_security?.mode || 'inherit';
-        return 'inherit';
-      },
-
-      securityModeLabel(mode) {
-        if (mode === 'override') return 'custom';
-        if (mode === 'disabled') return 'off';
-        return 'inherit';
-      },
-
-      securityBadgeClass(mode) {
-        if (mode === 'override') return 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10';
-        if (mode === 'disabled') return 'border-gray-600 text-gray-400 bg-gray-800/60';
-        return 'border-sky-500/40 text-sky-300 bg-sky-500/10';
-      },
-
-      setSecurityMode(featureKey, mode) {
-        if (!this.form.security_overrides) this.form.security_overrides = this.normalizeSecurityOverrides({});
-        if (!this.form.security_overrides[featureKey]) this.form.security_overrides[featureKey] = { mode: 'inherit' };
-        this.form.security_overrides[featureKey].mode = this.normalizeOverrideMode(mode);
-      },
-
-      hasHttpsPort() {
-        return (this.form.listen_ports || []).some(p => p.https);
-      },
-
-      modeName(mode) {
-        return { reverse_proxy: 'Reverse Proxy', static: 'Static Files', redirect: 'Redirect' }[mode] || mode;
-      },
-
-      // Domain extraction helper (handles legacy host JSON key casing).
-      domainOf(hostLike) {
-        const d = hostLike?.domain ?? hostLike?.Domain ?? hostLike?.id ?? hostLike?.ID ?? '';
-        return (d || '').toString().trim();
-      },
-
-      normalizeListenPorts(maybeArr) {
-        if (!Array.isArray(maybeArr)) return [];
-        const rows = maybeArr
-          .map(p => ({
-            port: Number(p.port ?? p.Port ?? 0),
-            https: !!(p.https ?? p.HTTPS ?? p.ssl ?? p.SSL),
-            _key: p._key ? String(p._key) : '',
-          }))
-          .filter(p => p.port > 0);
-        return rows.map((p, i) => ({
-          port: p.port,
-          https: p.https,
-          _key: p._key || ('lp-' + Date.now() + '-' + i + '-' + Math.random().toString(36).slice(2, 9)),
-        }));
-      },
-
-      // Normalizes possible legacy host fields so Edit/Delete can work.
-      normalizeHost(raw) {
-        const h = raw || {};
-        const listen_ports = this.normalizeListenPorts(h.listen_ports ?? h.ListenPorts ?? h.listenPorts ?? []);
-        const upstreamRaw = h.upstream_servers ?? h.UpstreamServers ?? h.upstreamServers ?? [];
-        const upstream_servers = Array.isArray(upstreamRaw)
-          ? upstreamRaw
-          : (upstreamRaw ? [String(upstreamRaw)] : []);
-
-        const enabledRaw = h.enabled ?? h.Enabled;
-        const enabled = (typeof enabledRaw === 'boolean') ? enabledRaw : !!(enabledRaw ?? true);
-
-        return {
-          ...h,
-          domain: this.domainOf(h),
-          name: h.name ?? h.Name ?? '',
-          enabled,
-          listen_ports: listen_ports.length ? listen_ports : [{ port: 80, https: false, _key: 'lp-def-80' }],
-          mode: h.mode ?? h.Mode ?? 'reverse_proxy',
-          upstream_servers: upstream_servers.length ? upstream_servers : [''],
-          lb_algorithm: h.lb_algorithm ?? h.LBAlgorithm ?? h.lbAlgorithm ?? 'round_robin',
-          static_root: h.static_root ?? h.StaticRoot ?? h.staticRoot ?? '',
-          static_source: (() => {
-            const s = String(h.static_source ?? h.StaticSource ?? '').trim().toLowerCase();
-            return s === 'dashboard' ? 'dashboard' : 'manual';
-          })(),
-          redirect_url: h.redirect_url ?? h.RedirectURL ?? h.redirectUrl ?? '',
-          redirect_code: Number(h.redirect_code ?? h.RedirectCode ?? h.redirectCode ?? 301),
-          waf_mode: h.waf_mode ?? h.WAFMode ?? h.wafMode ?? 'On',
-          ssl_cert_id: h.ssl_cert_id ?? h.SSLCertID ?? h.sslCertID ?? h.ssl_cert ?? '',
-          ssl_enabled: !!(h.ssl_enabled ?? h.SSLEnabled ?? h.sslEnabled ?? false),
-          proxy_ssl_verify_off: !!(h.proxy_ssl_verify_off ?? h.ProxySSLVerifyOff ?? false),
-          proxy_ssl_name: String(h.proxy_ssl_name ?? h.ProxySSLName ?? '').trim(),
-          listen_ipv6: !!(h.listen_ipv6 ?? h.ListenIPv6 ?? h.listenIpv6 ?? false),
-          redirect_http_to_https: !!(h.redirect_http_to_https ?? h.RedirectHTTPToHTTPS ?? h.redirectHttpToHttps ?? false),
-          hsts_enabled: !!(h.hsts_enabled ?? h.HSTSEnabled ?? h.hstsEnabled ?? false),
-          gzip_enabled: !!(h.gzip_enabled ?? h.GzipEnabled ?? h.gzipEnabled ?? false),
-          brotli_enabled: !!(h.brotli_enabled ?? h.BrotliEnabled ?? h.brotliEnabled ?? false),
-          security_overrides: this.normalizeSecurityOverrides(h.security_overrides ?? h.SecurityOverrides ?? {}),
-        };
-      },
-
-      get detailPretty() {
-        try {
-          return JSON.stringify(this.detailHost || {}, null, 2);
-        } catch (e) {
-          return String(this.detailHost || '');
-        }
-      },
-
-      get detailHasHttps() {
-        return (this.detailHost?.listen_ports || []).some(p => p.https);
-      },
-
-      get detailTargetText() {
-        const h = this.detailHost || {};
-        if (h.mode === 'redirect') {
-          const u = (h.redirect_url || '').trim();
-          return u ? ('→ ' + u) : '—';
-        }
-        if (h.mode === 'static') {
-          const r = (h.static_root || '').trim();
-          return r ? r : '—';
-        }
-        const up = (h.upstream_servers || []).filter(Boolean);
-        return up.length ? up.join(', ') : '—';
-      },
-
-      get detailLBText() {
-        const h = this.detailHost || {};
-        if (h.mode !== 'reverse_proxy' || !(h.upstream_servers || []).length || h.upstream_servers.length < 2) return '';
-        const a = h.lb_algorithm || 'round_robin';
-        if (a === 'least_conn') return 'Least connections';
-        if (a === 'ip_hash') return 'IP hash';
-        return 'Round robin';
-      },
-
-      get detailCertLine() {
-        const h = this.detailHost || {};
-        if (!this.detailHasHttps) return '—';
-        const line = this.certSummary(h);
-        if (line) return line;
-        if (h.ssl_cert_id) return h.ssl_cert_id;
-        return 'Belum memilih sertifikat';
-      },
-
-      tlsOptionLabel(c) {
-        const src = c.source === 'letsencrypt' ? 'LE' : 'custom';
-        return c.domain + ' (' + src + ')';
-      },
-
-      certSummary(host) {
-        if (!host.ssl_enabled) return '';
-        const c = (this.tlsCerts || []).find(x => x.id === host.ssl_cert_id);
-        if (!c) return host.ssl_cert_id || '';
-        return c.domain + ' · ' + (c.source === 'letsencrypt' ? 'LE' : 'custom');
-      },
-
-      refreshIcons() {
-        this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
-      },
-
-      setHostMode(m) {
-        this.form.mode = m.id;
-        if (m.id !== 'reverse_proxy') this.form.show_advanced_upstream_tls = false;
-        this.$nextTick(async () => {
-          if (window.lucide) lucide.createIcons();
-          if (this.form.mode === 'static') await this.loadStaticPage();
-        });
-      },
-
-      sanitizeDomainDir(domain) {
-        const d = (domain || '').toLowerCase().trim();
-        let out = '';
-        for (let i = 0; i < d.length; i++) {
-          const ch = d[i];
-          if (/[a-z0-9.-]/.test(ch)) out += ch;
-          else out += '_';
-        }
-        return out || 'host';
-      },
-
-      dashboardStaticRoot() {
-        return '/var/www/html/' + this.sanitizeDomainDir(this.form.domain);
-      },
-
-      setStaticSource(v) {
-        this.form.static_source = v;
-        if (v === 'dashboard') {
-          this.form.static_root = this.dashboardStaticRoot();
-        }
-        this.form.static_page_msg = '';
-        this.form.static_page_error = '';
-        this.$nextTick(async () => {
-          if (window.lucide) lucide.createIcons();
-          if (this.form.mode === 'static') await this.loadStaticPage();
-        });
-      },
-
-      async loadStaticPage() {
-        this.form.static_page_error = '';
-        if (this.form.mode !== 'static') return;
-        const dom = (this.form.domain || '').trim();
-        if (!dom) {
-          this.form.static_page_html = '';
-          return;
-        }
-        try {
-          const r = await fetch('/api/hosts/' + encodeURIComponent(dom) + '/static-page');
-          const d = await r.json().catch(() => ({}));
-          if (!r.ok) {
-            this.form.static_page_html = '';
-            if (r.status === 404 && !this.isEdit) {
-              this.form.static_page_error = '';
-              return;
-            }
-            this.form.static_page_error = d.error || ('HTTP ' + r.status);
-            return;
-          }
-          this.form.static_page_html = d.html != null ? d.html : '';
-        } catch (e) {
-          this.form.static_page_error = 'Gagal memuat index.html';
-        }
-        this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
-      },
-
-      async saveStaticPage() {
-        this.form.static_page_error = '';
-        this.form.static_page_msg = '';
-        const dom = (this.form.domain || '').trim();
-        if (!dom) {
-          this.form.static_page_error = 'Domain wajib diisi.';
-          return;
-        }
-        if ((this.form.static_source || 'manual') !== 'dashboard') return;
-        this.form.static_page_saving = true;
-        try {
-          const r = await fetch('/api/hosts/' + encodeURIComponent(dom) + '/static-page', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ html: this.form.static_page_html != null ? this.form.static_page_html : '' }),
-          });
-          const d = await r.json().catch(() => ({}));
-          if (!r.ok || !d.ok) {
-            this.form.static_page_error = d.error || ('HTTP ' + r.status);
-            this.form.static_page_saving = false;
-            return;
-          }
-          this.form.static_page_msg = 'index.html tersimpan.';
-        } catch (e) {
-          this.form.static_page_error = 'Gagal menyimpan.';
-        }
-        this.form.static_page_saving = false;
-        this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
-      },
-
-      async applyStaticTemplate(key) {
-        const allowed = ['minimal', 'maintenance', 'landing'];
-        if (!allowed.includes(key)) return;
-        this.form.static_page_msg = '';
-        this.form.static_page_error = '';
-        const q = this.assetVersion ? ('?v=' + encodeURIComponent(this.assetVersion)) : '';
-        const url = '/public/static-templates/' + key + '.html' + q;
-        try {
-          const r = await fetch(url);
-          if (!r.ok) {
-            this.form.static_page_error = 'Gagal memuat template.';
-            return;
-          }
-          this.form.static_page_html = await r.text();
-        } catch (e) {
-          this.form.static_page_error = 'Gagal memuat template.';
-        }
-        this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
-      },
-
-      addPort() {
-        this.form.listen_ports.push({
-          port: '',
-          https: false,
-          _key: 'lp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9),
-        });
-        this.refreshIcons();
-      },
-
-      removePort(idx) {
-        if (this.form.listen_ports.length > 1) {
-          this.form.listen_ports.splice(idx, 1);
-          this.refreshIcons();
-        }
-      },
-
-      addUpstream() {
-        this.form.upstream_servers.push('');
-        this.refreshIcons();
-      },
-
-      removeUpstream(idx) {
-        if (this.form.upstream_servers.length > 1) {
-          this.form.upstream_servers.splice(idx, 1);
-          this.refreshIcons();
-        }
-      },
-
-      async init() {
-        this.assetVersion = (this.$el && this.$el.dataset && this.$el.dataset.assetVersion) ? String(this.$el.dataset.assetVersion) : '';
-        await Promise.all([this.fetchHosts(), this.fetchTls()]);
-      },
-
-      async fetchTls() {
-        try {
-          const r = await fetch('/api/tls/certificates');
-          const d = await r.json();
-          this.tlsCerts = Array.isArray(d.certificates) ? d.certificates : [];
-        } catch (e) { this.tlsCerts = []; }
-      },
-
-      async fetchHosts() {
-        this.loading = true;
-        try {
-          const r = await fetch('/api/hosts');
-          const d = await r.json();
-          this.hosts = Array.isArray(d) ? d : [];
-        } catch (e) { this.hosts = []; }
-        this.loading = false;
-        this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
-      },
-
-      openAdd() {
-        this.fetchTls();
-        this.form = this.blank();
-        this.modalTab = 'general';
-        this.isEdit = false;
-        this.error = '';
-        this.showModal = true;
-        this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
-      },
-
-      openEdit(host) {
-        this.fetchTls();
-        const nh = this.normalizeHost(host);
-        if (!nh.domain) {
-          // Legacy/invalid host data: domain dibutuhkan untuk edit/update via API.
-          this.form = { ...this.blank(), ...nh, original_domain: nh.domain || '' };
-          this.isEdit = true;
-          this.error = 'Invalid host data: domain missing.';
-          this.showModal = true;
-          this.$nextTick(async () => {
-            if (window.lucide) lucide.createIcons();
-            if (this.form.mode === 'static') await this.loadStaticPage();
-          });
-          return;
-        }
-        this.form = {
-          ...this.blank(),
-          ...nh,
-          original_domain: nh.domain,
-          listen_ports: (nh.listen_ports && nh.listen_ports.length > 0)
-            ? nh.listen_ports.map(p => ({ ...p }))
-            : [{ port: 80, https: false, _key: 'lp-fallback' }],
-          upstream_servers: (nh.upstream_servers && nh.upstream_servers.length > 0)
-            ? [...nh.upstream_servers]
-            : [''],
-          ssl_cert_id: nh.ssl_cert_id || '',
-          redirect_code: nh.redirect_code || 301,
-          security_overrides: this.normalizeSecurityOverrides(nh.security_overrides || {}),
-          static_page_html: '',
-          static_page_error: '',
-          static_page_msg: '',
-          static_page_saving: false,
-        };
-        if ((this.form.proxy_ssl_verify_off || (this.form.proxy_ssl_name || '').trim()) && this.form.mode === 'reverse_proxy') {
-          this.form.show_advanced_upstream_tls = true;
-        }
-
-        const realIPMode = this.form?.security_overrides?.real_ip?.mode || 'inherit';
-        const needsTLSRealIP = (this.form.mode === 'reverse_proxy') && (
-          this.form.proxy_ssl_verify_off ||
-          (this.form.proxy_ssl_name || '').trim() ||
-          (realIPMode !== 'inherit')
-        );
-        this.modalTab = needsTLSRealIP ? 'tls_realip' : 'general';
-        this.isEdit = true;
-        this.error = '';
-        this.showModal = true;
-        this.$nextTick(async () => {
-          if (window.lucide) lucide.createIcons();
-          if (this.form.mode === 'static') await this.loadStaticPage();
-        });
-      },
-
-      async save() {
-        this.error = '';
-
-        if (!this.form.domain.trim()) { this.error = 'Domain is required.'; return; }
-
-        // Transport rules: Redirect/HSTS require both ports 80 and 443.
-        if (this.form.redirect_http_to_https || this.form.hsts_enabled) {
-          if (!Array.isArray(this.form.listen_ports)) this.form.listen_ports = [];
-
-          const has80 = this.form.listen_ports.some(p => Number(p.port) === 80 && !p.https);
-          if (!has80) {
-            this.form.listen_ports.push({
-              port: 80,
-              https: false,
-              _key: 'lp-force-80-' + Date.now(),
-            });
-          }
-
-          const has443 = this.form.listen_ports.some(p => Number(p.port) === 443 && !!p.https);
-          if (!has443) {
-            this.form.listen_ports.push({
-              port: 443,
-              https: true,
-              _key: 'lp-force-443-' + Date.now(),
-            });
-          }
-
-          // If HTTPS is enabled via port 443 but no cert chosen, try to auto-pick one.
-          if (!(this.form.ssl_cert_id || '').trim() && this.activeTlsCerts && this.activeTlsCerts.length > 0) {
-            this.form.ssl_cert_id = this.activeTlsCerts[0].id;
-          }
-        }
-
-        const ports = (this.form.listen_ports || []).filter(p => p.port);
-        if (ports.length === 0) { this.error = 'At least one listening port is required.'; return; }
-
-        if (this.hasHttpsPort() && !(this.form.ssl_cert_id || '').trim()) {
-          this.error = 'HTTPS port requires a TLS certificate. Select one or add on the SSL page.';
-          return;
-        }
-
-        if (this.form.mode === 'reverse_proxy') {
-          const servers = this.form.upstream_servers.map(s => s.trim()).filter(s => s);
-          if (servers.length === 0) { this.error = 'At least one upstream server is required.'; return; }
-        } else if (this.form.mode === 'static') {
-          const ss = (this.form.static_source || 'manual').toLowerCase();
-          if (ss === 'dashboard') {
-            this.form.static_root = this.dashboardStaticRoot();
-          } else if (!this.form.static_root.trim()) {
-            this.error = 'Document root is required for manual static mode.';
-            return;
-          }
-        } else if (this.form.mode === 'redirect') {
-          if (!this.form.redirect_url.trim()) { this.error = 'Redirect URL is required.'; return; }
-        }
-
-        const dom = this.form.domain.trim();
-        const orig = (this.form.original_domain || '').toString().trim();
-        const {
-          original_domain,
-          show_advanced_upstream_tls,
-          static_page_html,
-          static_page_error,
-          static_page_msg,
-          static_page_saving,
-          ...rest
-        } = this.form;
-        const payload = {
-          ...rest,
-          domain: dom,
-          listen_ports: ports.map(p => ({
-            port: parseInt(p.port, 10),
-            https: p.https
-          })),
-          upstream_servers: this.form.mode === 'reverse_proxy'
-            ? this.form.upstream_servers.map(s => s.trim()).filter(s => s)
-            : [],
-          ssl_enabled: this.hasHttpsPort(),
-          enabled: (this.form.enabled !== undefined) ? !!this.form.enabled : true,
-          security_overrides: this.normalizeSecurityOverrides(this.form.security_overrides || {}),
-          previous_domain: (this.isEdit && orig && orig !== dom) ? orig : '',
-        };
-
-        this.saving = true;
-        try {
-          const r = await fetch('/api/hosts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          const d = await r.json();
-          if (!d.ok) { this.error = d.error || 'Save failed.'; this.saving = false; return; }
-          this.showModal = false;
-          await this.fetchHosts();
-        } catch (e) { this.error = 'Network error. Try again.'; }
-        this.saving = false;
-      },
-
-      // Open custom delete confirm modal
-      confirmDelete(hostLikeOrDomain) {
-        this.deleteTarget = this.domainOf(hostLikeOrDomain);
-        this.deleteError = this.deleteTarget ? '' : 'Invalid host data: domain missing.';
-        this.deleting = false;
-        this.showDeleteModal = true;
-        this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
-      },
-
-      async openDetail(host) {
-        await this.fetchTls();
-        this.detailHost = this.normalizeHost(host);
-        this.showDetailModal = true;
-        this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
-      },
-
-      // Actual delete after confirmation
-      async doDelete() {
-        if (!this.deleteTarget) {
-          this.deleteError = 'Invalid host data: domain missing.';
-          return;
-        }
-        this.deleting = true;
-        this.deleteError = '';
-        try {
-          const r = await fetch('/api/hosts/' + encodeURIComponent(this.deleteTarget), { method: 'DELETE' });
-          const d = await r.json();
-          if (!d.ok) {
-            this.deleteError = d.error || 'Delete failed.';
-            this.deleting = false;
-            return;
-          }
-          this.showDeleteModal = false;
-          this.deleteTarget = '';
-          await this.fetchHosts();
-          this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
-        } catch (e) {
-          this.deleteError = 'Network error. Please try again.';
-        }
-        this.deleting = false;
-      }
-    }
-  }
-</script>
+<script src="/public/js/pages/hosts.js?v={{.AssetVersion}}"></script>
 {{end}}

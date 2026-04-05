@@ -81,7 +81,13 @@ func (app *App) renderLogin(w http.ResponseWriter, errMsg string) {
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return
 	}
-	data := struct{ Error string }{Error: errMsg}
+	data := struct {
+		Error        string
+		AssetVersion string
+	}{
+		Error:        errMsg,
+		AssetVersion: app.assetVersion,
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "private, no-cache, max-age=0, must-revalidate")
 	if err = t.ExecuteTemplate(w, "login", data); err != nil {

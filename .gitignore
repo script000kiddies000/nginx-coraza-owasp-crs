@@ -1,8 +1,9 @@
-# Cursor / IDE
+9# Cursor / IDE
 .cursor/
 
 # Local logs / runtime
 logs/*
+
 
 # Local baseline snapshot (pre-dashboard), not tracked
 old code/
@@ -27,7 +28,7 @@ flux-data/*
 ssl_certs/*
 !ssl_certs/.gitkeep
 
-
+dashboard/scripts/extract_page_scripts.py
 template/*
 config/conf.d/
 # Atau jika ingin spesifik:
