@@ -27,34 +27,35 @@ func WriteWPSecuritySnippet(cfg models.WPSecurityConfig) (path string, err error
 	b.WriteString(time.Now().UTC().Format(time.RFC3339))
 	b.WriteString("\n# Include inside server { }:  include ")
 	b.WriteString(path)
-	b.WriteString(";\n\n")
+	b.WriteString(";\n")
+	b.WriteString("# DEBUG CRS ONLY: semua directive WordPress hardening di-comment sementara.\n\n")
 
 	if cfg.HidePoweredBy {
-		b.WriteString("proxy_hide_header X-Powered-By;\n\n")
+		b.WriteString("# proxy_hide_header X-Powered-By;\n\n")
 	}
 
 	if cfg.RateLimitLogin {
 		b.WriteString("# /wp-login.php only — zone key empty for other URIs (see http{} map $flux_wp_login_key)\n")
-		b.WriteString("limit_req zone=flux_wp_login burst=5 nodelay;\n\n")
+		b.WriteString("# limit_req zone=flux_wp_login burst=5 nodelay;\n\n")
 	}
 
 	if cfg.BlockXMLRPC {
-		b.WriteString("location = /xmlrpc.php {\n    deny all;\n    return 444;\n}\n\n")
+		b.WriteString("# location = /xmlrpc.php {\n#     deny all;\n#     return 444;\n# }\n\n")
 	}
 	if cfg.BlockSensitiveFiles {
-		b.WriteString("location ~* /(wp-config\\.php|\\.env|\\.htaccess|\\.git) {\n    deny all;\n    return 404;\n}\n\n")
+		b.WriteString("# location ~* /(wp-config\\.php|\\.env|\\.htaccess|\\.git) {\n#     deny all;\n#     return 404;\n# }\n\n")
 	}
 	if cfg.BlockUploadsPHP {
-		b.WriteString("location ~* /wp-content/uploads/.*\\.php$ {\n    deny all;\n    return 403;\n}\n\n")
+		b.WriteString("# location ~* /wp-content/uploads/.*\\.php$ {\n#     deny all;\n#     return 403;\n# }\n\n")
 	}
 	if cfg.BlockAuthorEnum {
-		b.WriteString("if ($query_string ~* \"author=[0-9]+\") {\n    return 403;\n}\n\n")
+		b.WriteString("# if ($query_string ~* \"author=[0-9]+\") {\n#     return 403;\n# }\n\n")
 	}
 	if cfg.BlockScannerUA {
-		b.WriteString("if ($http_user_agent ~* \"(WPScan|sqlmap|nikto|nmap|masscan|ZmEu|w3af|dirbuster|nuclei)\") {\n    return 403;\n}\n\n")
+		b.WriteString("# if ($http_user_agent ~* \"(WPScan|sqlmap|nikto|nmap|masscan|ZmEu|w3af|dirbuster|nuclei)\") {\n#     return 403;\n# }\n\n")
 	}
 	if cfg.StripAssetVersion {
-		b.WriteString("location ~* \\.(css|js)$ {\n    if ($arg_ver ~* \"[0-9]+\\.[0-9]+\") {\n        rewrite ^(.*)$ $1? permanent;\n    }\n}\n\n")
+		b.WriteString("# location ~* \\.(css|js)$ {\n#     if ($arg_ver ~* \"[0-9]+\\.[0-9]+\") {\n#         rewrite ^(.*)$ $1? permanent;\n#     }\n# }\n\n")
 	}
 
 	if cfg.RemindFileEdit {

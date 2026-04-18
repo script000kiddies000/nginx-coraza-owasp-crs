@@ -226,7 +226,8 @@ server {
     coraza {{if eq .WAFMode "Off"}}off{{else}}on{{end}};
     coraza_rules_file /etc/nginx/coraza/coraza.conf;
 
-    include /etc/nginx/snippets/hide-backend-headers.conf;
+    # DEBUG CRS ONLY: nonaktifkan fitur tambahan header hardening.
+    # include /etc/nginx/snippets/hide-backend-headers.conf;
 
     location = /favicon.ico {
         access_log off;
@@ -252,9 +253,11 @@ server {
         root             /etc/nginx;
         add_header       Cache-Control "no-store" always;
         add_header       X-Request-ID  $request_id always;
-        add_header       X-Flux-Block-Reason $flux_block_reason_display always;
+        # DEBUG CRS ONLY: nonaktifkan header reason tambahan.
+        # add_header       X-Flux-Block-Reason $flux_block_reason_display always;
         sub_filter       '__REQUEST_ID__' $request_id;
-        sub_filter       '__FLUX_BLOCK_REASON__' $flux_block_reason_display;
+        # DEBUG CRS ONLY: nonaktifkan placeholder reason tambahan.
+        # sub_filter       '__FLUX_BLOCK_REASON__' $flux_block_reason_display;
         sub_filter_once  on;
     }
 {{if eq .Mode "redirect"}}
@@ -285,23 +288,22 @@ server {
     }
 {{- end}}
 
-    # Static assets: bypass WAF for performance + avoid connector edge cases
-    # (browser loads many assets in parallel; inspecting every JS/CSS/WOFF adds overhead).
-    location ~* \.(?:css|js|map|png|jpe?g|gif|svg|ico|woff2?|ttf|eot)$ {
-        include /etc/nginx/snippets/static-assets-bypass.conf;
-        proxy_intercept_errors on;
-        proxy_pass         {{if .UpstreamHTTPS}}https{{else}}http{{end}}://{{upstreamName .Domain}};
+    # DEBUG CRS ONLY: nonaktifkan static-assets bypass agar request asset tetap lewat Coraza/CRS.
+    # location ~* \.(?:css|js|map|png|jpe?g|gif|svg|ico|woff2?|ttf|eot)$ {
+    #     include /etc/nginx/snippets/static-assets-bypass.conf;
+    #     proxy_intercept_errors on;
+    #     proxy_pass         {{if .UpstreamHTTPS}}https{{else}}http{{end}}://{{upstreamName .Domain}};
 {{- if .UpstreamHTTPS}}
-        proxy_ssl_server_name on;
+    #     proxy_ssl_server_name on;
 {{- if .ProxySSLName}}
-        proxy_ssl_name {{.ProxySSLName}};
+    #     proxy_ssl_name {{.ProxySSLName}};
 {{- end}}
 {{- if .ProxySSLVerifyOff}}
-        proxy_ssl_verify off;
+    #     proxy_ssl_verify off;
 {{- end}}
 {{- end}}
-        proxy_set_header   X-Request-ID    $request_id;
-    }
+    #     proxy_set_header   X-Request-ID    $request_id;
+    # }
 
     location / {
         proxy_intercept_errors on;

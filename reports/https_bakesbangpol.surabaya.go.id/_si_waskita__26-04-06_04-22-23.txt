@@ -1,0 +1,33 @@
+# Dirsearch started Mon Apr  6 04:23:03 2026 as: /usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u https://bakesbangpol.surabaya.go.id/si_waskita/
+
+404     6KB  https://bakesbangpol.surabaya.go.id/si_waskita/%2e%2e//google.com
+200   740B   https://bakesbangpol.surabaya.go.id/si_waskita/.htaccess
+302   430B   https://bakesbangpol.surabaya.go.id/si_waskita/admin    -> REDIRECTS TO: https://bakesbangpol.surabaya.go.id/si_waskita
+302   430B   https://bakesbangpol.surabaya.go.id/si_waskita/admin/    -> REDIRECTS TO: https://bakesbangpol.surabaya.go.id/si_waskita
+301   178B   https://bakesbangpol.surabaya.go.id/si_waskita/css    -> REDIRECTS TO: https://bakesbangpol.surabaya.go.id/si_waskita/css/
+200     0B   https://bakesbangpol.surabaya.go.id/si_waskita/favicon.ico
+301   178B   https://bakesbangpol.surabaya.go.id/si_waskita/img    -> REDIRECTS TO: https://bakesbangpol.surabaya.go.id/si_waskita/img/
+200     6KB  https://bakesbangpol.surabaya.go.id/si_waskita/index.php
+405     2MB  https://bakesbangpol.surabaya.go.id/si_waskita/index.php/login/
+500     2MB  https://bakesbangpol.surabaya.go.id/si_waskita/json
+405     2MB  https://bakesbangpol.surabaya.go.id/si_waskita/login
+405     2MB  https://bakesbangpol.surabaya.go.id/si_waskita/login/
+405     2MB  https://bakesbangpol.surabaya.go.id/si_waskita/logout
+405     2MB  https://bakesbangpol.surabaya.go.id/si_waskita/logout/
+200    24B   https://bakesbangpol.surabaya.go.id/si_waskita/robots.txt
+403   564B   https://bakesbangpol.surabaya.go.id/si_waskita/storage/
+403     6KB  https://bakesbangpol.surabaya.go.id/si_waskita/storage/logs/laravel.log
+301   178B   https://bakesbangpol.surabaya.go.id/si_waskita/storage    -> REDIRECTS TO: https://bakesbangpol.surabaya.go.id/si_waskita/storage/
+302   430B   https://bakesbangpol.surabaya.go.id/si_waskita/user    -> REDIRECTS TO: https://bakesbangpol.surabaya.go.id/si_waskita
+302   430B   https://bakesbangpol.surabaya.go.id/si_waskita/user/    -> REDIRECTS TO: https://bakesbangpol.surabaya.go.id/si_waskita
+405     2MB  https://bakesbangpol.surabaya.go.id/si_waskita/user/3
+405     2MB  https://bakesbangpol.surabaya.go.id/si_waskita/user/2
+405     2MB  https://bakesbangpol.surabaya.go.id/si_waskita/user/1
+405     2MB  https://bakesbangpol.surabaya.go.id/si_waskita/user/admin
+405     2MB  https://bakesbangpol.surabaya.go.id/si_waskita/user/login.aspx
+405     2MB  https://bakesbangpol.surabaya.go.id/si_waskita/user/login.html
+405     2MB  https://bakesbangpol.surabaya.go.id/si_waskita/user/login.jsp
+405     2MB  https://bakesbangpol.surabaya.go.id/si_waskita/user/login.js
+405     2MB  https://bakesbangpol.surabaya.go.id/si_waskita/user/0
+405     2MB  https://bakesbangpol.surabaya.go.id/si_waskita/user/signup
+405     2MB  https://bakesbangpol.surabaya.go.id/si_waskita/user/login/
