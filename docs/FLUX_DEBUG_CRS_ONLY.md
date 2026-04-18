@@ -28,6 +28,7 @@ Modul lain (mis. `ngx_http_ssl_fingerprint` untuk JA3/JA4) tidak tercantum ekspl
 | `config/snippets/wafx-ja3-enforce.conf` | `return 403` berdasarkan map JA3/JA4. |
 | `config/snippets/flux-wp-managed.conf` | Snippet WP managed (deny, limit_req, dll.) — seluruh isi aktif di-comment. |
 | `config/snippets/wafx-wordpress-security.conf` | Snippet WP contoh WafX — seluruh blok deny/rate-limit di-comment. |
+| `config/snippets/flux-block-reason-stub.conf` | **Stub** `map` → `$flux_block_reason_display` agar nginx tidak `emerg` saat `flux-403-block-reason.conf` di-comment. |
 
 **Yang tidak disentuh (tetap ada):**
 
@@ -68,7 +69,7 @@ Modul lain (mis. `ngx_http_ssl_fingerprint` untuk JA3/JA4) tidak tercantum ekspl
 1. Uncomment `load_module ... geoip2 ...` jika pakai GeoIP.
 2. Uncomment `geoip2 { ... }` dan `include ... geoip-blocked-countries.conf` (pastikan `.mmdb` ada).
 3. Uncomment `wafx-ja3-map.conf` dan `wafx-ja4-map.conf` jika dipakai.
-4. Uncomment `flux-403-block-reason.conf` **setelah** map JA3/JA4 dan GeoIP (file ini punya komentar urutan include).
+4. Uncomment `flux-403-block-reason.conf` **setelah** map JA3/JA4 dan GeoIP (file ini punya komentar urutan include). **Sekaligus hapus atau comment** `include /etc/nginx/snippets/flux-block-reason-stub.conf` di `nginx.conf` (dua `map` ke `$flux_block_reason_display` akan bentrok).
 5. Uncomment `ip_rules.conf` jika threat intel ingin aktif.
 6. Uncomment `flux_json` **hanya jika** variabel di langkah 3–5 sudah konsisten (atau sederhanakan format log).
 7. Uncomment zone `limit_req` + `map $flux_wp_login_key` sebelum mengaktifkan kembali snippet WP yang memakai `limit_req`.
