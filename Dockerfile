@@ -176,9 +176,12 @@ FROM golang:1.25-bookworm AS builder-dashboard
 
 WORKDIR /build
 COPY dashboard/ .
-# Use alternative proxy to avoid proxy.golang.org DNS timeout in some environments.
-# Can override: --build-arg GOPROXY=https://proxy.golang.org,direct
-ARG GOPROXY=https://goproxy.io,direct
+# Go module proxy: default resmi Go + fallback direct (goproxy.io sering 502/down).
+# Override saat build jika perlu, misalnya:
+#   --build-arg GOPROXY=https://goproxy.cn,direct
+#   --build-arg GOPROXY=direct
+ARG GOPROXY=https://proxy.golang.org,direct
+ENV GOPROXY=$GOPROXY
 RUN go env -w GOPROXY=$GOPROXY
 # go mod tidy: download deps + buat go.sum jika belum ada
 RUN go mod tidy
